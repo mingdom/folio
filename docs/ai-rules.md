@@ -8,6 +8,8 @@ alwaysApply: true
   - Read [project-design.md](docs/project-design.md) to understand the codebase
   - Read [project-conventions.md](docs/project-conventions.md) to understand _how_ to write code for the codebase
 - Run `make lint` and `make test` after every change. `lint` in particular can be run very frequently.
+- When user starts a prompt with `QQ:` or `Question:`, just answer the question or prompt without producing code.
+- Prefer small testable steps, after each step give a summary to the user and summarize the next step
 
 ## Prohibited actions
 
