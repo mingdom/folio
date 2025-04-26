@@ -80,5 +80,5 @@ src/lab/portfolio.csv
 .executive.md
 private-data/*
 
-# Documentation folder (temporary exclusion)
-docs/
+# Local documentation folder
+.docs/

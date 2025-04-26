@@ -99,7 +99,7 @@ If you prefer to use Docker directly without Make:
 
 - **Port conflicts**: If port 8050 is already in use, modify the `PORT` environment variable in your `.env` file and update the port mapping in `docker-compose.yml`.
 
-- **Data source issues**: By default, the application uses yfinance as the data source. If you want to use FMP instead, you'll need to set the FMP_API_KEY in your `.env` file and change DATA_SOURCE to 'fmp'.
+- **Data source**: The application uses yfinance as the data source for stock data.
 
 - **Volume mounting**: If you're making changes to the code and want to see them reflected immediately, ensure the volumes in `docker-compose.yml` are correctly mapping your local directories.
 

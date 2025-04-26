@@ -2,8 +2,6 @@
 # TODO: this isn't being used yet. Please update the TODOs to individual sections below as you implement them
 
 app:
-  # Data source configuration
-  data_source: "yfinance"  # Options: "fmp", "yfinance"
 
   # Cache configuration
   cache:

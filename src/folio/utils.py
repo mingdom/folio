@@ -28,11 +28,8 @@ def load_config():
     return {}
 
 
-# Get configuration
-config = load_config()
-
 # Get the singleton data fetcher instance
-data_fetcher = get_data_fetcher(config=config)
+data_fetcher = get_data_fetcher()
 
 
 def get_beta(ticker: str, description: str = "") -> float:

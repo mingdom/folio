@@ -7,10 +7,7 @@ This module provides core functionality for portfolio analysis, including:
 - Portfolio metrics and summary calculations
 """
 
-import os
-
 import pandas as pd
-import yaml
 
 from src.stockdata import get_data_fetcher
 
@@ -33,18 +30,8 @@ from .portfolio_value import (
 )
 from .utils import clean_currency_value, get_beta
 
-# Load configuration
-config_path = os.path.join(os.path.dirname(__file__), "folio.yaml")
-config = {}
-if os.path.exists(config_path):
-    try:
-        with open(config_path) as f:
-            config = yaml.safe_load(f) or {}
-    except Exception as e:
-        logger.warning(f"Failed to load folio.yaml: {e}. Using default configuration.")
-
 # Get the singleton data fetcher instance
-data_fetcher = get_data_fetcher(config=config)
+data_fetcher = get_data_fetcher()
 
 
 def process_portfolio_data(

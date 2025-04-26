@@ -17,20 +17,19 @@ Folio is a powerful web-based dashboard for analyzing and optimizing your invest
 
 - **Complete Portfolio Visibility**: See your entire financial picture in one place
 - **Smart Risk Assessment**: Understand your portfolio's risk profile with beta analysis
-- **AI-Powered Insights**: Get personalized investment advice from our AI portfolio advisor
 - **Cash & Equivalents Detection**: Automatically identifies money market and cash-like positions
-- **Option Analytics**: Detailed metrics for options including implied volatility and Greeks
+- **Option Analytics**: Detailed metrics for options including delta exposure and notional value
 - **Zero Cost**: Free to use, with no hidden fees or subscriptions
 
 ## Key Features
 
 - **Portfolio Summary**: View total exposure, beta, and allocation breakdown
 - **Position Details**: Analyze individual positions with detailed metrics
-- **AI Portfolio Advisor**: Get personalized investment advice powered by Google's Gemini AI
+- **Position Grouping**: Automatically groups stocks with their related options
+- **P&L Visualization**: See potential profit/loss scenarios for option strategies
 - **Filtering & Sorting**: Filter by position type and sort by various metrics
 - **Real-time Data**: Uses Yahoo Finance API for up-to-date market data
 - **Responsive Design**: Works seamlessly on desktop and mobile devices
-- **Dark Mode**: Easy on the eyes for late-night financial analysis
 
 ## Getting Started
 
@@ -99,12 +98,14 @@ For more Docker commands and options, see [DOCKER.md](DOCKER.md).
 
 For information about logging configuration, see [docs/logging.md](docs/logging.md).
 
+For a detailed explanation of the project architecture, see [docs/project-design.md](docs/project-design.md).
+
 ## Using Folio
 
 1. **Upload Your Portfolio**: Use the upload button to import a CSV file with your holdings
 2. **Explore Your Data**: View summary metrics and detailed breakdowns of your investments
 3. **Filter and Sort**: Focus on specific asset types or metrics that matter to you
-4. **Get AI Insights**: Click the "Robot Advisor" button to get personalized advice about your portfolio
+4. **Analyze Positions**: Click on any position to see detailed metrics and P&L scenarios
 5. **Export or Share**: Save your analysis or share insights with your financial advisor
 
 ## Sample Portfolio

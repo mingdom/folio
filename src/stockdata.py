@@ -59,21 +59,17 @@ class DataFetcherInterface(ABC):
         pass
 
 
-def create_data_fetcher(source="yfinance", cache_dir=None):
+def create_data_fetcher(cache_dir=None):
     """
-    Factory function to create the appropriate data fetcher.
+    Factory function to create a YFinance data fetcher.
 
     Args:
-        source (str): Data source to use ('yfinance' or 'fmp')
         cache_dir (str, optional): Cache directory. If None, uses default.
 
     Returns:
-        DataFetcherInterface: An instance of the appropriate data fetcher
-
-    Raises:
-        ValueError: If the specified source is not supported
+        DataFetcherInterface: An instance of YFinanceDataFetcher
     """
-    # Set default cache directories based on data source and environment
+    # Set default cache directory based on environment
     # In Hugging Face Spaces, use /tmp for cache
     is_huggingface = (
         os.environ.get("HF_SPACE") == "1" or os.environ.get("SPACE_ID") is not None
@@ -82,23 +78,15 @@ def create_data_fetcher(source="yfinance", cache_dir=None):
     if cache_dir is None:
         if is_huggingface:
             # Use /tmp directory for Hugging Face
-            cache_dir = "/tmp/cache_yf" if source == "yfinance" else "/tmp/cache_fmp"
+            cache_dir = "/tmp/cache_yf"
         else:
             # Use local directory for other environments
-            cache_dir = ".cache_yf" if source == "yfinance" else ".cache_fmp"
+            cache_dir = ".cache_yf"
 
-    if source == "yfinance":
-        from src.yfinance import YFinanceDataFetcher
+    from src.yfinance import YFinanceDataFetcher
 
-        logger.info(f"Creating YFinance data fetcher with cache dir: {cache_dir}")
-        return YFinanceDataFetcher(cache_dir=cache_dir)
-    elif source == "fmp":
-        from src.fmp import DataFetcher
-
-        logger.info(f"Creating FMP data fetcher with cache dir: {cache_dir}")
-        return DataFetcher(cache_dir=cache_dir)
-    else:
-        raise ValueError(f"Unknown data source: {source}")
+    logger.info(f"Creating YFinance data fetcher with cache dir: {cache_dir}")
+    return YFinanceDataFetcher(cache_dir=cache_dir)
 
 
 # Singleton data fetcher class
@@ -106,9 +94,10 @@ class DataFetcherSingleton:
     """Singleton class for data fetcher."""
 
     _instance = None
+    _initialized = False
 
     @classmethod
-    def get_instance(cls, source=None, cache_dir=None, config=None):
+    def get_instance(cls, cache_dir=None):
         """
         Get the singleton instance of the data fetcher.
 
@@ -116,11 +105,7 @@ class DataFetcherSingleton:
         the application, preventing duplicate initialization.
 
         Args:
-            source (str, optional): Data source to use ('yfinance' or 'fmp').
-                If None, uses the value from config or defaults to 'yfinance'.
             cache_dir (str, optional): Cache directory. If None, uses default.
-            config (dict, optional): Configuration dictionary. If provided,
-                used to determine the data source if source is None.
 
         Returns:
             DataFetcherInterface: The singleton data fetcher instance.
@@ -131,22 +116,16 @@ class DataFetcherSingleton:
         if cls._instance is not None:
             return cls._instance
 
-        # Determine the data source
-        if source is None:
-            if config is not None:
-                source = config.get("app", {}).get("data_source", "yfinance")
-            else:
-                source = "yfinance"
-
         try:
-            logger.info(f"Using data source: {source}")
-            cls._instance = create_data_fetcher(source=source, cache_dir=cache_dir)
+            logger.info("Initializing YFinance data fetcher")
+            cls._instance = create_data_fetcher(cache_dir=cache_dir)
 
             if cls._instance is None:
                 raise RuntimeError(
                     "Data fetcher initialization failed but didn't raise an exception"
                 )
 
+            cls._initialized = True
             return cls._instance
         except ValueError as e:
             logger.error(f"Failed to initialize data fetcher: {e}")
@@ -157,7 +136,7 @@ class DataFetcherSingleton:
 
 
 # Convenience function to maintain backward compatibility
-def get_data_fetcher(source=None, cache_dir=None, config=None):
+def get_data_fetcher(cache_dir=None, **kwargs):
     """
     Get the singleton instance of the data fetcher.
 
@@ -165,16 +144,13 @@ def get_data_fetcher(source=None, cache_dir=None, config=None):
     for backward compatibility.
 
     Args:
-        source (str, optional): Data source to use ('yfinance' or 'fmp').
-            If None, uses the value from config or defaults to 'yfinance'.
         cache_dir (str, optional): Cache directory. If None, uses default.
-        config (dict, optional): Configuration dictionary. If provided,
-            used to determine the data source if source is None.
+        **kwargs: Additional arguments that are ignored (for backward compatibility)
 
     Returns:
         DataFetcherInterface: The singleton data fetcher instance.
     """
-    return DataFetcherSingleton.get_instance(source, cache_dir, config)
+    return DataFetcherSingleton.get_instance(cache_dir)
 
 
 # Cache management functions
