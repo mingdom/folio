@@ -43,25 +43,28 @@ def help_command(args: list[str], state: dict[str, Any], console):  # noqa: ARG0
 
         if command == "simulate":
             console.print(
-                "  [green]simulate spy[/green] - Run a simulation with default parameters"
+                "  [green]simulate[/green] - Run a simulation with default parameters (SPY benchmark)"
             )
             console.print(
-                "  [green]simulate spy --range 10 --steps 21[/green] - Run a simulation with ±10% range and 21 steps"
+                "  [green]simulate --range 10 --steps 21[/green] - Run a simulation with ±10% range and 21 steps"
             )
             console.print(
-                "  [green]simulate spy --focus SPY,AAPL[/green] - Run a simulation focusing on specific tickers"
+                "  [green]simulate --focus SPY,AAPL[/green] - Run a simulation focusing on specific tickers"
             )
             console.print(
-                "  [green]simulate spy --detailed[/green] - Run a simulation with detailed position analysis"
+                "  [green]simulate --detailed[/green] - Run a simulation with detailed position analysis"
             )
             console.print(
-                "  [green]simulate spy --preset detailed[/green] - Run a simulation using a saved preset"
+                "  [green]simulate --preset detailed[/green] - Run a simulation using a saved preset"
             )
             console.print(
-                "  [green]simulate spy --save-preset my_preset[/green] - Save current parameters as a preset"
+                "  [green]simulate --save-preset my_preset[/green] - Save current parameters as a preset"
             )
             console.print(
-                "  [green]simulate spy --filter options[/green] - Run a simulation only on positions with options"
+                "  [green]simulate --filter options[/green] - Run a simulation only on positions with options"
+            )
+            console.print(
+                "  [green]simulate spy[/green] - Explicitly specify SPY benchmark (same as 'simulate')"
             )
 
         elif command == "position":
@@ -82,6 +85,9 @@ def help_command(args: list[str], state: dict[str, Any], console):  # noqa: ARG0
             )
 
         elif command == "portfolio":
+            console.print(
+                "  [green]portfolio[/green] - Show a summary of the portfolio (same as 'portfolio summary')"
+            )
             console.print(
                 "  [green]portfolio summary[/green] - Show a summary of the portfolio"
             )

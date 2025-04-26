@@ -23,11 +23,8 @@ def portfolio_command(args: list[str], state: dict[str, Any], console):
     """
     # Check if we have a subcommand
     if not args:
-        console.print(
-            "[bold yellow]Usage:[/bold yellow] portfolio <subcommand> [options]"
-        )
-        console.print("Available subcommands: list, summary, load")
-        console.print("Type 'help portfolio' for more information.")
+        # Default to summary if no subcommand is specified
+        portfolio_summary([], state, console)
         return
 
     subcommand = args[0].lower()

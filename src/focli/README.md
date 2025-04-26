@@ -33,9 +33,9 @@ portfolio load <path>
 Load your portfolio data from a CSV file. This is typically the first command you'll run to begin your analysis session.
 
 ```
-portfolio summary
+portfolio
 ```
-Get a high-level overview of your portfolio, including total value, exposure breakdown, and key risk metrics. This helps you understand your overall positioning at a glance.
+Get a high-level overview of your portfolio, including total value, exposure breakdown, and key risk metrics. This helps you understand your overall positioning at a glance. (Same as `portfolio summary`)
 
 ```
 portfolio list [options]
@@ -50,7 +50,7 @@ View all positions in your portfolio with filtering and sorting options:
 ### Simulation
 
 ```
-simulate spy [options]
+simulate [options]
 ```
 See how your portfolio might perform across different market scenarios:
 - `--range 20` - Set the range of market movement to analyze (±20%)
@@ -96,14 +96,14 @@ Exit the application.
 
 ```
 folio> portfolio load private-data/portfolio-private.csv
-folio> portfolio summary
-folio> simulate spy --range 15 --steps 11
+folio> portfolio
+folio> simulate --range 15 --steps 11
 folio> position SPY risk
 folio> position AAPL simulate --range 20
 folio> portfolio list --options --sort value
 ```
 
-This workflow gives you a complete picture of your portfolio's risk profile and behavior in different market conditions, focusing on the positions that matter most.
+This workflow gives you a complete picture of your portfolio's risk profile and behavior in different market conditions, focusing on the positions that matter most. Notice how commands use sensible defaults, making the interface more intuitive and requiring fewer keystrokes for common operations.
 
 ## Getting Help
 

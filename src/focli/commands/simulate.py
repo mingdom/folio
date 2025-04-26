@@ -26,27 +26,28 @@ def simulate_command(args: list[str], state: dict[str, Any], console):
         console.print("Use 'portfolio load <path>' to load a portfolio.")
         return
 
-    # Check if we have a subcommand
+    # Check if we have a subcommand or arguments
     if not args:
-        console.print(
-            "[bold yellow]Usage:[/bold yellow] simulate <subcommand> [options]"
-        )
-        console.print("Available subcommands: spy, scenario")
-        console.print("Type 'help simulate' for more information.")
+        # Default to SPY simulation with default parameters
+        simulate_spy([], state, console)
         return
 
-    subcommand = args[0].lower()
-    subcommand_args = args[1:]
+    # Check if the first argument is a subcommand
+    first_arg = args[0].lower()
+    if first_arg in ["spy", "scenario"]:
+        # It's a subcommand
+        subcommand = first_arg
+        subcommand_args = args[1:]
 
-    if subcommand == "spy":
-        simulate_spy(subcommand_args, state, console)
-    elif subcommand == "scenario":
-        console.print(
-            "[bold yellow]Note:[/bold yellow] Scenario simulation is not yet implemented."
-        )
+        if subcommand == "spy":
+            simulate_spy(subcommand_args, state, console)
+        elif subcommand == "scenario":
+            console.print(
+                "[bold yellow]Note:[/bold yellow] Scenario simulation is not yet implemented."
+            )
     else:
-        console.print(f"[bold red]Unknown subcommand:[/bold red] {subcommand}")
-        console.print("Available subcommands: spy, scenario")
+        # No subcommand specified, assume SPY simulation with the provided arguments
+        simulate_spy(args, state, console)
 
 
 def simulate_spy(args: list[str], state: dict[str, Any], console):
