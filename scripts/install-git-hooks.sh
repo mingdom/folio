@@ -1,23 +1,16 @@
 #!/bin/bash
 
-# Script to install git hooks
+# Script to install git hooks using pre-commit
 
-HOOK_DIR=$(git rev-parse --git-dir)/hooks
-PROJECT_HOOK_DIR=scripts/git-hooks
+echo "Installing git hooks with pre-commit..."
 
-echo "Installing git hooks..."
+# Check if Poetry is installed
+if ! command -v poetry &> /dev/null; then
+    echo "Poetry not found. Please install Poetry first."
+    exit 1
+fi
 
-# Make sure the hooks directory exists
-mkdir -p $HOOK_DIR
-
-# Copy each hook from the project hooks directory to the git hooks directory
-for hook in $PROJECT_HOOK_DIR/*; do
-    if [ -f "$hook" ]; then
-        hook_name=$(basename $hook)
-        echo "Installing $hook_name hook..."
-        cp "$hook" "$HOOK_DIR/$hook_name"
-        chmod +x "$HOOK_DIR/$hook_name"
-    fi
-done
+# Install pre-commit hooks
+poetry run pre-commit install
 
 echo "Git hooks installed successfully!"

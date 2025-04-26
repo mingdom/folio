@@ -1,3 +1,38 @@
+[tool.poetry]
+name = "folio"
+version = "0.1.0"
+description = "Portfolio analysis and visualization tools"
+authors = ["Dong Ming <d3ming@gmail.com>"]
+readme = "README.md"
+packages = [{include = "src"}]
+
+[tool.poetry.dependencies]
+python = "^3.9"  # Compatible with Python 3.9 and above
+pandas = "2.2.1"
+numpy = "1.26.4"
+quantlib = ">=1.30"
+requests = ">=2.32.0"
+pyyaml = "6.0.1"
+yfinance = ">=0.2.37"
+dash = ">=2.14.2"
+dash-bootstrap-components = ">=1.5.0"
+dash-bootstrap-templates = ">=1.1.1"
+gunicorn = ">=21.2.0"
+google-generativeai = ">=0.3.0"
+
+# The dev group includes both development tools (linting, testing)
+# and CLI tools (focli interactive shell)
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.11.7"
+pytest = "^8.3.5"
+rich = ">=13.9.0"
+prompt-toolkit = ">=3.0.43"
+pre-commit = "^4.2.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
 [tool.mypy]
 python_version = "3.11"
 warn_return_any = true

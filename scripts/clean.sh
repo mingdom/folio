@@ -24,4 +24,9 @@ rm -rf "$PROJECT_ROOT/models"/*.pkl
 echo "Removing cache files..."
 rm -rf "$PROJECT_ROOT/cache"/*
 
-echo "Cleanup complete!" 
+# Remove Poetry cache files
+echo "Removing Poetry cache files..."
+rm -rf "$PROJECT_ROOT/.pytest_cache"
+rm -rf "$PROJECT_ROOT/.ruff_cache"
+
+echo "Cleanup complete!"

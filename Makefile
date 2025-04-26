@@ -3,35 +3,24 @@
 # Variables
 SHELL := /bin/bash
 PYTHON := python3
-VENV_DIR := venv
 SCRIPTS_DIR := scripts
 LOGS_DIR := logs
-SRC_DIR := src.v2
 TIMESTAMP := $(shell date +%Y%m%d_%H%M%S)
 PORT := 5000
-HOOKS_DIR := scripts/git-hooks
+POETRY := poetry
 
 # Default target
 .PHONY: help
 help:
 	@echo "Available targets:"
 	@echo "  help        - Show this help message"
-	@echo "  env         - Set up and activate a virtual environment"
+	@echo "  env         - Set up Poetry and create a virtual environment"
 	@echo "  install     - Install dependencies and set script permissions"
 	@echo "  hooks       - Install git hooks for pre-commit checks"
-	@echo "  train       - Train the model (use --sample for training with sample data)"
-	@echo "  predict     - Run predictions using console app (usage: make predict [NVDA])"
-	@echo "  mlflow      - Start the MLflow UI to view training results (optional: make mlflow PORT=5001)"
 	@echo "  folio       - Start the portfolio dashboard with debug mode enabled"
 	@echo "               Options: portfolio=path/to/file.csv (use custom portfolio file)"
 	@echo "                        log=LEVEL (set logging level: DEBUG, INFO, WARNING, ERROR)"
-	@echo "  portfolio   - Start the portfolio dashboard with sample portfolio and debug mode"
-	@echo "               Options: log=LEVEL (set logging level: DEBUG, INFO, WARNING, ERROR)"
-	@echo "  simulator   - Run the SPY simulator to analyze portfolio behavior under different market conditions"
-	@echo "               Options: range=VALUE (SPY change range, default: 20.0)"
-	@echo "                        steps=VALUE (number of steps, default: 41)"
-	@echo "                        focus=TICKER (focus on specific ticker(s), comma-separated)"
-	@echo "                        detailed=1 (show detailed analysis for all positions)"
+
 	@echo "  focli       - Start the interactive Folio CLI shell for portfolio analysis"
 	@echo "  clean       - Clean up generated files and caches"
 	@echo "               Options: --cache (also clear data cache)"
@@ -39,6 +28,10 @@ help:
 	@echo "               Options: --fix (auto-fix linting issues)"
 	@echo "  test        - Run all unit tests in the tests directory"
 	@echo "  test-e2e    - Run end-to-end tests against real portfolio data"
+	@echo ""
+	@echo "Note: All targets now use Poetry under the hood for dependency management"
+	@echo ""
+	@echo "Docker targets:"
 	@echo "  docker-build - Build the Docker image"
 	@echo "  docker-run   - Run the Docker container"
 	@echo "  docker-up    - Start the application with docker-compose"
@@ -49,26 +42,30 @@ help:
 # Set up virtual environment
 .PHONY: env
 env:
-	@echo "Setting up virtual environment..."
-	@bash $(SCRIPTS_DIR)/setup-venv.sh
-	@echo "Activating virtual environment..."
-	@echo "NOTE: To use the virtual environment in your current shell, run: source activate-venv.sh"
+	@echo "Setting up virtual environment with Poetry..."
+	@if ! command -v $(POETRY) &> /dev/null; then \
+		echo "Poetry not found. Installing..."; \
+		curl -sSL https://install.python-poetry.org | $(PYTHON) -; \
+	fi
+	@$(POETRY) config virtualenvs.in-project true
+	@echo "Creating Poetry virtual environment..."
+	@$(POETRY) env use $(PYTHON)
+	@echo "Virtual environment created successfully."
+	@echo "NOTE: To activate the virtual environment in your current shell, run: poetry shell"
 	@echo "The virtual environment will be automatically activated for all make commands."
 
 # Install dependencies
 .PHONY: install
 install:
 	@echo "Installing dependencies..."
-	@if [ ! -d "$(VENV_DIR)" ]; then \
-		echo "Virtual environment not found. Please run 'make env' first."; \
+	@if ! command -v $(POETRY) &> /dev/null; then \
+		echo "Poetry not found. Please run 'make env' first."; \
 		exit 1; \
 	fi
 	@mkdir -p $(LOGS_DIR)
 	@(echo "=== Installation Log $(TIMESTAMP) ===" && \
 	echo "Starting installation at: $$(date)" && \
-	(source $(VENV_DIR)/bin/activate && \
-	$(PYTHON) -m pip install --upgrade pip && \
-	bash $(SCRIPTS_DIR)/install-reqs.sh) 2>&1 && \
+	$(POETRY) install && \
 	echo "Setting script permissions..." && \
 	chmod +x $(SCRIPTS_DIR)/*.sh && \
 	chmod +x $(SCRIPTS_DIR)/*.py && \
@@ -79,38 +76,15 @@ install:
 # Install git hooks
 .PHONY: hooks
 hooks:
-	@echo "Installing git hooks..."
-	@chmod +x $(SCRIPTS_DIR)/install-git-hooks.sh
-	@$(SCRIPTS_DIR)/install-git-hooks.sh
-
-# Train the model
-.PHONY: train
-train:
-	@echo "Training the model..."
-	@source $(VENV_DIR)/bin/activate && \
-	PYTHONPATH=. $(PYTHON) -m $(SRC_DIR).train $(if $(findstring --sample,$(MAKECMDGOALS)),--force-sample,)
-
-# Run predictions
-.PHONY: predict
-predict:
-	@echo "Running predictions..."
-	@source $(VENV_DIR)/bin/activate && \
-	if [ -n "$(filter-out $@,$(MAKECMDGOALS))" ]; then \
-		TICKERS=$$(echo "$(filter-out $@,$(MAKECMDGOALS))" | tr ',' ' '); \
-		echo "Predicting for: $$TICKERS"; \
-		PYTHONPATH=. $(PYTHON) -m $(SRC_DIR).console_app --tickers $$TICKERS; \
-	else \
-		echo "Running predictions on watchlist..."; \
-		PYTHONPATH=. $(PYTHON) -m $(SRC_DIR).console_app; \
+	@echo "Installing git hooks with pre-commit..."
+	@if ! command -v $(POETRY) &> /dev/null; then \
+		echo "Poetry not found. Please run 'make env' first."; \
+		exit 1; \
 	fi
+	@$(POETRY) run pre-commit install
+	@echo "Git hooks installed successfully!"
 
-# Start the MLflow UI
-.PHONY: mlflow
-mlflow:
-	@echo "Starting MLflow UI on http://127.0.0.1:$(PORT)..."
-	@echo "Press Ctrl+C to stop the server."
-	@source $(VENV_DIR)/bin/activate && \
-	$(PYTHON) $(SCRIPTS_DIR)/run_mlflow.py $(if $(PORT),--port $(PORT),)
+
 
 # Clean up generated files
 .PHONY: clean
@@ -131,16 +105,14 @@ clean:
 .PHONY: lint
 lint:
 	@echo "Running linter (ruff)..."
-	@if [ ! -d "$(VENV_DIR)" ]; then \
-		echo "Virtual environment not found. Please run 'make env' first."; \
+	@if ! command -v $(POETRY) &> /dev/null; then \
+		echo "Poetry not found. Please run 'make env' first."; \
 		exit 1; \
 	fi
 	@mkdir -p $(LOGS_DIR)
 	@(echo "=== Code Check Log $(TIMESTAMP) ===" && \
 	echo "Starting checks at: $$(date)" && \
-	(source $(VENV_DIR)/bin/activate && \
-	echo "Running linter (ruff)..." && \
-	ruff check --fix --unsafe-fixes .) \
+	$(POETRY) run ruff check --fix --unsafe-fixes . \
 	2>&1) | tee $(LOGS_DIR)/code_check_latest.log
 	@echo "Check log saved to: $(LOGS_DIR)/code_check_latest.log"
 
@@ -148,40 +120,22 @@ lint:
 .PHONY: --fix
 --fix:
 
-# Lab Projects
-.PHONY: portfolio folio stop-folio port simulator focli
+# Portfolio and CLI Projects
+.PHONY: folio stop-folio port focli
+
+# Poetry is used under the hood for all targets
 
 # Docker targets
 .PHONY: docker-build docker-run docker-up docker-down docker-logs docker-compose-up docker-compose-down docker-test deploy-hf
 
-portfolio:
-	@echo "Starting portfolio dashboard with sample portfolio.csv and debug mode..."
-	@if [ ! -d "$(VENV_DIR)" ]; then \
-		echo "Virtual environment not found. Please run 'make env' first."; \
-		exit 1; \
-	fi
-	@source $(VENV_DIR)/bin/activate && \
-	LOG_LEVEL=$(if $(log),$(log),INFO) \
-	PYTHONPATH=. python3 -m src.folio.app --port 8051 --debug --portfolio src/folio/assets/sample-portfolio.csv
-
-port:
-	@echo "Running portfolio analysis..."
-	@if [ ! -d "$(VENV_DIR)" ]; then \
-		echo "Virtual environment not found. Please run 'make env' first."; \
-		exit 1; \
-	fi
-	@source $(VENV_DIR)/bin/activate && \
-	PYTHONPATH=. python3 src/lab/portfolio.py "$(if $(csv),$(csv),src/folio/assets/sample-portfolio.csv)"
-
 folio:
 	@echo "Starting portfolio dashboard with debug mode..."
-	@if [ ! -d "$(VENV_DIR)" ]; then \
-		echo "Virtual environment not found. Please run 'make env' first."; \
+	@if ! command -v $(POETRY) &> /dev/null; then \
+		echo "Poetry not found. Please run 'make env' first."; \
 		exit 1; \
 	fi
-	@source $(VENV_DIR)/bin/activate && \
-	LOG_LEVEL=$(if $(log),$(log),INFO) \
-	PYTHONPATH=. python3 -m src.folio.app --port 8051 --debug $(if $(portfolio),--portfolio $(portfolio),)
+	@LOG_LEVEL=$(if $(log),$(log),INFO) \
+	$(POETRY) run python -m src.folio.app --port 8051 --debug $(if $(portfolio),--portfolio $(portfolio),)
 
 stop-folio:
 	@echo "Stopping portfolio dashboard..."
@@ -197,43 +151,34 @@ stop-folio:
 		echo "No running folio processes found."; \
 	fi
 
-simulator:
-	@echo "Running SPY simulator..."
-	@if [ ! -d "$(VENV_DIR)" ]; then \
-		echo "Virtual environment not found. Please run 'make env' first."; \
-		exit 1; \
-	fi
-	@source $(VENV_DIR)/bin/activate && \
-	PYTHONPATH=. ./scripts/folio-simulator.py $(if $(range),--range $(range),) $(if $(steps),--steps $(steps),) $(if $(focus),--focus $(focus),) $(if $(detailed),--detailed,)
+
 
 focli:
 	@echo "Starting Folio CLI interactive shell..."
-	@if [ ! -d "$(VENV_DIR)" ]; then \
-		echo "Virtual environment not found. Please run 'make env' first."; \
+	@if ! command -v $(POETRY) &> /dev/null; then \
+		echo "Poetry not found. Please run 'make env' first."; \
 		exit 1; \
 	fi
-	@source $(VENV_DIR)/bin/activate && \
-	PYTHONPATH=. python scripts/focli.py
+	@$(POETRY) run python src/focli/focli.py
 
 # Test targets
 .PHONY: test test-e2e
 test:
 	@echo "Running unit tests..."
-	@if [ ! -d "$(VENV_DIR)" ]; then \
-		echo "Virtual environment not found. Please run 'make env' first."; \
+	@if ! command -v $(POETRY) &> /dev/null; then \
+		echo "Poetry not found. Please run 'make env' first."; \
 		exit 1; \
 	fi
 	@mkdir -p $(LOGS_DIR)
 	@(echo "=== Test Run Log $(TIMESTAMP) ===" && \
 	echo "Starting tests at: $$(date)" && \
-	(source $(VENV_DIR)/bin/activate && \
-	PYTHONPATH=. pytest tests/ -v) 2>&1) | tee $(LOGS_DIR)/test_latest.log
+	$(POETRY) run pytest tests/ -v 2>&1) | tee $(LOGS_DIR)/test_latest.log
 	@echo "Test log saved to: $(LOGS_DIR)/test_latest.log"
 
 test-e2e:
 	@echo "Running end-to-end tests..."
-	@if [ ! -d "$(VENV_DIR)" ]; then \
-		echo "Virtual environment not found. Please run 'make env' first."; \
+	@if ! command -v $(POETRY) &> /dev/null; then \
+		echo "Poetry not found. Please run 'make env' first."; \
 		exit 1; \
 	fi
 	@if [ ! -f "private-data/test/test-portfolio.csv" ]; then \
@@ -243,8 +188,7 @@ test-e2e:
 	@mkdir -p $(LOGS_DIR)
 	@(echo "=== E2E Test Run Log $(TIMESTAMP) ===" && \
 	echo "Starting E2E tests at: $$(date)" && \
-	(source $(VENV_DIR)/bin/activate && \
-	PYTHONPATH=. pytest tests/e2e/ -v) 2>&1) | tee $(LOGS_DIR)/test_e2e_latest.log
+	$(POETRY) run pytest tests/e2e/ -v 2>&1) | tee $(LOGS_DIR)/test_e2e_latest.log
 	@echo "E2E test log saved to: $(LOGS_DIR)/test_e2e_latest.log"
 
 # Docker commands
@@ -262,7 +206,7 @@ docker-up:
 	@echo "Starting with docker-compose..."
 	docker-compose up -d
 	@echo "Folio app launched successfully!"
-	@echo "Access the app at: http://localhost:8050"
+	@echo "Access the app at: http://localhost:8060"
 
 # Stop docker-compose services
 docker-down:

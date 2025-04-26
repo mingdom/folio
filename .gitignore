@@ -3,6 +3,12 @@ venv/
 env/
 ENV/
 .env
+.venv/
+.poetry/
+
+# Poetry
+poetry.lock.bak
+.python-version
 
 # Cache directories
 .cache*/

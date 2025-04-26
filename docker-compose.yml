@@ -1,8 +1,12 @@
 services:
   folio:
-    image: folio:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - INSTALL_DEV=false
     ports:
-      - "8050:8050"
+      - "8060:8050"
     environment:
       - PORT=8050
       - HF_SPACE=

@@ -1045,7 +1045,7 @@ def main():
         logger.info("\n\n🚀 Folio is running!")
         logger.info(f"📊 Access the dashboard at: http://localhost:{args.port}\n")
 
-    app.run_server(debug=args.debug, port=args.port, host=args.host)
+    app.run(debug=args.debug, port=args.port, host=args.host)
     return 0
 
 

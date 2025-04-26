@@ -17,21 +17,28 @@ ARG INSTALL_DEV=false
 
 # Install only the necessary system dependencies
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends gcc && \
+    apt-get install -y --no-install-recommends gcc curl && \
     rm -rf /var/lib/apt/lists/*
 
-# Copy requirements files
-COPY requirements.txt .
-COPY requirements-dev.txt .
+# Install Poetry
+ENV POETRY_HOME=/opt/poetry
+ENV POETRY_VIRTUALENVS_CREATE=false
+RUN curl -sSL https://install.python-poetry.org | python3 - && \
+    ln -s /opt/poetry/bin/poetry /usr/local/bin/poetry
 
-# Install required packages
-RUN pip install --no-cache-dir -r requirements.txt && \
-    if [ "$INSTALL_DEV" = "true" ]; then \
-    echo "Installing development dependencies..." && \
-    pip install --no-cache-dir -r requirements-dev.txt; \
+# Copy only what's needed for dependency installation
+COPY pyproject.toml poetry.lock* ./
+
+# Install dependencies with --no-root to skip installing the current project
+RUN if [ "$INSTALL_DEV" = "true" ]; then \
+    echo "Installing with development dependencies..." && \
+    poetry install --no-interaction --no-ansi --no-root; \
+    else \
+    echo "Installing without development dependencies..." && \
+    poetry install --no-interaction --no-ansi --only main --no-root; \
     fi
 
-# Copy all necessary application code
+# Copy only the application code
 COPY src ./src
 
 # Expose both ports (7860 for Hugging Face, 8050 for local)
@@ -39,4 +46,5 @@ EXPOSE 7860 8050
 
 # Run the application with Gunicorn for production deployment
 # The command will determine the correct port based on environment
+# Note: Huggingface must use port 7860
 CMD ["sh", "-c", "if [ -n \"$HF_SPACE\" ]; then PORT=7860; fi && gunicorn --bind 0.0.0.0:$PORT --workers 2 --timeout 60 src.folio.app:server"]

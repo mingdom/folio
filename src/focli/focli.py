@@ -6,7 +6,7 @@ This script provides an interactive shell for running portfolio simulations,
 analyzing positions, and exploring investment scenarios.
 
 Usage:
-    python scripts/focli.py
+    python src/focli/focli.py
 
 Commands:
     help                Show help information

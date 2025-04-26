@@ -40,65 +40,94 @@ The easiest way to try Folio is through our Hugging Face Spaces deployment:
 
 ### Local Installation
 
-1. Clone the repository:
+1. **Install Poetry**:
+   We use `poetry` under the hood to manage dependencies.
+   ```bash
+   # For macOS/Linux
+   curl -sSL https://install.python-poetry.org | python3 -
+
+   # For Windows
+   (Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | python -
+   ```
+   For detailed installation instructions, visit [Poetry's official documentation](https://python-poetry.org/docs/#installation).
+
+2. **Clone the repository**:
    ```bash
    git clone https://github.com/mingdom/folio.git
    cd folio
    ```
 
-2. Set up the environment and install dependencies:
+3. **Install dependencies**:
    ```bash
-   make env
+   # Using Poetry
+   poetry install
+   poetry env activate
+
+   # Using Make:
    make install
+   make env
    ```
 
-3. Run with sample portfolio:
-   ```bash
-   make portfolio
-   ```
-
-4. Or start with a blank slate:
+4. **Run the application**:
    ```bash
    make folio
    ```
 
-### Development Setup
+### Development Workflow
 
-1. Install development dependencies:
+Our project uses Poetry for dependency management and Make for convenient command shortcuts.
+
+1. **Set up pre-commit hooks**:
    ```bash
-   pip install -r requirements-dev.txt
+   make hooks
    ```
 
-2. Set up pre-commit hooks:
+2. **Common development commands**:
    ```bash
-   pre-commit install
-   ```
-
-3. Run linting and tests:
-   ```bash
+   # Run linting
    make lint
+
+   # Run tests
    make test
+
+   # Start the interactive CLI (includes SPY simulator functionality)
+   make focli
    ```
+
+3. **Working with Poetry's environment**:
+   ```bash
+   # Activate Poetry's shell (recommended for development)
+   poetry shell
+
+   # After activating, you can run commands directly:
+   python -m src.folio.app
+   pytest
+   ruff check .
+   ```
+
+For detailed Poetry commands and information, see [docs/Poetry.md](docs/Poetry.md).
 
 ### Docker Deployment
 
-1. Start the application with Docker:
-   ```bash
-   make docker-up
-   ```
+```bash
+# Start the application
+make docker-up
 
-2. Access the dashboard at http://localhost:8050
+# View logs
+make docker-logs
 
-3. View logs (if needed):
-   ```bash
-   make docker-logs
-   ```
+# Stop the application
+make docker-down
+```
 
-For more Docker commands and options, see [DOCKER.md](DOCKER.md).
+The dashboard will be available at http://localhost:8050
 
-For information about logging configuration, see [docs/logging.md](docs/logging.md).
+### Documentation
 
-For a detailed explanation of the project architecture, see [docs/project-design.md](docs/project-design.md).
+- [Docker Commands](DOCKER.md) - Detailed Docker usage
+- [Logging Configuration](docs/logging.md) - Configure logging
+- [Project Architecture](docs/project-design.md) - Codebase structure and design
+- [Poetry Commands](docs/Poetry.md) - Detailed Poetry usage
 
 ## Using Folio
 

@@ -11,7 +11,7 @@ To start Folio CLI, you can use one of these methods:
 make focli
 
 # Or directly with Python
-python scripts/focli.py
+python src/focli/focli.py
 ```
 
 This will launch the interactive shell where you can enter commands.
