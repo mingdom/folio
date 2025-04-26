@@ -136,7 +136,7 @@ class DataFetcherSingleton:
 
 
 # Convenience function to maintain backward compatibility
-def get_data_fetcher(cache_dir=None, **kwargs):
+def get_data_fetcher(cache_dir=None):
     """
     Get the singleton instance of the data fetcher.
 
@@ -145,7 +145,6 @@ def get_data_fetcher(cache_dir=None, **kwargs):
 
     Args:
         cache_dir (str, optional): Cache directory. If None, uses default.
-        **kwargs: Additional arguments that are ignored (for backward compatibility)
 
     Returns:
         DataFetcherInterface: The singleton data fetcher instance.

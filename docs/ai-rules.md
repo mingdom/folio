@@ -7,6 +7,7 @@ alwaysApply: true
 - Prior to generating any code, carefully read the project conventions
   - Read [project-design.md](docs/project-design.md) to understand the codebase
   - Read [project-conventions.md](docs/project-conventions.md) to understand _how_ to write code for the codebase
+- Run `make lint` and `make test` after every change. `lint` in particular can be run very frequently.
 
 ## Prohibited actions
 

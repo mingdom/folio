@@ -9,6 +9,7 @@ LOGS_DIR := logs
 SRC_DIR := src.v2
 TIMESTAMP := $(shell date +%Y%m%d_%H%M%S)
 PORT := 5000
+HOOKS_DIR := scripts/git-hooks
 
 # Default target
 .PHONY: help
@@ -17,6 +18,7 @@ help:
 	@echo "  help        - Show this help message"
 	@echo "  env         - Set up and activate a virtual environment"
 	@echo "  install     - Install dependencies and set script permissions"
+	@echo "  hooks       - Install git hooks for pre-commit checks"
 	@echo "  train       - Train the model (use --sample for training with sample data)"
 	@echo "  predict     - Run predictions using console app (usage: make predict [NVDA])"
 	@echo "  mlflow      - Start the MLflow UI to view training results (optional: make mlflow PORT=5001)"
@@ -71,6 +73,14 @@ install:
 	chmod +x $(SCRIPTS_DIR)/*.py && \
 	echo "Installation complete at: $$(date)") | tee $(LOGS_DIR)/install_$(TIMESTAMP).log
 	@echo "Installation log saved to: $(LOGS_DIR)/install_$(TIMESTAMP).log"
+	@echo "To install git hooks, run 'make hooks'"
+
+# Install git hooks
+.PHONY: hooks
+hooks:
+	@echo "Installing git hooks..."
+	@chmod +x $(SCRIPTS_DIR)/install-git-hooks.sh
+	@$(SCRIPTS_DIR)/install-git-hooks.sh
 
 # Train the model
 .PHONY: train
