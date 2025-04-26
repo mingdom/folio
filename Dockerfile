@@ -33,7 +33,6 @@ RUN pip install --no-cache-dir -r requirements.txt && \
 
 # Copy all necessary application code
 COPY src ./src
-COPY config ./config
 
 # Expose both ports (7860 for Hugging Face, 8050 for local)
 EXPOSE 7860 8050

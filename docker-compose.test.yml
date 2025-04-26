@@ -15,6 +15,5 @@ services:
     volumes:
       - ./src:/app/src
       - ./tests:/app/tests
-      - ./config:/app/config
       - ./.env:/app/.env
     command: pytest tests/ -v

@@ -280,7 +280,7 @@ deploy-hf:
 	@echo "Checking if Hugging Face Space remote exists..."
 	@if ! git remote | grep -q "space"; then \
 		echo "Adding Hugging Face Space remote..."; \
-		git remote add space git@huggingface.co:mingdom/folio; \
+		git remote add space git@hf.co:spaces/mingdom/folio; \
 	fi
 	@echo "Ensuring Git LFS is tracking .pkl files..."
 	@grep -q "*.pkl filter=lfs diff=lfs merge=lfs -text" .gitattributes || \
