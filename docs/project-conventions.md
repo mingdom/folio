@@ -11,9 +11,30 @@ This document outlines the key coding conventions for the Folio project. These c
 
 - **Web Framework**: Dash (Python)
 - **Data Processing**: Pandas, NumPy
-- **Financial Data**: Yahoo Finance API (default), FMP API (optional)
+- **Financial Data**: Yahoo Finance API
 - **Testing**: Pytest
-- **Linting**: Flake8, Black, isort
+- **Linting**: Ruff
+
+## Principles
+1. **Follow the Boy Scout Rule**: Leave the code cleaner than you found it.
+
+2. **Don't Repeat Yourself (DRY)**: Extract repeated code into reusable functions.
+
+3. **You Aren't Gonna Need It (YAGNI)**: Don't add functionality until it's necessary.
+
+4. **Optimize After Measuring**: Profile code to identify actual bottlenecks before optimizing.
+
+5. **Use Consistent Formatting**: Use Black, Flake8, and isort to maintain consistent code style.
+
+6. **Imports at Top**: Always place all imports at the top of the file.
+
+7. **No Unused Code**: Remove commented-out code and unused imports/variables.
+
+8. **Configuration Over Hardcoding**: Use configuration files for values that might change.
+
+9. **Log with Context**: Include relevant information in log messages.
+
+10. **Make Small, Focused Changes**: Don't modify unrelated code when implementing a feature or fixing a bug.
 
 ## Core Conventions
 
@@ -329,50 +350,29 @@ def is_valid_ticker(ticker: str) -> bool:
     )
 ```
 
-## Additional Guidelines
+### 11. Maintain Separation of Concerns
+Business logic MUST reside in the core library (`src/folio/`), not in interface layers (`src/focli/`).
+```python
+# ❌ Bad: Business logic in CLI layer
+# src/focli/utils.py
+def calculate_position_value_with_price_change(position_group, price_change):
+    # Business logic for calculating position value
+    return new_value
 
-1. **Strict Separation of Concerns**: Business logic MUST reside in the core library (`src/folio/`), not in interface layers (`src/focli/`).
-   ```python
-   # ❌ Bad: Business logic in CLI layer
-   # src/focli/utils.py
-   def calculate_position_value_with_price_change(position_group, price_change):
-       # Business logic for calculating position value
-       return new_value
+# ✅ Good: Business logic in core library
+# src/folio/portfolio_value.py
+def calculate_position_value_with_price_change(position_group, price_change):
+    # Business logic for calculating position value
+    return new_value
 
-   # ✅ Good: Business logic in core library
-   # src/folio/portfolio_value.py
-   def calculate_position_value_with_price_change(position_group, price_change):
-       # Business logic for calculating position value
-       return new_value
-
-   # src/focli/commands/position.py
-   def handle_position_command(args):
-       # Only handle user interaction and call core library
-       result = portfolio_value.calculate_position_value_with_price_change(
-           position_group, price_change
-       )
-       # Format and display result
-   ```
-
-2. **Follow the Boy Scout Rule**: Leave the code cleaner than you found it.
-
-3. **Don't Repeat Yourself (DRY)**: Extract repeated code into reusable functions.
-
-4. **You Aren't Gonna Need It (YAGNI)**: Don't add functionality until it's necessary.
-
-5. **Optimize After Measuring**: Profile code to identify actual bottlenecks before optimizing.
-
-6. **Use Consistent Formatting**: Use Black, Flake8, and isort to maintain consistent code style.
-
-7. **Imports at Top**: Always place all imports at the top of the file.
-
-8. **No Unused Code**: Remove commented-out code and unused imports/variables.
-
-9. **Configuration Over Hardcoding**: Use configuration files for values that might change.
-
-10. **Log with Context**: Include relevant information in log messages.
-
-11. **Make Small, Focused Changes**: Don't modify unrelated code when implementing a feature or fixing a bug.
+# src/focli/commands/position.py
+def handle_position_command(args):
+    # Only handle user interaction and call core library
+    result = portfolio_value.calculate_position_value_with_price_change(
+        position_group, price_change
+    )
+    # Format and display result
+```
 
 ## Benefits of Following These Conventions
 
