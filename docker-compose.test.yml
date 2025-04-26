@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  folio:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - INSTALL_DEV=true
+    environment:
+      - PYTHONPATH=/app
+      - DATA_SOURCE=yfinance
+      - LOG_LEVEL=DEBUG
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    volumes:
+      - ./src:/app/src
+      - ./tests:/app/tests
+      - ./config:/app/config
+      - ./.env:/app/.env
+    command: pytest tests/ -v

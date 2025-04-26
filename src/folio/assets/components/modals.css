@@ -1,0 +1,109 @@
+/* 
+ * Modal Styles
+ * This file defines styles for all modal components
+ */
+
+/* Modal container */
+.modal-content {
+  border: none;
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-lg);
+  background-color: var(--white);
+  overflow: hidden;
+}
+
+/* Modal header */
+.modal-header {
+  border-bottom: 1px solid var(--light-gray);
+  background: var(--gradient-light);
+  padding: var(--spacing-md) var(--spacing-lg);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.modal-title {
+  margin: 0;
+  font-weight: var(--font-weight-bold);
+  color: var(--black);
+}
+
+.modal-header .close {
+  padding: var(--spacing-sm);
+  margin: calc(-1 * var(--spacing-sm)) calc(-1 * var(--spacing-sm)) calc(-1 * var(--spacing-sm)) auto;
+  background-color: transparent;
+  border: 0;
+  font-size: 1.5rem;
+  color: var(--dark-gray);
+  opacity: 0.5;
+  transition: opacity var(--transition-fast);
+}
+
+.modal-header .close:hover {
+  opacity: 1;
+}
+
+/* Modal body */
+.modal-body {
+  padding: var(--spacing-lg);
+}
+
+/* Modal footer */
+.modal-footer {
+  border-top: 1px solid var(--light-gray);
+  padding: var(--spacing-md) var(--spacing-lg);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.modal-footer > * {
+  margin: 0 var(--spacing-xs);
+}
+
+/* Modal sizes */
+.modal-sm {
+  max-width: 300px;
+}
+
+.modal-lg {
+  max-width: 800px;
+}
+
+.modal-xl {
+  max-width: 1140px;
+}
+
+/* Position details modal */
+#position-modal .modal-body {
+  padding: var(--spacing-md);
+}
+
+#position-modal .table {
+  margin-bottom: 0;
+}
+
+/* P&L modal */
+#pnl-modal .modal-body {
+  padding: var(--spacing-md);
+}
+
+/* AI modal */
+#ai-modal .modal-body {
+  padding: var(--spacing-lg);
+}
+
+/* Modal backdrop */
+.modal-backdrop {
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+/* Modal animations */
+.modal.fade .modal-dialog {
+  transition: transform var(--transition-medium);
+  transform: translate(0, -50px);
+}
+
+.modal.show .modal-dialog {
+  transform: none;
+}

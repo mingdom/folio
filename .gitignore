@@ -1,0 +1,84 @@
+# Python virtual environments
+venv/
+env/
+ENV/
+.env
+
+# Cache directories
+.cache*/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Log files
+*.log
+logs/**
+mlruns/**
+
+# Local configuration
+.env*
+!.env.example
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Model files (optional, uncomment if you want to ignore model files)
+# models/*.pkl
+
+# Data files (optional, uncomment if you want to ignore data files)
+# data/
+
+# Test coverage
+.coverage
+htmlcov/
+coverage.xml
+.coverage.*
+
+# this is where we store the models
+models/
+.archive/
+
+# Temporary files
+.tmp/
+*.tmp
+*~
+*.bak
+
+# Lab private files
+src/lab/portfolio.csv
+**/portfolio.csv  # Ignore any portfolio.csv files in any directory
+
+# augment specific
+.augment/
+
+# latest AI generated commit message here
+.commit-msg.md
+
+# Personal notes file
+.executive.md
+private-data/*
+
+# Documentation folder (temporary exclusion)
+docs/

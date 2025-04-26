@@ -1,0 +1,17 @@
+services:
+  folio:
+    image: folio:latest
+    ports:
+      - "8050:8050"
+    environment:
+      - PORT=8050
+      - HF_SPACE=
+      - PYTHONPATH=/app
+      - DATA_SOURCE=yfinance
+      - LOG_LEVEL=INFO
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    volumes:
+      - ./config:/app/config
+      - ./data:/app/data
+      - ./.env:/app/.env
+    restart: unless-stopped

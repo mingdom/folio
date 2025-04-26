@@ -1,0 +1,110 @@
+/* 
+ * Form Styles
+ * This file defines styles for all form components
+ */
+
+/* Form controls */
+.form-control {
+  border-radius: var(--border-radius-sm);
+  border: var(--border-width) solid var(--medium-gray);
+  padding: var(--spacing-sm);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-base);
+  color: var(--black);
+  background-color: var(--white);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.form-control:focus {
+  box-shadow: 0 0 0 3px rgba(75, 0, 130, 0.2);
+  border-color: var(--primary-color);
+  outline: 0;
+}
+
+/* Form labels */
+.form-label {
+  font-weight: var(--font-weight-bold);
+  margin-bottom: var(--spacing-xs);
+  color: var(--black);
+}
+
+/* Form groups */
+.form-group {
+  margin-bottom: var(--spacing-md);
+}
+
+/* Input groups */
+.input-group {
+  display: flex;
+  position: relative;
+}
+
+.input-group .form-control {
+  position: relative;
+  flex: 1 1 auto;
+  width: 1%;
+  min-width: 0;
+}
+
+.input-group-text {
+  display: flex;
+  align-items: center;
+  padding: var(--spacing-sm);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-normal);
+  line-height: var(--line-height-base);
+  color: var(--dark-gray);
+  text-align: center;
+  white-space: nowrap;
+  background-color: var(--off-white);
+  border: var(--border-width) solid var(--medium-gray);
+  border-radius: var(--border-radius-sm);
+}
+
+/* Upload area */
+#upload-portfolio {
+  border: 2px dashed var(--primary-color);
+  background-color: rgba(75, 0, 130, 0.03);
+  border-radius: var(--border-radius-md);
+  padding: var(--spacing-lg);
+  text-align: center;
+  transition: all var(--transition-fast);
+  cursor: pointer;
+}
+
+#upload-portfolio:hover {
+  border-color: var(--primary-light);
+  background-color: rgba(75, 0, 130, 0.05);
+}
+
+/* Checkboxes and radios */
+.form-check {
+  display: block;
+  min-height: 1.5rem;
+  padding-left: 1.5rem;
+  margin-bottom: var(--spacing-sm);
+}
+
+.form-check-input {
+  width: 1rem;
+  height: 1rem;
+  margin-top: 0.25rem;
+  margin-left: -1.5rem;
+  background-color: var(--white);
+  border: var(--border-width) solid var(--medium-gray);
+}
+
+.form-check-input:checked {
+  background-color: var(--primary-color);
+  border-color: var(--primary-color);
+}
+
+.form-check-label {
+  margin-bottom: 0;
+}
+
+/* Textarea */
+textarea.form-control {
+  min-height: 100px;
+  resize: vertical;
+}

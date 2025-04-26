@@ -1,0 +1,158 @@
+/*
+ * Card Styles
+ * This file defines styles for all card components
+ */
+
+/* Base card styles */
+.card {
+  border: none;
+  border-radius: var(--border-radius-md);
+  box-shadow: var(--shadow-md);
+  background-color: var(--white);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+  margin-bottom: var(--spacing-md);
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+/* Card header */
+.card-header {
+  background: var(--gradient-light);
+  border-bottom: 1px solid var(--light-gray);
+  border-radius: var(--border-radius-md) var(--border-radius-md) 0 0 !important;
+  padding: var(--spacing-md);
+}
+
+/* Collapsible section headers - automatically applied to all collapsible sections */
+.card .card-header button span {
+  font-size: 1.5rem;
+  font-weight: 500;
+  margin-bottom: 0;
+  line-height: 1.2;
+}
+
+/* Card body */
+.card-body {
+  padding: var(--spacing-md);
+}
+
+/* Center the Portfolio Summary header */
+#summary-card .card-body>h4 {
+  text-align: center;
+}
+
+/* Card footer */
+.card-footer {
+  background-color: var(--off-white);
+  border-top: 1px solid var(--light-gray);
+  border-radius: 0 0 var(--border-radius-md) var(--border-radius-md);
+  padding: var(--spacing-md);
+}
+
+/* Card title and subtitle */
+.card-title {
+  font-weight: var(--font-weight-bold);
+  margin-bottom: var(--spacing-xs);
+  color: var(--black);
+}
+
+.card-subtitle {
+  color: var(--dark-gray);
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--spacing-sm);
+}
+
+/* Card text */
+.card-text {
+  color: var(--black);
+  margin-bottom: var(--spacing-md);
+}
+
+.card-text:last-child {
+  margin-bottom: 0;
+}
+
+/* Card with gradient border */
+.gradient-border {
+  position: relative;
+  border-radius: var(--border-radius-md);
+  padding: var(--spacing-lg);
+  margin-bottom: var(--spacing-lg);
+  background: var(--white);
+  box-shadow: var(--shadow-md);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.gradient-border::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: -1;
+  margin: -2px;
+  border-radius: inherit;
+  background: var(--gradient-primary);
+  pointer-events: none;
+}
+
+/* Metric cards */
+.metric-card {
+  background-color: var(--white);
+  border-radius: var(--border-radius-md);
+  padding: var(--spacing-md);
+  box-shadow: var(--shadow-sm);
+  text-align: center;
+  height: 100%;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.metric-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.metric-title {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  color: var(--dark-gray);
+  margin-bottom: var(--spacing-xs);
+}
+
+.metric-value {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  margin-bottom: var(--spacing-xs);
+}
+
+/* Chart cards */
+.chart-card {
+  border: none;
+  border-radius: var(--border-radius-md);
+  box-shadow: var(--shadow-md);
+  transition: all var(--transition-medium);
+  overflow: hidden;
+  background-color: var(--white);
+}
+
+.chart-card:hover {
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+}
+
+.chart-card .card-header {
+  background: var(--gradient-light);
+  border-bottom: 1px solid var(--light-gray);
+  padding: var(--spacing-md);
+  border-radius: var(--border-radius-md) var(--border-radius-md) 0 0 !important;
+}
+
+.chart-card .card-body {
+  padding: var(--spacing-md);
+  overflow: hidden;
+}

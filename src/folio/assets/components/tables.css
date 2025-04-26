@@ -1,0 +1,152 @@
+/*
+ * Table Styles
+ * This file defines styles for all table components
+ */
+
+/* Base table styles */
+.table {
+  width: 100% !important;
+  background-color: var(--white);
+  border-radius: var(--border-radius-md);
+  overflow: hidden;
+  border-collapse: separate;
+  border-spacing: 0;
+  margin-bottom: var(--spacing-lg);
+  table-layout: fixed !important;
+  /* Use fixed table layout for more predictable column widths */
+  box-sizing: border-box !important;
+}
+
+/* Table header */
+.table thead th {
+  background: var(--gradient-light);
+  border-bottom: 1px solid var(--light-gray);
+  font-weight: var(--font-weight-bold);
+  color: var(--black);
+  padding: var(--spacing-md);
+  text-align: left;
+  white-space: nowrap;
+  /* Prevent wrapping in headers */
+}
+
+/* Table body */
+.table tbody {
+  /* No border needed */
+}
+
+.table tbody tr {
+  transition: background-color var(--transition-fast);
+  width: 100% !important;
+  margin: 0 !important;
+  display: table-row !important;
+}
+
+.table tbody tr:hover {
+  background-color: rgba(75, 0, 130, 0.05);
+}
+
+.table tbody td {
+  padding: var(--spacing-md);
+  border-bottom: 1px solid var(--light-gray);
+  vertical-align: middle;
+  word-wrap: break-word;
+  /* Allow long text to wrap */
+  overflow-wrap: break-word;
+  white-space: normal;
+  /* Allow text to wrap */
+  box-sizing: border-box !important;
+}
+
+/* Sortable headers */
+.sort-header {
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--border-radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sort-header:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.sort-header i {
+  margin-left: var(--spacing-xs);
+  opacity: 0.5;
+}
+
+/* Portfolio table specific */
+.portfolio-table {
+  box-shadow: var(--shadow-md);
+  width: 100% !important;
+  border: 1px solid var(--light-gray);
+  border-radius: var(--border-radius-md);
+  overflow: hidden;
+  box-sizing: border-box !important;
+  table-layout: fixed !important;
+}
+
+.portfolio-table-container {
+  margin-bottom: var(--spacing-lg);
+  overflow-x: auto;
+  /* Add horizontal scrolling if needed */
+  padding: 0 var(--spacing-md);
+
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.position-row {
+  transition: background-color var(--transition-fast);
+  cursor: pointer;
+
+  width: 100% !important;
+  margin: 0 !important;
+}
+
+.position-row:hover {
+  background-color: rgba(75, 0, 130, 0.08) !important;
+}
+
+/* Ensure columns in portfolio table have proper spacing */
+.position-row>[class*="col-"],
+.g-0>[class*="col-"] {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.header-row {
+
+  width: 100% !important;
+  margin: 0 !important;
+}
+
+/* Responsive tables */
+@media (max-width: 768px) {
+  .table {
+    font-size: var(--font-size-sm);
+  }
+
+  .table thead th,
+  .table tbody td {
+    padding: var(--spacing-sm);
+  }
+}
+
+/* Tooltip behavior for portfolio table */
+.tooltip {
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+  z-index: var(--z-index-tooltip);
+}
+
+.tooltip.show {
+  opacity: 1;
+}
+
+/* Ensure only one tooltip is visible at a time */
+.position-row:not(:hover) .tooltip {
+  display: none !important;
+}

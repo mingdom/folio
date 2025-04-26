@@ -1,0 +1,163 @@
+/*
+ * Main CSS File
+ * This file imports all other CSS files and defines global styles
+ */
+
+/* Import theme variables */
+@import 'theme.css';
+
+/* Import layout styles */
+@import 'layout.css';
+
+/* Import component styles */
+@import 'components/buttons.css';
+@import 'components/cards.css';
+@import 'components/tables.css';
+@import 'components/forms.css';
+@import 'components/modals.css';
+@import 'components/charts.css';
+@import 'components/dash.css';
+@import 'components/ai.css';
+
+/* Base styles */
+body {
+  font-family: var(--font-family);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-base);
+  color: var(--black);
+  background-color: var(--off-white);
+  margin: 0;
+  padding: 0;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-weight: var(--font-weight-bold);
+  line-height: 1.2;
+  margin-top: 0;
+  margin-bottom: var(--spacing-md);
+  color: var(--black);
+}
+
+h1 {
+  font-size: 2.5rem;
+}
+
+h2 {
+  font-size: 2rem;
+}
+
+h3 {
+  font-size: 1.75rem;
+}
+
+h4 {
+  font-size: 1.5rem;
+}
+
+h5 {
+  font-size: 1.25rem;
+}
+
+h6 {
+  font-size: 1rem;
+}
+
+p {
+  margin-top: 0;
+  margin-bottom: var(--spacing-md);
+}
+
+a {
+  color: var(--primary-color);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+a:hover {
+  color: var(--primary-light);
+  text-decoration: underline;
+}
+
+/* Code and keyboard shortcuts */
+code,
+kbd,
+pre,
+samp {
+  font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.875em;
+}
+
+kbd {
+  display: inline-block;
+  padding: 0.2em 0.4em;
+  font-size: 0.85em;
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+  color: var(--white);
+  background-color: var(--black);
+  border-radius: var(--border-radius-sm);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.2);
+}
+
+/* Lists */
+ul,
+ol {
+  margin-top: 0;
+  margin-bottom: var(--spacing-md);
+  padding-left: var(--spacing-lg);
+}
+
+/* Images */
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Horizontal rule */
+hr {
+  margin: var(--spacing-md) 0;
+  border: 0;
+  border-top: 1px solid var(--light-gray);
+}
+
+/* Focus outline */
+:focus {
+  outline: 0;
+  box-shadow: 0 0 0 3px rgba(75, 0, 130, 0.25);
+}
+
+/* Selection */
+::selection {
+  background-color: var(--primary-color);
+  color: var(--white);
+}
+
+/* Scrollbar - Standard approach for Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--medium-gray) var(--off-white);
+}
+
+/* Scrollbar - For webkit browsers */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--off-white);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--medium-gray);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--dark-gray);
+}

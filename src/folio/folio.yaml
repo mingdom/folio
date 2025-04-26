@@ -1,0 +1,29 @@
+# Folio Application Configuration
+# TODO: this isn't being used yet. Please update the TODOs to individual sections below as you implement them
+
+app:
+  # Data source configuration
+  data_source: "yfinance"  # Options: "fmp", "yfinance"
+
+  # Cache configuration
+  cache:
+    ttl: 86400  # Cache time-to-live in seconds (1 day)
+
+  # Beta calculation configuration
+  beta:
+    period: "6m"  # Default period for beta calculations (6 months)
+
+  # UI configuration
+  ui:
+    theme: "default"
+    table_rows_per_page: 20
+
+  # Logging configuration
+  logging:
+    # Default log level if environment is not specified
+    level: "INFO"  # Options: "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"
+    file: "folio.log"
+    # Environment-specific log levels
+    environments:
+      local: "INFO"     # For local development (make folio)
+      production: "ERROR"  # For production deployment (including Hugging Face)

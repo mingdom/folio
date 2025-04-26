@@ -1,0 +1,75 @@
+/*
+ * Dash-specific Styles
+ * This file defines styles for Dash-specific components
+ */
+
+/* Loading spinner */
+._dash-loading {
+  background-color: rgba(255, 255, 255, 0.8) !important;
+}
+
+._dash-loading-callback {
+  border-color: var(--primary-color) !important;
+}
+
+/* Dash charts */
+.dash-chart {
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto !important;
+  min-height: 350px;
+  max-height: 450px;
+  overflow: visible !important;
+  /* Changed from hidden to visible */
+  border-radius: 0 0 var(--border-radius-md) var(--border-radius-md);
+  padding: var(--spacing-sm);
+  position: relative;
+  /* Ensure proper positioning */
+  display: block;
+  /* Force block display */
+}
+
+/* Ensure charts don't overflow but can still render properly */
+.js-plotly-plot,
+.plotly,
+.plot-container {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow: visible !important;
+  /* Changed from hidden to visible */
+  position: relative;
+  /* Ensure proper positioning */
+  display: block;
+  /* Force block display */
+}
+
+/* Force chart visibility */
+.dash-chart>div {
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* Prevent charts from capturing scroll events */
+.dash-chart .plotly,
+.dash-chart .js-plotly-plot,
+.dash-chart .plot-container {
+  pointer-events: auto !important;
+  /* Allow clicks but not scroll */
+}
+
+/* Only allow pointer events on specific interactive elements */
+.dash-chart .drag,
+.dash-chart .zoom,
+.dash-chart .pan,
+.dash-chart .select,
+.dash-chart .lasso {
+  pointer-events: auto !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .dash-chart {
+    min-height: 250px;
+    max-height: 300px;
+  }
+}

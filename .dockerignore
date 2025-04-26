@@ -1,0 +1,50 @@
+# Version control
+.git
+.gitignore
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Virtual environment
+venv/
+env/
+ENV/
+
+# IDE files
+.vscode/
+.idea/
+
+# Logs
+logs/
+*.log
+
+# Cache directories
+.cache*/
+.tmp/
+
+# Local data
+data/
+*.csv
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Docker files (not needed in build context)
+Dockerfile.dev
+docker-compose.dev.yml
+
+# Documentation
+# Keep docs/ for Hugging Face deployment
+# docs/
+*.md
+!README.md
+
+# personal notes
+-executive.md
