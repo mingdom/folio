@@ -32,6 +32,7 @@ help:
 	@echo "                        steps=VALUE (number of steps, default: 41)"
 	@echo "                        focus=TICKER (focus on specific ticker(s), comma-separated)"
 	@echo "                        detailed=1 (show detailed analysis for all positions)"
+	@echo "  focli       - Start the interactive Folio CLI shell for portfolio analysis"
 	@echo "  clean       - Clean up generated files and caches"
 	@echo "               Options: --cache (also clear data cache)"
 	@echo "  lint        - Run type checker and linter"
@@ -148,7 +149,7 @@ lint:
 --fix:
 
 # Lab Projects
-.PHONY: portfolio folio stop-folio port simulator
+.PHONY: portfolio folio stop-folio port simulator focli
 
 # Docker targets
 .PHONY: docker-build docker-run docker-up docker-down docker-logs docker-compose-up docker-compose-down docker-test deploy-hf
@@ -204,6 +205,15 @@ simulator:
 	fi
 	@source $(VENV_DIR)/bin/activate && \
 	PYTHONPATH=. ./scripts/folio-simulator.py $(if $(range),--range $(range),) $(if $(steps),--steps $(steps),) $(if $(focus),--focus $(focus),) $(if $(detailed),--detailed,)
+
+focli:
+	@echo "Starting Folio CLI interactive shell..."
+	@if [ ! -d "$(VENV_DIR)" ]; then \
+		echo "Virtual environment not found. Please run 'make env' first."; \
+		exit 1; \
+	fi
+	@source $(VENV_DIR)/bin/activate && \
+	PYTHONPATH=. python scripts/focli.py
 
 # Test targets
 .PHONY: test test-e2e

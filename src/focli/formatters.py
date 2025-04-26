@@ -11,7 +11,9 @@ from rich.table import Table
 from src.folio.formatting import format_currency
 
 
-def display_simulation_results(results, detailed=False, focus_tickers=None, console=None):
+def display_simulation_results(
+    results, detailed=False, focus_tickers=None, console=None
+):
     """Display simulation results using Rich.
 
     Args:
@@ -43,8 +45,12 @@ def display_simulation_results(results, detailed=False, focus_tickers=None, cons
     summary_table.add_column("SPY Change", style="yellow")
 
     summary_table.add_row("Current Value", f"${current_value:,.2f}", "0.0%")
-    summary_table.add_row("Minimum Value", f"${min_value:,.2f}", f"{min_spy_change:.1f}%")
-    summary_table.add_row("Maximum Value", f"${max_value:,.2f}", f"{max_spy_change:.1f}%")
+    summary_table.add_row(
+        "Minimum Value", f"${min_value:,.2f}", f"{min_spy_change:.1f}%"
+    )
+    summary_table.add_row(
+        "Maximum Value", f"${max_value:,.2f}", f"{max_spy_change:.1f}%"
+    )
 
     console.print(summary_table)
 
@@ -76,6 +82,7 @@ def display_simulation_results(results, detailed=False, focus_tickers=None, cons
     # If detailed is True, show position-level analysis
     if detailed:
         display_position_analysis(results, focus_tickers, console)
+
 
 def display_position_analysis(results, focus_tickers=None, console=None):
     """Display position-level analysis.
@@ -115,17 +122,27 @@ def display_position_analysis(results, focus_tickers=None, console=None):
 
         # Add basic position details
         position_table.add_row("Beta", f"{details.get('beta', 0):.2f}")
-        position_table.add_row("Current Value", format_currency(details.get('current_value', 0)))
-        position_table.add_row("Stock Value", format_currency(details.get('stock_value', 0)))
-        position_table.add_row("Option Value", format_currency(details.get('option_value', 0)))
+        position_table.add_row(
+            "Current Value", format_currency(details.get("current_value", 0))
+        )
+        position_table.add_row(
+            "Stock Value", format_currency(details.get("stock_value", 0))
+        )
+        position_table.add_row(
+            "Option Value", format_currency(details.get("option_value", 0))
+        )
 
         # Add stock details if available
-        if details.get('has_stock'):
-            position_table.add_row("Stock Quantity", f"{details.get('stock_quantity', 0)}")
-            position_table.add_row("Stock Price", format_currency(details.get('stock_price', 0)))
+        if details.get("has_stock"):
+            position_table.add_row(
+                "Stock Quantity", f"{details.get('stock_quantity', 0)}"
+            )
+            position_table.add_row(
+                "Stock Price", format_currency(details.get("stock_price", 0))
+            )
 
         # Add option details if available
-        if details.get('has_options'):
+        if details.get("has_options"):
             position_table.add_row("Option Count", f"{details.get('option_count', 0)}")
 
         console.print(position_table)
@@ -156,6 +173,7 @@ def display_position_analysis(results, focus_tickers=None, console=None):
 
             console.print(changes_table)
 
+
 def display_position_details(group, detailed=True, console=None):
     """Display detailed information about a position group.
 
@@ -178,7 +196,9 @@ def display_position_details(group, detailed=True, console=None):
     # Add basic position details
     summary_table.add_row("Beta", f"{group.beta:.2f}")
     summary_table.add_row("Net Exposure", format_currency(group.net_exposure))
-    summary_table.add_row("Beta-Adjusted Exposure", format_currency(group.beta_adjusted_exposure))
+    summary_table.add_row(
+        "Beta-Adjusted Exposure", format_currency(group.beta_adjusted_exposure)
+    )
 
     # Add stock details if available
     if group.stock_position:
@@ -192,7 +212,9 @@ def display_position_details(group, detailed=True, console=None):
         summary_table.add_row("Option Count", f"{len(group.option_positions)}")
         summary_table.add_row("Call Options", f"{group.call_count}")
         summary_table.add_row("Put Options", f"{group.put_count}")
-        summary_table.add_row("Total Delta Exposure", format_currency(group.total_delta_exposure))
+        summary_table.add_row(
+            "Total Delta Exposure", format_currency(group.total_delta_exposure)
+        )
 
     console.print(summary_table)
 
@@ -218,6 +240,7 @@ def display_position_details(group, detailed=True, console=None):
 
         console.print(options_table)
 
+
 def display_portfolio_summary(summary, console=None):
     """Display a summary of the portfolio.
 
@@ -236,12 +259,16 @@ def display_portfolio_summary(summary, console=None):
     summary_table.add_column("Value", style="green")
 
     # Add portfolio metrics
-    summary_table.add_row("Total Value", format_currency(summary.portfolio_estimate_value))
+    summary_table.add_row(
+        "Total Value", format_currency(summary.portfolio_estimate_value)
+    )
     summary_table.add_row("Stock Value", format_currency(summary.stock_value))
     summary_table.add_row("Option Value", format_currency(summary.option_value))
     summary_table.add_row("Cash Value", format_currency(summary.cash_like_value))
     summary_table.add_row("Portfolio Beta", f"{summary.portfolio_beta:.2f}")
-    summary_table.add_row("Net Market Exposure", format_currency(summary.net_market_exposure))
+    summary_table.add_row(
+        "Net Market Exposure", format_currency(summary.net_market_exposure)
+    )
 
     console.print(summary_table)
 
@@ -257,22 +284,171 @@ def display_portfolio_summary(summary, console=None):
         exposure_table.add_row(
             "Long Exposure",
             format_currency(summary.long_exposure.total_value),
-            f"{summary.long_exposure.total_value / total_value * 100:.1f}%"
+            f"{summary.long_exposure.total_value / total_value * 100:.1f}%",
         )
         exposure_table.add_row(
             "Short Exposure",
             format_currency(summary.short_exposure.total_value),
-            f"{summary.short_exposure.total_value / total_value * 100:.1f}%"
+            f"{summary.short_exposure.total_value / total_value * 100:.1f}%",
         )
         exposure_table.add_row(
             "Options Exposure",
             format_currency(summary.options_exposure.total_value),
-            f"{summary.options_exposure.total_value / total_value * 100:.1f}%"
+            f"{summary.options_exposure.total_value / total_value * 100:.1f}%",
         )
         exposure_table.add_row(
             "Cash",
             format_currency(summary.cash_like_value),
-            f"{summary.cash_percentage * 100:.1f}%"
+            f"{summary.cash_percentage * 100:.1f}%",
         )
 
     console.print(exposure_table)
+
+
+def display_position_risk_analysis(group, detailed=False, console=None):
+    """Display risk analysis for a position group.
+
+    Args:
+        group: PortfolioGroup to analyze
+        detailed: Whether to show detailed information
+        console: Rich console for output
+    """
+    if console is None:
+        console = Console()
+
+    ticker = group.ticker
+    console.print(f"\n[bold cyan]Risk Analysis: {ticker}[/bold cyan]")
+
+    # Create a risk table
+    risk_table = Table(title=f"{ticker} Risk Metrics", box=ROUNDED)
+    risk_table.add_column("Metric", style="cyan")
+    risk_table.add_column("Value", style="green")
+    risk_table.add_column("Description", style="yellow")
+
+    # Add risk metrics
+    risk_table.add_row("Beta", f"{group.beta:.2f}", "Sensitivity to market movements")
+
+    # Calculate beta-adjusted exposure
+    beta_adjusted = group.beta_adjusted_exposure
+    risk_table.add_row(
+        "Beta-Adjusted Exposure",
+        format_currency(beta_adjusted),
+        "Exposure adjusted for market sensitivity",
+    )
+
+    # Calculate option exposure
+    option_exposure = (
+        sum(op.delta_exposure for op in group.option_positions)
+        if group.option_positions
+        else 0
+    )
+    risk_table.add_row(
+        "Option Delta Exposure",
+        format_currency(option_exposure),
+        "Exposure from options delta",
+    )
+
+    # Calculate stock exposure
+    stock_exposure = group.stock_position.market_value if group.stock_position else 0
+    risk_table.add_row(
+        "Stock Exposure",
+        format_currency(stock_exposure),
+        "Exposure from stock position",
+    )
+
+    # Calculate option/stock ratio
+    if stock_exposure != 0:
+        option_stock_ratio = option_exposure / stock_exposure
+        risk_table.add_row(
+            "Option/Stock Ratio",
+            f"{option_stock_ratio:.2f}",
+            "Ratio of option exposure to stock exposure",
+        )
+
+    console.print(risk_table)
+
+    # If we have options and detailed is True, show option greeks
+    if detailed and group.option_positions:
+        greeks_table = Table(title=f"{ticker} Option Greeks", box=ROUNDED)
+        greeks_table.add_column("Type", style="cyan")
+        greeks_table.add_column("Strike", style="green", justify="right")
+        greeks_table.add_column("Expiry", style="yellow")
+        greeks_table.add_column("Delta", style="magenta", justify="right")
+        greeks_table.add_column("Gamma", style="blue", justify="right")
+        greeks_table.add_column("Theta", style="red", justify="right")
+        greeks_table.add_column("Vega", style="green", justify="right")
+
+        for option in group.option_positions:
+            # Note: We're using placeholder values for greeks other than delta
+            # In a real implementation, these would come from the option data
+            greeks_table.add_row(
+                option.option_type,
+                format_currency(option.strike),
+                option.expiry,
+                f"{option.delta:.2f}",
+                "N/A",  # Gamma
+                "N/A",  # Theta
+                "N/A",  # Vega
+            )
+
+        console.print(greeks_table)
+
+
+def display_position_simulation(results, console=None):
+    """Display position simulation results.
+
+    Args:
+        results: Results from simulate_position_with_spy_changes
+        console: Rich console for output
+    """
+    if console is None:
+        console = Console()
+
+    ticker = results["ticker"]
+    beta = results["beta"]
+    current_value = results["current_value"]
+
+    console.print(
+        f"\n[bold cyan]Position Simulation: {ticker} (Beta: {beta:.2f})[/bold cyan]"
+    )
+
+    # Create a summary table
+    summary_table = Table(title=f"{ticker} Simulation Summary", box=ROUNDED)
+    summary_table.add_column("Metric", style="cyan")
+    summary_table.add_column("Value", style="green")
+    summary_table.add_column("SPY Change", style="yellow")
+
+    summary_table.add_row("Current Value", format_currency(current_value), "0.0%")
+    summary_table.add_row(
+        "Minimum Value",
+        format_currency(results["min_value"]),
+        f"{results['min_spy_change']:.1f}%",
+    )
+    summary_table.add_row(
+        "Maximum Value",
+        format_currency(results["max_value"]),
+        f"{results['max_spy_change']:.1f}%",
+    )
+
+    console.print(summary_table)
+
+    # Create a detailed table with all values
+    value_table = Table(title=f"{ticker} Values at Different SPY Changes", box=ROUNDED)
+    value_table.add_column("SPY Change", style="yellow")
+    value_table.add_column("Position Value", style="green")
+    value_table.add_column("Change", style="cyan")
+    value_table.add_column("% Change", style="magenta")
+
+    for i, spy_change in enumerate(results["spy_changes"]):
+        value = results["values"][i]
+        change = results["changes"][i]
+        pct_change = results["pct_changes"][i]
+
+        value_table.add_row(
+            f"{spy_change * 100:.1f}%",
+            format_currency(value),
+            f"${change:+,.2f}",
+            f"{pct_change:+.2f}%",
+        )
+
+    console.print(value_table)

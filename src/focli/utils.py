@@ -183,3 +183,161 @@ def parse_args(args, arg_specs):
             i += 1
 
     return result
+
+
+def calculate_position_value_with_price_change(position_group, price_change):
+    """Calculate the value of a position with a given price change.
+
+    Args:
+        position_group: PortfolioGroup to calculate
+        price_change: Price change as a decimal (e.g., 0.05 for 5% increase)
+
+    Returns:
+        New position value
+    """
+    # Start with current value
+
+    # For a simple implementation, we'll adjust the value based on the price change
+    # This is a simplified approach - in a real implementation, we would recalculate
+    # option values based on the new underlying price and delta
+
+    # Calculate stock value change
+    stock_value = (
+        position_group.stock_position.market_value
+        if position_group.stock_position
+        else 0
+    )
+    new_stock_value = stock_value * (1 + price_change)
+
+    # Calculate option value change (simplified)
+    option_value = (
+        sum(op.market_value for op in position_group.option_positions)
+        if position_group.option_positions
+        else 0
+    )
+
+    # For options, we use delta to approximate the change
+    # This is a simplified approach
+    option_delta_exposure = (
+        position_group.total_delta_exposure
+        if hasattr(position_group, "total_delta_exposure")
+        else 0
+    )
+    option_delta_change = option_delta_exposure * price_change
+    new_option_value = option_value + option_delta_change
+
+    # Total new value
+    new_value = new_stock_value + new_option_value
+
+    return new_value
+
+
+def simulate_position_with_spy_changes(position_group, spy_changes):
+    """Simulate a position with SPY changes.
+
+    Args:
+        position_group: PortfolioGroup to simulate
+        spy_changes: List of SPY changes as decimals
+
+    Returns:
+        Dictionary with simulation results
+    """
+    ticker = position_group.ticker
+    beta = position_group.beta
+    current_value = position_group.net_exposure
+
+    # Calculate position values at different SPY changes
+    values = []
+    for spy_change in spy_changes:
+        # Calculate the price change for this position based on beta
+        price_change = spy_change * beta
+
+        # Calculate the new position value
+        new_value = calculate_position_value_with_price_change(
+            position_group, price_change
+        )
+        values.append(new_value)
+
+    # Calculate changes from current value
+    changes = [value - current_value for value in values]
+    pct_changes = [
+        (change / current_value) * 100 if current_value != 0 else 0
+        for change in changes
+    ]
+
+    # Find min and max values
+    min_value = min(values)
+    max_value = max(values)
+    min_index = values.index(min_value)
+    max_index = values.index(max_value)
+    min_spy_change = spy_changes[min_index] * 100  # Convert to percentage
+    max_spy_change = spy_changes[max_index] * 100  # Convert to percentage
+
+    # Create results dictionary
+    results = {
+        "ticker": ticker,
+        "beta": beta,
+        "current_value": current_value,
+        "spy_changes": spy_changes,
+        "values": values,
+        "changes": changes,
+        "pct_changes": pct_changes,
+        "min_value": min_value,
+        "max_value": max_value,
+        "min_spy_change": min_spy_change,
+        "max_spy_change": max_spy_change,
+    }
+
+    return results
+
+
+def filter_portfolio_groups(portfolio_groups, filter_criteria=None):
+    """Filter portfolio groups based on criteria.
+
+    Args:
+        portfolio_groups: List of portfolio groups
+        filter_criteria: Dictionary of filter criteria
+            - tickers: List of tickers to include
+            - min_value: Minimum position value
+            - max_value: Maximum position value
+            - has_options: Whether to include positions with options
+            - has_stock: Whether to include positions with stock
+
+    Returns:
+        Filtered list of portfolio groups
+    """
+    if not filter_criteria:
+        return portfolio_groups
+
+    filtered_groups = portfolio_groups
+
+    # Filter by tickers
+    if filter_criteria.get("tickers"):
+        tickers = [t.upper() for t in filter_criteria["tickers"]]
+        filtered_groups = [g for g in filtered_groups if g.ticker in tickers]
+
+    # Filter by value
+    if filter_criteria.get("min_value") is not None:
+        filtered_groups = [
+            g for g in filtered_groups if g.net_exposure >= filter_criteria["min_value"]
+        ]
+
+    if filter_criteria.get("max_value") is not None:
+        filtered_groups = [
+            g for g in filtered_groups if g.net_exposure <= filter_criteria["max_value"]
+        ]
+
+    # Filter by position type
+    if filter_criteria.get("has_options") is not None:
+        has_options = filter_criteria["has_options"]
+        filtered_groups = [
+            g for g in filtered_groups if bool(g.option_positions) == has_options
+        ]
+
+    if filter_criteria.get("has_stock") is not None:
+        has_stock = filter_criteria["has_stock"]
+        filtered_groups = [
+            g for g in filtered_groups if bool(g.stock_position) == has_stock
+        ]
+
+    return filtered_groups

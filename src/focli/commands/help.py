@@ -54,13 +54,31 @@ def help_command(args: list[str], state: dict[str, Any], console):  # noqa: ARG0
             console.print(
                 "  [green]simulate spy --detailed[/green] - Run a simulation with detailed position analysis"
             )
+            console.print(
+                "  [green]simulate spy --preset detailed[/green] - Run a simulation using a saved preset"
+            )
+            console.print(
+                "  [green]simulate spy --save-preset my_preset[/green] - Save current parameters as a preset"
+            )
+            console.print(
+                "  [green]simulate spy --filter options[/green] - Run a simulation only on positions with options"
+            )
 
         elif command == "position":
             console.print(
                 "  [green]position SPY[/green] - Show details for the SPY position"
             )
             console.print(
-                "  [green]position AAPL --detailed[/green] - Show detailed information for the AAPL position"
+                "  [green]position AAPL details --detailed[/green] - Show detailed information for the AAPL position"
+            )
+            console.print(
+                "  [green]position SPY risk[/green] - Show risk analysis for the SPY position"
+            )
+            console.print(
+                "  [green]position AAPL simulate[/green] - Simulate the AAPL position with SPY changes"
+            )
+            console.print(
+                "  [green]position AAPL simulate --range 15 --steps 11[/green] - Customize the position simulation"
             )
 
         elif command == "portfolio":
@@ -72,6 +90,15 @@ def help_command(args: list[str], state: dict[str, Any], console):  # noqa: ARG0
             )
             console.print(
                 "  [green]portfolio list[/green] - List all positions in the portfolio"
+            )
+            console.print(
+                "  [green]portfolio list --focus SPY,AAPL[/green] - List specific positions"
+            )
+            console.print(
+                "  [green]portfolio list --options[/green] - List only positions with options"
+            )
+            console.print(
+                "  [green]portfolio list --sort value[/green] - Sort positions by value"
             )
 
         elif command == "help":

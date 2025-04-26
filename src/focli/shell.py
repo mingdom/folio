@@ -37,6 +37,7 @@ def create_completer():
 
     return NestedCompleter.from_nested_dict(completion_dict)
 
+
 def main():
     """Main entry point for the Folio CLI."""
     console = Console()
@@ -48,16 +49,30 @@ def main():
 
     # Create session with auto-completion and history
     session = PromptSession(
-        completer=create_completer(),
-        history=FileHistory(history_file)
+        completer=create_completer(), history=FileHistory(history_file)
     )
 
     # Initialize application state
     state = {
+        # Portfolio data
         "portfolio_groups": None,
         "portfolio_summary": None,
-        "last_simulation": None,
         "loaded_portfolio": None,
+        # Simulation results
+        "last_simulation": None,
+        "simulation_history": [],
+        # Position analysis
+        "last_position": None,
+        "position_simulations": {},
+        "filtered_groups": None,
+        # Parameter presets
+        "simulation_presets": {
+            "default": {"range": 20.0, "steps": 13},
+            "detailed": {"range": 20.0, "steps": 21, "detailed": True},
+            "quick": {"range": 10.0, "steps": 5},
+        },
+        # Session history
+        "command_history": [],
     }
 
     # Try to load default portfolio
@@ -66,7 +81,9 @@ def main():
         load_portfolio(default_portfolio, state, console)
     except Exception as e:
         console.print(f"[yellow]Could not load default portfolio: {e}[/yellow]")
-        console.print("[yellow]Use 'portfolio load <path>' to load a portfolio.[/yellow]")
+        console.print(
+            "[yellow]Use 'portfolio load <path>' to load a portfolio.[/yellow]"
+        )
 
     # Main REPL loop
     while True:
@@ -82,6 +99,9 @@ def main():
                 if confirm_exit():
                     break
                 continue
+
+            # Add to command history
+            state["command_history"].append(text)
 
             # Process the command
             execute_command(text, state, console)
@@ -100,6 +120,7 @@ def main():
 
     console.print("Goodbye!")
 
+
 def confirm_exit():
     """Confirm exit with the user.
 
@@ -107,6 +128,7 @@ def confirm_exit():
         True if the user confirms, False otherwise
     """
     return confirm("Are you sure you want to exit?")
+
 
 if __name__ == "__main__":
     main()
