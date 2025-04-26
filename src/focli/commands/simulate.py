@@ -8,8 +8,11 @@ import copy
 from typing import Any
 
 from src.focli.formatters import display_simulation_results
-from src.focli.utils import filter_portfolio_groups, generate_spy_changes, parse_args
-from src.folio.simulator import simulate_portfolio_with_spy_changes
+from src.focli.utils import filter_portfolio_groups, parse_args
+from src.folio.simulator import (
+    generate_spy_changes,
+    simulate_portfolio_with_spy_changes,
+)
 
 
 def simulate_command(args: list[str], state: dict[str, Any], console):

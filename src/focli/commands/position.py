@@ -11,12 +11,8 @@ from src.focli.formatters import (
     display_position_risk_analysis,
     display_position_simulation,
 )
-from src.focli.utils import (
-    find_position_group,
-    generate_spy_changes,
-    parse_args,
-    simulate_position_with_spy_changes,
-)
+from src.focli.utils import find_position_group, parse_args
+from src.folio.simulator import generate_spy_changes, simulate_position_with_spy_changes
 
 
 def position_command(args: list[str], state: dict[str, Any], console):

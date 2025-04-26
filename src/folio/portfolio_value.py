@@ -491,3 +491,46 @@ def calculate_component_percentages(
     )  # Will be negative
 
     return result
+
+
+def calculate_position_value_with_price_change(
+    position_group: PortfolioGroup, price_change: float
+) -> float:
+    """Calculate the value of a position with a given price change.
+
+    Args:
+        position_group: PortfolioGroup to calculate
+        price_change: Price change as a decimal (e.g., 0.05 for 5% increase)
+
+    Returns:
+        New position value
+    """
+    # Calculate stock value change
+    stock_value = (
+        position_group.stock_position.market_value
+        if position_group.stock_position
+        else 0
+    )
+    new_stock_value = stock_value * (1 + price_change)
+
+    # Calculate option value change (simplified)
+    option_value = (
+        sum(op.market_value for op in position_group.option_positions)
+        if position_group.option_positions
+        else 0
+    )
+
+    # For options, we use delta to approximate the change
+    # This is a simplified approach
+    option_delta_exposure = (
+        position_group.total_delta_exposure
+        if hasattr(position_group, "total_delta_exposure")
+        else 0
+    )
+    option_delta_change = option_delta_exposure * price_change
+    new_option_value = option_value + option_delta_change
+
+    # Total new value
+    new_value = new_stock_value + new_option_value
+
+    return new_value

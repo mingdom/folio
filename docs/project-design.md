@@ -6,11 +6,16 @@ alwaysApply: true
 
 # Folio Project Design
 
-This document outlines how the Folio codebase is structured and how data flows through the application. Folio is a web-based dashboard for analyzing and visualizing investment portfolios, with a focus on stocks and options.
+This document outlines how the Folio codebase is structured and how data flows through the application. Folio provides tools for analyzing and visualizing investment portfolios, with a focus on stocks and options, through both a web-based dashboard and a command-line interface (CLI).
 
 ## Application Overview
 
-Folio is a Python-based web application built with Dash that provides comprehensive portfolio analysis capabilities. The primary domain entities for this app are outlined below. For an authoritative overview of the data model, [data_model.py](src/folio/data_model.py) is the source of truth.
+Folio is a Python-based application that provides comprehensive portfolio analysis capabilities through multiple interfaces:
+
+1. **Web Interface**: A Dash-based web application for visualizing portfolio data
+2. **CLI Interface (`focli`)**: A command-line interface for portfolio analysis and simulation
+
+Both interfaces leverage the same core library (`src/folio/`) for business logic, following our [strict separation of concerns](#separation-of-concerns) principles. The primary domain entities for this app are outlined below. For an authoritative overview of the data model, [data_model.py](src/folio/data_model.py) is the source of truth.
 
 ## Deployment Modes
 
@@ -90,9 +95,9 @@ Portfolio metrics are calculated in several steps:
 
 The canonical implementations for these calculations are in [portfolio_value.py](src/folio/portfolio_value.py).
 
-## UI Components
+## Web UI Components
 
-The UI is built with Dash and consists of several key components:
+The web UI is built with Dash and consists of several key components:
 
 1. **Summary Cards**: Display high-level portfolio metrics
 2. **Charts**: Visualize portfolio allocation and exposure
@@ -111,22 +116,64 @@ Components interact through Dash callbacks:
 3. Components subscribe to changes in the stored data and update accordingly
 4. This pattern allows for a reactive UI without page reloads
 
+## CLI Interface
+
+The CLI interface (`focli`) provides a command-line tool for portfolio analysis and simulation:
+
+### Architecture
+
+1. **Shell**: An interactive shell implemented in [shell.py](src/focli/shell.py) using the `cmd` module
+2. **Commands**: Command handlers in the [commands](src/focli/commands) directory
+3. **Formatters**: Output formatting utilities in [formatters.py](src/focli/formatters.py)
+4. **Utils**: CLI-specific utilities in [utils.py](src/focli/utils.py)
+
+### Command Structure
+
+The CLI follows a command-subcommand structure:
+
+```
+folio> command [subcommand] [options]
+```
+
+Key commands include:
+- `simulate`: Simulate portfolio performance with SPY changes
+- `position`: Analyze a specific position group
+- `portfolio`: View and analyze portfolio data
+
+### Separation of Concerns
+
+The CLI strictly adheres to the [separation of concerns](#separation-of-concerns) principles:
+- Command handlers only handle parsing, validation, and presentation
+- All business logic is delegated to the core library
+- No calculation or simulation logic exists in the CLI layer
+
 ## Key Modules
 
-### Data Processing
+### Core Library (src/folio/)
+
+#### Data Processing
 
 - **portfolio.py**: Core portfolio processing logic
 - **portfolio_value.py**: Canonical implementations of portfolio value calculations
+- **simulator.py**: Portfolio and position simulation logic
 - **options.py**: Option pricing and Greeks calculations
 - **cash_detection.py**: Identification of cash-like positions
 
-### Data Fetching
+#### Data Fetching
 
 - **stockdata.py**: Common interface for data fetchers
 - **yfinance.py**: Yahoo Finance data fetcher
 - **fmp.py**: Financial Modeling Prep data fetcher
 
-### UI Components
+#### Application Core
+
+- **data_model.py**: Core data structures
+- **logger.py**: Logging configuration
+- **security.py**: Security utilities for validating user inputs
+
+### Web UI (src/folio/)
+
+#### UI Components
 
 - **components/**: UI components for the dashboard
   - **charts.py**: Portfolio visualization charts
@@ -135,12 +182,24 @@ Components interact through Dash callbacks:
   - **pnl_chart.py**: Profit/loss visualization
   - **summary_cards.py**: High-level portfolio metrics
 
-### Application Core
+#### Web Application
 
 - **app.py**: Main Dash application setup and callbacks
-- **data_model.py**: Core data structures
-- **logger.py**: Logging configuration
-- **security.py**: Security utilities for validating user inputs
+
+### CLI Interface (src/focli/)
+
+#### Command Handling
+
+- **shell.py**: Interactive shell implementation
+- **commands/**: Command handlers
+  - **simulate.py**: Portfolio simulation commands
+  - **position.py**: Position analysis commands
+  - **portfolio.py**: Portfolio management commands
+
+#### Presentation
+
+- **formatters.py**: Output formatting utilities
+- **utils.py**: CLI-specific utilities (no business logic)
 
 ## Configuration
 
@@ -180,13 +239,48 @@ To add new features to Folio:
 3. **Callbacks**: Add new callbacks in `app.py` to handle user interactions
 4. **Testing**: Add tests for new functionality
 
+## Separation of Concerns
+
+Folio strictly adheres to separation of concerns principles:
+
+### Core Library vs Interface Layers
+
+1. **Core Library (`src/folio/`)**:
+   - Contains ALL business logic, data processing, and calculation functionality
+   - Provides a stable API for interface layers to use
+   - Should never depend on interface-specific code
+
+2. **Interface Layers (`src/focli/`, web UI)**:
+   - Handle user interaction, command parsing, and result presentation
+   - Call core library functions to perform business operations
+   - Should NEVER contain business logic
+   - Focus solely on translating user inputs to core library calls and formatting outputs
+
+### Business Logic Placement
+
+Business logic must ALWAYS reside in the core library, not in interface layers. Examples include:
+
+- Calculations and algorithms
+- Data transformations
+- Simulation logic
+- Portfolio analysis
+- Value calculations
+
+Interface layers should be thin wrappers around the core library, focusing only on:
+- Parsing user input
+- Calling appropriate core library functions
+- Formatting and presenting results
+- Managing UI state
+
 ## Conclusion
 
 Folio is designed with a clean separation of concerns:
 
+- Business logic is centralized in the core library
 - Data fetching is abstracted behind interfaces
 - Data processing is separated from UI components
 - UI components are modular and reusable
 - Configuration is externalized for flexibility
+- Interface layers are thin and focused on user interaction
 
 This architecture makes the codebase maintainable, testable, and extensible, allowing for easy addition of new features and improvements.

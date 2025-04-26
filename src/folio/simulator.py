@@ -9,6 +9,7 @@ import numpy as np
 from .data_model import PortfolioGroup
 from .logger import logger
 from .portfolio import recalculate_portfolio_with_prices
+from .portfolio_value import calculate_position_value_with_price_change
 
 
 def simulate_portfolio_with_spy_changes(
@@ -213,3 +214,94 @@ def calculate_percentage_changes(values: list[float], base_value: float) -> list
         return [0.0] * len(values)
 
     return [(value / base_value - 1.0) * 100.0 for value in values]
+
+
+def generate_spy_changes(range_pct: float, steps: int) -> list[float]:
+    """Generate a list of SPY changes for simulation.
+
+    Args:
+        range_pct: Range of SPY changes in percent (e.g., 20.0 for ±20%)
+        steps: Number of steps in the simulation
+
+    Returns:
+        List of SPY changes as decimals (e.g., [-0.2, -0.1, 0.0, 0.1, 0.2])
+    """
+    # Calculate the step size
+    step_size = (2 * range_pct) / (steps - 1) if steps > 1 else 0
+
+    # Generate the SPY changes
+    spy_changes = [-range_pct + i * step_size for i in range(steps)]
+
+    # Ensure we have a zero point
+    if 0.0 not in spy_changes and steps > 2:
+        # Find the closest point to zero and replace it with zero
+        closest_to_zero = min(spy_changes, key=lambda x: abs(x))
+        zero_index = spy_changes.index(closest_to_zero)
+        spy_changes[zero_index] = 0.0
+
+    # Convert to percentages
+    spy_changes = [change / 100.0 for change in spy_changes]
+
+    return spy_changes
+
+
+def simulate_position_with_spy_changes(
+    position_group: PortfolioGroup, spy_changes: list[float]
+) -> dict:
+    """Simulate a position with SPY changes.
+
+    Args:
+        position_group: PortfolioGroup to simulate
+        spy_changes: List of SPY changes as decimals
+
+    Returns:
+        Dictionary with simulation results
+    """
+
+    ticker = position_group.ticker
+    beta = position_group.beta
+    current_value = position_group.net_exposure
+
+    # Calculate position values at different SPY changes
+    values = []
+    for spy_change in spy_changes:
+        # Calculate the price change for this position based on beta
+        price_change = spy_change * beta
+
+        # Calculate the new position value
+        new_value = calculate_position_value_with_price_change(
+            position_group, price_change
+        )
+        values.append(new_value)
+
+    # Calculate changes from current value
+    changes = [value - current_value for value in values]
+    pct_changes = [
+        (change / current_value) * 100 if current_value != 0 else 0
+        for change in changes
+    ]
+
+    # Find min and max values
+    min_value = min(values)
+    max_value = max(values)
+    min_index = values.index(min_value)
+    max_index = values.index(max_value)
+    min_spy_change = spy_changes[min_index] * 100  # Convert to percentage
+    max_spy_change = spy_changes[max_index] * 100  # Convert to percentage
+
+    # Create results dictionary
+    results = {
+        "ticker": ticker,
+        "beta": beta,
+        "current_value": current_value,
+        "spy_changes": spy_changes,
+        "values": values,
+        "changes": changes,
+        "pct_changes": pct_changes,
+        "min_value": min_value,
+        "max_value": max_value,
+        "min_spy_change": min_spy_change,
+        "max_spy_change": max_spy_change,
+    }
+
+    return results
