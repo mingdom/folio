@@ -77,8 +77,18 @@ def main(
         portfolio_groups=portfolio_groups,
         spy_changes=spy_changes,
         cash_value=portfolio_summary.cash_like_value,
-        # Removed pending_activity_value as it shouldn't be included in simulation
     )
+
+    # Set the original portfolio value to the total portfolio value from the summary
+    original_portfolio_value = portfolio_summary.portfolio_estimate_value
+    simulation_result["original_portfolio_value"] = original_portfolio_value
+
+    # Recalculate the P&L % of Orig correctly
+    portfolio_pnls = simulation_result["portfolio_pnls"]
+    simulation_result["portfolio_pnl_vs_original_percents"] = [
+        (pnl / original_portfolio_value) * 100 if original_portfolio_value else 0
+        for pnl in portfolio_pnls
+    ]
 
     # Display results
     display_simulation_results(simulation_result, detailed)
@@ -94,6 +104,7 @@ def display_simulation_results(simulation_result, detailed=False):
     table.add_column("Portfolio Value", style="green")
     table.add_column("P&L", style="yellow")
     table.add_column("P&L %", style="magenta")
+    table.add_column("P&L % of Orig", style="blue")
 
     # Add rows
     for i, spy_change in enumerate(simulation_result["spy_changes"]):
@@ -101,12 +112,20 @@ def display_simulation_results(simulation_result, detailed=False):
         portfolio_value = simulation_result["portfolio_values"][i]
         portfolio_pnl = simulation_result["portfolio_pnls"][i]
         portfolio_pnl_percent = simulation_result["portfolio_pnl_percents"][i]
+        portfolio_pnl_vs_original_percent = simulation_result[
+            "portfolio_pnl_vs_original_percents"
+        ][i]
 
         # Format values
         portfolio_value_str = f"${portfolio_value:,.2f}"
         portfolio_pnl_str = f"${portfolio_pnl:+,.2f}" if portfolio_pnl else "$0.00"
         portfolio_pnl_percent_str = (
             f"{portfolio_pnl_percent:+.2f}%" if portfolio_pnl_percent else "0.00%"
+        )
+        portfolio_pnl_vs_original_percent_str = (
+            f"{portfolio_pnl_vs_original_percent:+.2f}%"
+            if portfolio_pnl_vs_original_percent
+            else "0.00%"
         )
 
         # Add row with color based on P&L
@@ -116,14 +135,17 @@ def display_simulation_results(simulation_result, detailed=False):
             portfolio_value_str,
             f"[{pnl_style}]{portfolio_pnl_str}[/{pnl_style}]",
             f"[{pnl_style}]{portfolio_pnl_percent_str}[/{pnl_style}]",
+            f"[{pnl_style}]{portfolio_pnl_vs_original_percent_str}[/{pnl_style}]",
         )
 
     # Display the table
     console.print(table)
 
-    # Display current portfolio value
+    # Display portfolio values
     current_value = simulation_result.get("current_portfolio_value", 0)
-    console.print(f"\nCurrent Portfolio Value: ${current_value:,.2f}\n")
+    original_value = simulation_result.get("original_portfolio_value", 0)
+    console.print(f"\nCurrent Portfolio Value (0% baseline): ${current_value:,.2f}")
+    console.print(f"Original Portfolio Value: ${original_value:,.2f}\n")
 
     # Display detailed position results if requested
     if detailed and simulation_result["position_results"]:

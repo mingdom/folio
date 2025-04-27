@@ -375,76 +375,120 @@ def simulate_portfolio(
     portfolio_groups: list[PortfolioGroup],
     spy_changes: list[float],
     cash_value: float = 0.0,
-    pending_activity_value: float = 0.0,
 ) -> dict[str, Any]:
     """
     Simulate portfolio performance across different SPY price changes.
+
+    This function calculates portfolio values at different SPY changes and
+    uses the 0% SPY change scenario as the baseline for P&L calculations.
+    This ensures that P&L is always zero at 0% SPY change, providing a
+    consistent reference point.
+
+    Note: Pending activity value is not included in the simulation to avoid
+    artificial inflation of portfolio values.
 
     Args:
         portfolio_groups: Portfolio groups to simulate
         spy_changes: List of SPY price change percentages as decimals
         cash_value: Value of cash positions
-        pending_activity_value: Value of pending activity
 
     Returns:
-        Dictionary with simulation results
+        Dictionary with simulation results including:
+        - spy_changes: The input SPY changes
+        - portfolio_values: Portfolio values at each SPY change
+        - portfolio_pnls: P&L values relative to the 0% baseline
+        - portfolio_pnl_percents: P&L percentages relative to the 0% baseline
+        - portfolio_pnl_vs_original_percents: P&L percentages relative to the original portfolio value
+        - current_portfolio_value: The baseline portfolio value (at 0% SPY change)
+        - original_portfolio_value: The original portfolio value (before simulation)
+        - position_results: Detailed results for each position group
     """
     if not portfolio_groups:
         logger.warning("Cannot simulate an empty portfolio")
         return {
             "spy_changes": spy_changes,
-            "portfolio_values": [cash_value + pending_activity_value]
-            * len(spy_changes),
+            "portfolio_values": [cash_value] * len(spy_changes),
             "portfolio_pnls": [0.0] * len(spy_changes),
             "portfolio_pnl_percents": [0.0] * len(spy_changes),
+            "portfolio_pnl_vs_original_percents": [0.0] * len(spy_changes),
+            "current_portfolio_value": cash_value,
+            "original_portfolio_value": cash_value,
             "position_results": {},
         }
 
     # Initialize results containers
     portfolio_values = []
-    portfolio_pnls = []
     position_results = {group.ticker: [] for group in portfolio_groups}
 
-    # Calculate current portfolio value
-    current_portfolio_value = (
-        sum(
-            (group.stock_position.market_value if group.stock_position else 0)
-            + sum(op.market_value for op in group.option_positions)
-            if group.option_positions
-            else 0
-            for group in portfolio_groups
-        )
-        + cash_value
-        + pending_activity_value
-    )
+    # We'll set a default original portfolio value that will be overridden
+    # by the CLI with the actual portfolio value from the portfolio summary
+    original_portfolio_value = cash_value
+    for group in portfolio_groups:
+        if group.stock_position:
+            original_portfolio_value += group.stock_position.market_value
+        for option in group.option_positions:
+            original_portfolio_value += option.market_value
+
+    # Find the index of 0% SPY change to use as baseline
+    # If 0% is not in the list, we'll calculate baseline values separately
+    zero_index = None
+    for i, change in enumerate(spy_changes):
+        if abs(change) < 0.001:  # Close to 0%
+            zero_index = i
+            break
 
     # Simulate for each SPY change
     for spy_change in spy_changes:
-        portfolio_value = cash_value + pending_activity_value
-        portfolio_pnl = 0.0
+        portfolio_value = (
+            cash_value  # Note: pending_activity_value is excluded from simulation
+        )
 
         # Simulate each position group
         for group in portfolio_groups:
             group_result = simulate_position_group(group, spy_change)
             portfolio_value += group_result["new_value"]
-            portfolio_pnl += group_result["pnl"]
             position_results[group.ticker].append(group_result)
 
         # Store portfolio-level results
         portfolio_values.append(portfolio_value)
-        portfolio_pnls.append(portfolio_pnl)
 
-    # Calculate portfolio-level metrics
+    # If we don't have a 0% change in the list, calculate baseline separately
+    if zero_index is None:
+        # Calculate baseline values at 0% SPY change
+        baseline_value = cash_value
+        for group in portfolio_groups:
+            baseline_result = simulate_position_group(group, 0.0)
+            baseline_value += baseline_result["new_value"]
+    else:
+        # Use the value at 0% SPY change as baseline
+        baseline_value = portfolio_values[zero_index]
+
+    # Calculate P&L values relative to the baseline
+    portfolio_pnls = [value - baseline_value for value in portfolio_values]
+
+    # Calculate P&L percentages (relative to baseline value)
     portfolio_pnl_percents = [
-        (pnl / current_portfolio_value) * 100 if current_portfolio_value else 0
+        (pnl / baseline_value) * 100 if baseline_value else 0 for pnl in portfolio_pnls
+    ]
+
+    # Calculate P&L percentages relative to original portfolio value
+    # We need to calculate the percentage change relative to the original portfolio value
+    portfolio_pnl_vs_original_percents = [
+        (pnl / original_portfolio_value) * 100 if original_portfolio_value else 0
         for pnl in portfolio_pnls
     ]
+
+    # For consistency with the rest of the codebase, include current_portfolio_value
+    # This is the baseline value we calculated
+    current_portfolio_value = baseline_value
 
     return {
         "spy_changes": spy_changes,
         "portfolio_values": portfolio_values,
         "portfolio_pnls": portfolio_pnls,
         "portfolio_pnl_percents": portfolio_pnl_percents,
+        "portfolio_pnl_vs_original_percents": portfolio_pnl_vs_original_percents,
         "current_portfolio_value": current_portfolio_value,
+        "original_portfolio_value": original_portfolio_value,
         "position_results": position_results,
     }
