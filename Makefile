@@ -233,23 +233,11 @@ docker-test:
 # Deploy to Hugging Face Spaces
 deploy-hf:
 	@echo "Deploying to Hugging Face Spaces..."
-	@echo "Checking for Git LFS..."
-	@if ! command -v git-lfs &> /dev/null; then \
-		echo "Error: Git LFS is not installed. Please install it first."; \
-		echo "  macOS: brew install git-lfs"; \
-		echo "  Linux: apt-get install git-lfs"; \
-		exit 1; \
-	fi
 	@echo "Checking if Hugging Face Space remote exists..."
 	@if ! git remote | grep -q "space"; then \
 		echo "Adding Hugging Face Space remote..."; \
 		git remote add space git@hf.co:spaces/mingdom/folio; \
 	fi
-	@echo "Ensuring Git LFS is tracking .pkl files..."
-	@grep -q "*.pkl filter=lfs diff=lfs merge=lfs -text" .gitattributes || \
-		echo "*.pkl filter=lfs diff=lfs merge=lfs -text" >> .gitattributes
-	@echo "Initializing Git LFS..."
-	@git lfs install
 	@echo "Pushing to Hugging Face Space..."
 	@git push space main:main
 	@echo "\n✅ Deployment to Hugging Face Space completed!"
