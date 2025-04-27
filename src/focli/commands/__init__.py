@@ -11,6 +11,7 @@ from typing import Any
 from .help import help_command
 from .portfolio import portfolio_command
 from .position import position_command
+from .sim import app as sim_app
 from .simulate import simulate_command
 
 # Command registry
@@ -84,6 +85,11 @@ register_command(
     simulate_command,
     "Simulate portfolio performance with SPY changes",
     ["spy", "scenario"],
+)
+register_command(
+    "sim",
+    lambda args, state, console: sim_app(args),
+    "Simulate portfolio performance using the improved simulator_v2",
 )
 register_command("position", position_command, "Analyze a specific position group")
 register_command(

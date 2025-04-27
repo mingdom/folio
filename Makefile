@@ -20,8 +20,11 @@ help:
 	@echo "  folio       - Start the portfolio dashboard with debug mode enabled"
 	@echo "               Options: portfolio=path/to/file.csv (use custom portfolio file)"
 	@echo "                        log=LEVEL (set logging level: DEBUG, INFO, WARNING, ERROR)"
-
 	@echo "  focli       - Start the interactive Folio CLI shell for portfolio analysis"
+	@echo "  simulate    - Run portfolio simulation using the improved simulator_v2"
+	@echo "               Options: ticker=SYMBOL (focus on a specific ticker)"
+	@echo "                        detailed=1 (show detailed position-level results)"
+	@echo "                        portfolio=path/to/file.csv (use custom portfolio file)"
 	@echo "  clean       - Clean up generated files and caches"
 	@echo "               Options: --cache (also clear data cache)"
 	@echo "  lint        - Run type checker and linter"
@@ -120,7 +123,7 @@ lint:
 --fix:
 
 # Portfolio and CLI Projects
-.PHONY: folio stop-folio port focli
+.PHONY: folio stop-folio port focli simulate
 
 # Poetry is used under the hood for all targets
 
@@ -159,6 +162,24 @@ focli:
 		exit 1; \
 	fi
 	@$(POETRY) run python src/focli/focli.py
+
+simulate:
+	@echo "Running portfolio simulation with simulator_v2..."
+	@if ! command -v $(POETRY) &> /dev/null; then \
+		echo "Poetry not found. Please run 'make env' first."; \
+		exit 1; \
+	fi
+	@if [ -n "$(portfolio)" ]; then \
+		$(POETRY) run python -m src.focli.commands.sim $(portfolio) --min-spy-change -0.1 --max-spy-change 0.1 --steps 11 $(if $(ticker),--ticker $(ticker),) $(if $(detailed),--detailed,); \
+	elif [ -f "@private-data/private-portfolio.csv" ]; then \
+		$(POETRY) run python -m src.focli.commands.sim @private-data/private-portfolio.csv --min-spy-change -0.1 --max-spy-change 0.1 --steps 11 $(if $(ticker),--ticker $(ticker),) $(if $(detailed),--detailed,); \
+	elif [ -f "private-data/portfolio-private.csv" ]; then \
+		$(POETRY) run python -m src.focli.commands.sim private-data/portfolio-private.csv --min-spy-change -0.1 --max-spy-change 0.1 --steps 11 $(if $(ticker),--ticker $(ticker),) $(if $(detailed),--detailed,); \
+	else \
+		echo "Error: Portfolio file not found. Please specify a file path:"; \
+		echo "  make simulate portfolio=path/to/your/portfolio.csv"; \
+		exit 1; \
+	fi
 
 # Test targets
 .PHONY: test test-e2e

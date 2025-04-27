@@ -29,6 +29,7 @@ pytest-mock = "^3.14.0"  # Added for mocking in tests
 rich = ">=13.9.0"
 prompt-toolkit = ">=3.0.43"
 pre-commit = "^4.2.0"
+typer = "^0.15.2"
 
 [build-system]
 requires = ["poetry-core"]
