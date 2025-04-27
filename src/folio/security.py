@@ -99,7 +99,7 @@ def validate_csv_upload(
     # Check file size
     if len(decoded) > MAX_FILE_SIZE:
         logger.warning(f"File too large: {len(decoded)} bytes (max {MAX_FILE_SIZE})")
-        raise ValueError(f"File too large (max {MAX_FILE_SIZE/1024/1024:.1f}MB)")
+        raise ValueError(f"File too large (max {MAX_FILE_SIZE / 1024 / 1024:.1f}MB)")
 
     # Parse CSV
     try:

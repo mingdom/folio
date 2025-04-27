@@ -16,6 +16,23 @@ python src/focli/focli.py
 
 This will launch the interactive shell where you can enter commands.
 
+### Direct Simulation Mode
+
+You can also run simulations directly from the command line without entering the interactive shell:
+
+```bash
+# Run simulation with default parameters
+python src/focli/focli.py --simulate
+
+# Run a quick simulation (fewer steps, smaller range)
+python src/focli/focli.py --simulate --preset quick
+
+# Run a detailed simulation (more steps)
+python src/focli/focli.py --simulate --preset detailed
+```
+
+This is useful for quickly checking how your portfolio might perform under different market conditions.
+
 ## Why Use Folio CLI?
 
 - **Speed**: Get answers in seconds without waiting for GUI elements to load
@@ -57,7 +74,7 @@ See how your portfolio might perform across different market scenarios:
 - `--steps 13` - Set the number of data points in the simulation
 - `--detailed` - Show position-level details in the simulation
 - `--focus SPY,AAPL` - Focus on specific positions
-- `--preset <name>` - Use a saved parameter preset
+- `--preset <name>` - Use a saved parameter preset (default, quick, detailed)
 - `--save-preset <name>` - Save current parameters as a preset
 - `--filter options` - Run simulation only on positions with options
 
@@ -91,6 +108,7 @@ Exit the application.
 3. **Drill down with position commands** to understand specific holdings
 4. **Save presets** for analyses you run frequently
 5. **Use filtering** to focus on segments of your portfolio
+6. **Use direct simulation mode** for quick portfolio checks
 
 ## Example Workflow
 

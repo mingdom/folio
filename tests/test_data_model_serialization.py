@@ -66,7 +66,9 @@ class TestDataModelSerialization(unittest.TestCase):
         stock = StockPosition.from_dict(stock_dict)
 
         # Check that market_value was calculated correctly
-        self.assertEqual(stock.market_value, stock_dict["price"] * stock_dict["quantity"])
+        self.assertEqual(
+            stock.market_value, stock_dict["price"] * stock_dict["quantity"]
+        )
 
     def test_option_position_serialization(self):
         """Test that OptionPosition objects can be serialized and deserialized."""
@@ -138,7 +140,9 @@ class TestDataModelSerialization(unittest.TestCase):
         option = OptionPosition.from_dict(option_dict)
 
         # Check that market_value was calculated correctly with 100x multiplier
-        self.assertEqual(option.market_value, option_dict["price"] * option_dict["quantity"] * 100)
+        self.assertEqual(
+            option.market_value, option_dict["price"] * option_dict["quantity"] * 100
+        )
 
     def test_portfolio_group_serialization(self):
         """Test that PortfolioGroup objects can be serialized and deserialized."""
@@ -202,50 +206,77 @@ class TestDataModelSerialization(unittest.TestCase):
         self.assertEqual(group.stock_position.ticker, group2.stock_position.ticker)
         self.assertEqual(group.stock_position.quantity, group2.stock_position.quantity)
         self.assertEqual(group.stock_position.beta, group2.stock_position.beta)
-        self.assertEqual(group.stock_position.market_exposure, group2.stock_position.market_exposure)
+        self.assertEqual(
+            group.stock_position.market_exposure, group2.stock_position.market_exposure
+        )
         self.assertEqual(
             group.stock_position.beta_adjusted_exposure,
             group2.stock_position.beta_adjusted_exposure,
         )
         self.assertEqual(group.stock_position.price, group2.stock_position.price)
-        self.assertEqual(group.stock_position.cost_basis, group2.stock_position.cost_basis)
-        self.assertEqual(group.stock_position.market_value, group2.stock_position.market_value)
+        self.assertEqual(
+            group.stock_position.cost_basis, group2.stock_position.cost_basis
+        )
+        self.assertEqual(
+            group.stock_position.market_value, group2.stock_position.market_value
+        )
 
         # Check that the option position was deserialized correctly
-        self.assertEqual(group.option_positions[0].ticker, group2.option_positions[0].ticker)
         self.assertEqual(
-            group.option_positions[0].position_type, group2.option_positions[0].position_type
+            group.option_positions[0].ticker, group2.option_positions[0].ticker
         )
-        self.assertEqual(group.option_positions[0].quantity, group2.option_positions[0].quantity)
-        self.assertEqual(group.option_positions[0].beta, group2.option_positions[0].beta)
+        self.assertEqual(
+            group.option_positions[0].position_type,
+            group2.option_positions[0].position_type,
+        )
+        self.assertEqual(
+            group.option_positions[0].quantity, group2.option_positions[0].quantity
+        )
+        self.assertEqual(
+            group.option_positions[0].beta, group2.option_positions[0].beta
+        )
         self.assertEqual(
             group.option_positions[0].beta_adjusted_exposure,
             group2.option_positions[0].beta_adjusted_exposure,
         )
-        self.assertEqual(group.option_positions[0].strike, group2.option_positions[0].strike)
-        self.assertEqual(group.option_positions[0].expiry, group2.option_positions[0].expiry)
         self.assertEqual(
-            group.option_positions[0].option_type, group2.option_positions[0].option_type
-        )
-        self.assertEqual(group.option_positions[0].delta, group2.option_positions[0].delta)
-        self.assertEqual(
-            group.option_positions[0].delta_exposure, group2.option_positions[0].delta_exposure
+            group.option_positions[0].strike, group2.option_positions[0].strike
         )
         self.assertEqual(
-            group.option_positions[0].notional_value, group2.option_positions[0].notional_value
+            group.option_positions[0].expiry, group2.option_positions[0].expiry
         )
         self.assertEqual(
-            group.option_positions[0].underlying_beta, group2.option_positions[0].underlying_beta
+            group.option_positions[0].option_type,
+            group2.option_positions[0].option_type,
         )
         self.assertEqual(
-            group.option_positions[0].market_exposure, group2.option_positions[0].market_exposure
+            group.option_positions[0].delta, group2.option_positions[0].delta
         )
-        self.assertEqual(group.option_positions[0].price, group2.option_positions[0].price)
+        self.assertEqual(
+            group.option_positions[0].delta_exposure,
+            group2.option_positions[0].delta_exposure,
+        )
+        self.assertEqual(
+            group.option_positions[0].notional_value,
+            group2.option_positions[0].notional_value,
+        )
+        self.assertEqual(
+            group.option_positions[0].underlying_beta,
+            group2.option_positions[0].underlying_beta,
+        )
+        self.assertEqual(
+            group.option_positions[0].market_exposure,
+            group2.option_positions[0].market_exposure,
+        )
+        self.assertEqual(
+            group.option_positions[0].price, group2.option_positions[0].price
+        )
         self.assertEqual(
             group.option_positions[0].cost_basis, group2.option_positions[0].cost_basis
         )
         self.assertEqual(
-            group.option_positions[0].market_value, group2.option_positions[0].market_value
+            group.option_positions[0].market_value,
+            group2.option_positions[0].market_value,
         )
 
     def test_portfolio_summary_serialization(self):
@@ -345,8 +376,12 @@ class TestDataModelSerialization(unittest.TestCase):
         self.assertEqual(summary.cash_percentage, summary2.cash_percentage)
         self.assertEqual(summary.stock_value, summary2.stock_value)
         self.assertEqual(summary.option_value, summary2.option_value)
-        self.assertEqual(summary.pending_activity_value, summary2.pending_activity_value)
-        self.assertEqual(summary.portfolio_estimate_value, summary2.portfolio_estimate_value)
+        self.assertEqual(
+            summary.pending_activity_value, summary2.pending_activity_value
+        )
+        self.assertEqual(
+            summary.portfolio_estimate_value, summary2.portfolio_estimate_value
+        )
         self.assertEqual(summary.price_updated_at, summary2.price_updated_at)
 
         # Check that the exposure breakdowns were deserialized correctly
@@ -354,7 +389,8 @@ class TestDataModelSerialization(unittest.TestCase):
             summary.long_exposure.stock_exposure, summary2.long_exposure.stock_exposure
         )
         self.assertEqual(
-            summary.long_exposure.stock_beta_adjusted, summary2.long_exposure.stock_beta_adjusted
+            summary.long_exposure.stock_beta_adjusted,
+            summary2.long_exposure.stock_beta_adjusted,
         )
         self.assertEqual(
             summary.long_exposure.option_delta_exposure,
@@ -368,7 +404,8 @@ class TestDataModelSerialization(unittest.TestCase):
             summary.long_exposure.total_exposure, summary2.long_exposure.total_exposure
         )
         self.assertEqual(
-            summary.long_exposure.total_beta_adjusted, summary2.long_exposure.total_beta_adjusted
+            summary.long_exposure.total_beta_adjusted,
+            summary2.long_exposure.total_beta_adjusted,
         )
 
     def test_portfolio_summary_serialization_without_pending_activity(self):

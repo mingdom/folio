@@ -91,7 +91,6 @@ class TestExposures:
 
         summary_dict.get("pending_activity_value", 0.0)
 
-
         # Test that summary card values match position details
         assert abs(summary_net_exposure - total_ui_market_value) < 0.01, (
             f"Net Exposure in summary cards ({format_currency(summary_net_exposure)}) does not match the total market value shown in the UI ({format_currency(total_ui_market_value)})"

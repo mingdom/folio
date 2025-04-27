@@ -8,26 +8,31 @@ and handling for different error conditions.
 
 class FolioError(Exception):
     """Base class for all Folio application exceptions."""
+
     pass
 
 
 class DataError(FolioError):
     """Raised when there are issues with data processing or validation."""
+
     pass
 
 
 class PortfolioError(FolioError):
     """Raised when there are issues with portfolio operations."""
+
     pass
 
 
 class UIError(FolioError):
     """Raised when there are issues with the UI components."""
+
     pass
 
 
 class ConfigurationError(FolioError):
     """Raised when there are issues with application configuration."""
+
     pass
 
 

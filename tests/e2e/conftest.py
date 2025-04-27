@@ -67,28 +67,31 @@ def processed_portfolio(portfolio_data):
             # Possible alternative: (groups, cash_like_positions)
             groups, cash_like_positions = result
             from src.folio.portfolio import calculate_portfolio_summary
+
             summary = calculate_portfolio_summary(groups, cash_like_positions, 0.0)
     else:
         # If result is not a tuple, it's likely just the groups
         groups = result
         from src.folio.portfolio import calculate_portfolio_summary
+
         summary = calculate_portfolio_summary(groups, [], 0.0)
         cash_like_positions = []
 
     # Ensure we have a valid summary object
-    if not hasattr(summary, 'to_dict'):
+    if not hasattr(summary, "to_dict"):
         logger.error("Error: summary object does not have to_dict method")
         logger.error(f"Type of summary: {type(summary)}")
         # Create a minimal summary for testing
         # Import here to avoid circular imports
         from src.folio.data_model import ExposureBreakdown, PortfolioSummary
+
         empty_exposure = ExposureBreakdown()
         summary = PortfolioSummary(
             net_market_exposure=0.0,
             portfolio_beta=0.0,
             long_exposure=empty_exposure,
             short_exposure=empty_exposure,
-            options_exposure=empty_exposure
+            options_exposure=empty_exposure,
         )
 
     # Convert summary to dictionary for use in tests

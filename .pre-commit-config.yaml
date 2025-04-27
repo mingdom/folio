@@ -3,8 +3,11 @@ repos:
     rev: v0.11.4
     hooks:
       - id: ruff
-        args: [--fix, --unsafe-fixes]
+        args: [--fix]
+        files: ^(src|tests)/
       - id: ruff-format
+        files: ^(src|tests)/
+        types_or: [python, pyi]
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.5.0
