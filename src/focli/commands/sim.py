@@ -26,12 +26,14 @@ console = Console()
 def main(
     file_path: str = typer.Argument(..., help="Path to the portfolio CSV file"),
     min_spy_change: float = typer.Option(
-        -0.1, help="Minimum SPY change to simulate (as a decimal)"
+        -0.2, help="Minimum SPY change to simulate (as a decimal)"
     ),
     max_spy_change: float = typer.Option(
-        0.1, help="Maximum SPY change to simulate (as a decimal)"
+        0.2, help="Maximum SPY change to simulate (as a decimal)"
     ),
-    steps: int = typer.Option(5, help="Number of steps between min and max SPY change"),
+    steps: int = typer.Option(
+        21, help="Number of steps between min and max SPY change"
+    ),
     ticker: str | None = typer.Option(
         None, help="Focus on a specific ticker (optional)"
     ),
