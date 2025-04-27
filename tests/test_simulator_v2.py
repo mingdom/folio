@@ -12,6 +12,8 @@ from src.folio.simulator_v2 import (
     calculate_stock_pnl,
     calculate_stock_value,
     calculate_underlying_price,
+    simulate_portfolio,
+    simulate_position_group,
 )
 
 
@@ -147,3 +149,77 @@ class TestSimulatorV2(unittest.TestCase):
         )
         # Put should be profitable with price decrease
         self.assertGreater(put_pnl, 0)
+
+    def test_zero_pnl_at_zero_spy_change(self):
+        """Test that there is zero P&L at 0% SPY change."""
+        # Import here to avoid circular imports
+        from src.folio.data_model import OptionPosition, PortfolioGroup, StockPosition
+
+        # Create a test date for option expiry
+        today = date.today()
+        expiry = today + timedelta(days=30)
+        expiry_str = expiry.strftime("%Y-%m-%d")
+
+        # Create a stock position
+        stock = StockPosition(
+            ticker="AAPL",
+            quantity=10,
+            beta=1.2,
+            market_exposure=1500.0,
+            beta_adjusted_exposure=1800.0,
+            price=150.0,
+            market_value=1500.0,
+        )
+
+        # Create an option position
+        option = OptionPosition(
+            ticker="AAPL",
+            position_type="option",
+            quantity=1,
+            beta=1.2,
+            beta_adjusted_exposure=600.0,
+            strike=150.0,
+            expiry=expiry_str,
+            option_type="CALL",
+            delta=0.5,
+            delta_exposure=750.0,
+            notional_value=15000.0,
+            underlying_beta=1.2,
+            market_exposure=750.0,
+            price=5.0,  # $5 per share = $500 per contract
+            market_value=500.0,
+        )
+
+        # Create a position group
+        group = PortfolioGroup(
+            ticker="AAPL",
+            stock_position=stock,
+            option_positions=[option],
+            net_exposure=2000.0,
+            beta=1.2,
+            beta_adjusted_exposure=2400.0,
+            total_delta_exposure=750.0,
+            options_delta_exposure=750.0,
+        )
+
+        # Simulate with 0% SPY change
+        result = simulate_position_group(group, 0.0)
+
+        # Check that P&L is zero or very close to zero
+        self.assertAlmostEqual(result["pnl"], 0.0, places=2)
+        self.assertAlmostEqual(result["pnl_percent"], 0.0, places=2)
+
+        # Check individual positions
+        for position_result in result["positions"]:
+            self.assertAlmostEqual(position_result["pnl"], 0.0, places=2)
+            self.assertAlmostEqual(position_result["pnl_percent"], 0.0, places=2)
+
+        # Test at portfolio level
+        spy_changes = [0.0]
+        portfolio_result = simulate_portfolio([group], spy_changes, cash_value=1000.0)
+
+        # Check that portfolio P&L is zero
+        self.assertAlmostEqual(portfolio_result["portfolio_pnls"][0], 0.0, places=2)
+        self.assertAlmostEqual(
+            portfolio_result["portfolio_pnl_percents"][0], 0.0, places=2
+        )
