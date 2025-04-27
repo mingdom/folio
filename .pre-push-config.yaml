@@ -2,50 +2,31 @@ repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.11.4
     hooks:
-      - id: ruff
-        args: [--fix]
-        files: ^(src|tests)/
-        stages: [pre-commit]
       - id: ruff-format
         files: ^(src|tests)/
         types_or: [python, pyi]
-        stages: [pre-push]
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.5.0
     hooks:
-      - id: trailing-whitespace
-        stages: [pre-commit]
-      - id: end-of-file-fixer
-        stages: [pre-commit]
       - id: check-yaml
-        stages: [pre-push]
       - id: check-added-large-files
-        stages: [pre-push]
       - id: check-toml
-        stages: [pre-push]
       - id: check-json
-        stages: [pre-push]
-      - id: debug-statements
-        stages: [pre-commit]
-      - id: check-merge-conflict
-        stages: [pre-commit]
 
   - repo: https://github.com/python-jsonschema/check-jsonschema
     rev: 0.28.0
     hooks:
       - id: check-github-workflows
         args: ["--verbose"]
-        stages: [pre-push]
 
   - repo: https://github.com/python-poetry/poetry
     rev: 1.8.2
     hooks:
       - id: poetry-check
-        stages: [pre-push]
         files: ^pyproject.toml$
 
-  # Run local hooks using Poetry
+  # Run tests only on push
   - repo: local
     hooks:
       - id: pytest-check
@@ -54,4 +35,3 @@ repos:
         language: system
         pass_filenames: false
         always_run: true
-        stages: [pre-push]

@@ -76,15 +76,14 @@ install:
 # Install git hooks
 .PHONY: hooks
 hooks:
-	@echo "Installing git hooks with pre-commit..."
+	@echo "Installing git hooks..."
 	@if ! command -v $(POETRY) &> /dev/null; then \
 		echo "Poetry not found. Please run 'make env' first."; \
 		exit 1; \
 	fi
-	@$(POETRY) run pre-commit install
+	@$(POETRY) run pre-commit install -c .pre-commit-config.yaml --hook-type pre-commit
+	@$(POETRY) run pre-commit install -c .pre-push-config.yaml --hook-type pre-push
 	@echo "Git hooks installed successfully!"
-
-
 
 # Clean up generated files
 .PHONY: clean
