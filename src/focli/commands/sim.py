@@ -291,6 +291,190 @@ def display_position_details(positions, spy_change):
     console.print("")
 
 
+def analyze_spy_correlation(simulation_result, console):
+    """
+    Analyze which positions have negative correlation with SPY.
+
+    This function identifies positions that perform worse when SPY increases,
+    which helps explain why a portfolio might have poor returns in up markets.
+
+    Args:
+        simulation_result: Simulation results dictionary
+        console: Rich console for output
+    """
+    # Get the SPY changes and find the positive change indices
+    spy_changes = simulation_result["spy_changes"]
+    positive_indices = [i for i, change in enumerate(spy_changes) if change > 0]
+
+    if not positive_indices:
+        console.print(
+            "[yellow]No positive SPY changes in simulation to analyze.[/yellow]"
+        )
+        return
+
+    # Find the position results for each ticker
+    position_results = simulation_result["position_results"]
+
+    # Calculate correlation metrics for each position
+    correlation_data = []
+
+    for ticker, results in position_results.items():
+        # Skip if no results
+        if not results:
+            continue
+
+        # Get the position PNLs at each SPY change
+        position_pnls = [result["pnl"] for result in results]
+
+        # Calculate average P&L for positive SPY changes
+        positive_pnls = [position_pnls[i] for i in positive_indices]
+        avg_positive_pnl = (
+            sum(positive_pnls) / len(positive_pnls) if positive_pnls else 0
+        )
+
+        # Get the original value (same for all results)
+        original_value = results[0]["original_value"] if results else 0
+
+        # Calculate correlation coefficient between position values and SPY changes
+        # (simplified approach - just check if position tends to lose money when SPY goes up)
+        correlation_score = avg_positive_pnl
+
+        # Calculate impact on portfolio (weighted by position size)
+        portfolio_impact = correlation_score
+
+        # Store the data
+        correlation_data.append(
+            {
+                "ticker": ticker,
+                "original_value": original_value,
+                "correlation_score": correlation_score,
+                "portfolio_impact": portfolio_impact,
+                "avg_positive_pnl": avg_positive_pnl,
+            }
+        )
+
+    # Sort by portfolio impact (most negative first)
+    correlation_data.sort(key=lambda x: x["portfolio_impact"])
+
+    # Create a table for the results
+    table = Table(title="Position Performance When SPY Increases (Avg of +2% to +20%)")
+
+    # Add columns with clearer headers
+    table.add_column("Ticker", style="cyan")
+    table.add_column("Current Position Size", style="green")
+    table.add_column("Avg P&L When SPY Up", style="yellow")
+    table.add_column("Return on Position", style="magenta")
+    table.add_column("Portfolio Weight", style="blue")
+
+    # Add rows
+    total_portfolio_value = sum(
+        abs(item["original_value"]) for item in correlation_data
+    )
+
+    for item in correlation_data:
+        ticker = item["ticker"]
+        original_value = item["original_value"]
+        avg_positive_pnl = item["avg_positive_pnl"]
+
+        # Calculate percentage return on position (handle negative position values properly)
+        abs_original = abs(original_value)
+        if abs_original > 0:
+            # If position value is negative (short), flip the sign of the percentage
+            sign_multiplier = -1 if original_value < 0 else 1
+            pnl_percent = (avg_positive_pnl / abs_original) * 100 * sign_multiplier
+        else:
+            pnl_percent = 0
+
+        # Calculate percentage of portfolio (always use absolute value for portfolio weight)
+        portfolio_percent = (
+            (abs_original / total_portfolio_value) * 100 if total_portfolio_value else 0
+        )
+
+        # Format values
+        original_value_str = f"${abs_original:,.2f}"
+        if original_value < 0:
+            original_value_str = f"${abs_original:,.2f} (Short)"
+
+        avg_positive_pnl_str = (
+            f"${avg_positive_pnl:+,.2f}" if avg_positive_pnl else "$0.00"
+        )
+
+        # Cap percentage display at ±100% for readability
+        display_pnl_percent = min(max(pnl_percent, -100), 100)
+        pnl_percent_str = f"{display_pnl_percent:+.2f}%"
+        if abs(pnl_percent) > 100:
+            pnl_percent_str += f" (actual: {pnl_percent:+.2f}%)"
+
+        portfolio_weight_str = f"{portfolio_percent:.2f}% of portfolio"
+
+        # Add row with color based on P&L
+        pnl_style = "green" if avg_positive_pnl >= 0 else "red"
+        table.add_row(
+            ticker,
+            original_value_str,
+            f"[{pnl_style}]{avg_positive_pnl_str}[/{pnl_style}]",
+            f"[{pnl_style}]{pnl_percent_str}[/{pnl_style}]",
+            portfolio_weight_str,
+        )
+
+    # Display the table with clearer explanations
+    console.print("\n[bold]Analysis: How Positions Perform When SPY Increases[/bold]")
+    console.print(
+        "[italic]This analysis shows the average performance of each position across all positive SPY changes (+2% to +20%)[/italic]"
+    )
+    console.print(
+        "[italic]Positions are ranked from worst to best performance when SPY increases[/italic]"
+    )
+    console.print(table)
+
+    # Show the SPY range used for this analysis
+    positive_spy_changes = [
+        f"+{change * 100:.1f}%"
+        for change in simulation_result["spy_changes"]
+        if change > 0
+    ]
+    console.print(f"\n[bold]SPY Changes Used:[/bold] {', '.join(positive_spy_changes)}")
+
+    # Provide analysis summary
+    negative_performers = [
+        item for item in correlation_data if item["avg_positive_pnl"] < 0
+    ]
+    if negative_performers:
+        total_negative_impact = sum(
+            item["avg_positive_pnl"] for item in negative_performers
+        )
+        console.print(
+            f"\n[bold]Key Finding:[/bold] {len(negative_performers)} positions consistently lose money when SPY increases."
+        )
+        console.print(
+            f"Total negative impact across all up-market scenarios: [red]${total_negative_impact:,.2f}[/red]"
+        )
+
+        # Recommend positions to investigate
+        console.print("\n[bold]Positions to investigate:[/bold]")
+        for item in negative_performers[:3]:  # Top 3 worst performers
+            console.print(
+                f"- {item['ticker']}: [red]${item['avg_positive_pnl']:,.2f}[/red] average loss when SPY increases"
+            )
+            console.print(
+                f"  Try: [cyan]position {item['ticker']} simulate[/cyan] for detailed analysis"
+            )
+
+        # Add explanation about what this means
+        console.print("\n[bold]What This Means:[/bold]")
+        console.print(
+            "These positions are negatively correlated with SPY - they tend to lose money when the market goes up."
+        )
+        console.print(
+            "This explains why your portfolio's overall performance decreases when SPY increases beyond certain levels."
+        )
+    else:
+        console.print(
+            "\n[bold green]Good news![/bold green] No positions show consistent losses when SPY increases."
+        )
+        console.print("Your portfolio appears to be well-positioned for up markets.")
+
+
 def shell_command(args: list[str], state: dict[str, Any], console: Console):
     """
     Execute the sim command in the shell context.
@@ -315,6 +499,7 @@ def shell_command(args: list[str], state: dict[str, Any], console: Console):
     steps = 21
     ticker = None
     detailed = False
+    analyze_correlation = False
 
     # Process arguments
     i = 0
@@ -353,10 +538,13 @@ def shell_command(args: list[str], state: dict[str, Any], console: Console):
         elif arg == "--detailed":
             detailed = True
             i += 1
+        elif arg in {"--analyze-correlation", "--analyze"}:
+            analyze_correlation = True
+            i += 1
         else:
             console.print(f"[bold red]Error:[/bold red] Unknown argument: {arg}")
             console.print(
-                "Usage: sim [--min-spy-change VALUE] [--max-spy-change VALUE] [--steps VALUE] [--ticker TICKER] [--detailed]"
+                "Usage: sim [--min-spy-change VALUE] [--max-spy-change VALUE] [--steps VALUE] [--ticker TICKER] [--detailed] [--analyze-correlation]"
             )
             return
 
@@ -401,6 +589,10 @@ def shell_command(args: list[str], state: dict[str, Any], console: Console):
 
     # Display results
     display_simulation_results(simulation_result, detailed)
+
+    # If analyze_correlation flag is set, run the correlation analysis
+    if analyze_correlation:
+        analyze_spy_correlation(simulation_result, console)
 
 
 if __name__ == "__main__":

@@ -66,6 +66,26 @@ def help_command(args: list[str], state: dict[str, Any], console):  # noqa: ARG0
             console.print(
                 "  [green]simulate spy[/green] - Explicitly specify SPY benchmark (same as 'simulate')"
             )
+            console.print(
+                "  [green]simulate --analyze-correlation[/green] - Analyze which positions perform poorly when SPY increases"
+            )
+
+        elif command == "sim":
+            console.print(
+                "  [green]sim[/green] - Run a simulation with default parameters"
+            )
+            console.print(
+                "  [green]sim --min-spy-change -0.2 --max-spy-change 0.2 --steps 21[/green] - Customize simulation range"
+            )
+            console.print(
+                "  [green]sim --ticker AAPL[/green] - Run a simulation for a specific ticker"
+            )
+            console.print(
+                "  [green]sim --detailed[/green] - Show detailed position-level results"
+            )
+            console.print(
+                "  [green]sim --analyze-correlation[/green] - Analyze which positions perform poorly when SPY increases"
+            )
 
         elif command == "position":
             console.print(

@@ -10,9 +10,7 @@ from typing import Any
 import pandas as pd
 
 
-def analyze_position_contributions(
-    simulation_result: dict[str, Any]
-) -> dict[str, Any]:
+def analyze_position_contributions(simulation_result: dict[str, Any]) -> dict[str, Any]:
     """
     Analyze how each position contributes to portfolio P&L at different SPY changes.
 
@@ -68,9 +66,7 @@ def analyze_position_contributions(
     for spy_change in spy_changes:
         # Sort positions by absolute contribution
         sorted_contributions = sorted(
-            contributions[spy_change].items(),
-            key=lambda x: abs(x[1]),
-            reverse=True
+            contributions[spy_change].items(), key=lambda x: abs(x[1]), reverse=True
         )
 
         # Get top 5 contributors by absolute value
@@ -81,15 +77,13 @@ def analyze_position_contributions(
         if spy_change < 0:
             # For negative SPY changes, we want positions that lose the most
             bottom_sorted = sorted(
-                contributions[spy_change].items(),
-                key=lambda x: x[1]
+                contributions[spy_change].items(), key=lambda x: x[1]
             )
             bottom_contributors[spy_change] = bottom_sorted[:5]
         else:
             # For positive SPY changes, we want positions that gain the least or lose
             bottom_sorted = sorted(
-                contributions[spy_change].items(),
-                key=lambda x: x[1]
+                contributions[spy_change].items(), key=lambda x: x[1]
             )
             bottom_contributors[spy_change] = bottom_sorted[:5]
 
@@ -100,14 +94,12 @@ def analyze_position_contributions(
         if spy_change > 0 and simulation_result["portfolio_pnls"][i] < 0:
             # Sort positions by contribution (most negative first)
             sorted_contributions = sorted(
-                contributions[spy_change].items(),
-                key=lambda x: x[1]
+                contributions[spy_change].items(), key=lambda x: x[1]
             )
 
             # Get positions with negative contributions
             negative_contributors = [
-                (ticker, pnl) for ticker, pnl in sorted_contributions
-                if pnl < 0
+                (ticker, pnl) for ticker, pnl in sorted_contributions if pnl < 0
             ]
 
             problematic_positions[spy_change] = negative_contributors
@@ -123,9 +115,7 @@ def analyze_position_contributions(
     }
 
 
-def find_key_spy_levels(
-    simulation_result: dict[str, Any]
-) -> dict[str, Any]:
+def find_key_spy_levels(simulation_result: dict[str, Any]) -> dict[str, Any]:
     """
     Find key SPY levels where portfolio behavior changes significantly.
 
@@ -141,8 +131,9 @@ def find_key_spy_levels(
     # Find where P&L changes from positive to negative or vice versa
     inflection_points = []
     for i in range(1, len(spy_changes)):
-        if (portfolio_pnls[i-1] >= 0 and portfolio_pnls[i] < 0) or \
-           (portfolio_pnls[i-1] < 0 and portfolio_pnls[i] >= 0):
+        if (portfolio_pnls[i - 1] >= 0 and portfolio_pnls[i] < 0) or (
+            portfolio_pnls[i - 1] < 0 and portfolio_pnls[i] >= 0
+        ):
             inflection_points.append((spy_changes[i], portfolio_pnls[i]))
 
     # Find the SPY change where portfolio P&L is maximum
@@ -156,7 +147,11 @@ def find_key_spy_levels(
     # Find the SPY change where portfolio starts to decline in rising markets
     declining_in_rising_market = None
     for i in range(1, len(spy_changes)):
-        if spy_changes[i-1] < spy_changes[i] and portfolio_pnls[i-1] > portfolio_pnls[i] and spy_changes[i] > 0:
+        if (
+            spy_changes[i - 1] < spy_changes[i]
+            and portfolio_pnls[i - 1] > portfolio_pnls[i]
+            and spy_changes[i] > 0
+        ):
             declining_in_rising_market = spy_changes[i]
             break
 
