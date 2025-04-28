@@ -67,7 +67,7 @@ class TestSimulatorV2Integration(unittest.TestCase):
         )
 
         # Simulate with a price increase
-        result = simulate_option_position(option, 160.0)
+        result = simulate_option_position(option, 160.0, current_underlying_price=150.0)
 
         # Check the results
         self.assertEqual(result["ticker"], "AAPL")

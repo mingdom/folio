@@ -242,6 +242,7 @@ def simulate_stock_position(
 def simulate_option_position(
     position: OptionPosition,
     new_underlying_price: float,
+    current_underlying_price: float,  # Required parameter, no default value
 ) -> dict[str, Any]:
     """
     Simulate an option position with a new underlying price.
@@ -249,6 +250,7 @@ def simulate_option_position(
     Args:
         position: Option position to simulate
         new_underlying_price: New price of the underlying
+        current_underlying_price: Current price of the underlying
 
     Returns:
         Dictionary with simulation results
@@ -262,15 +264,33 @@ def simulate_option_position(
     else:
         expiry_date = position.expiry
 
-    # Calculate new value using Black-Scholes
-    new_value = calculate_option_value(
-        position.option_type,
-        position.strike,
-        expiry_date,
-        new_underlying_price,
-        position.quantity,
-        getattr(position, "implied_volatility", 0.3),
+    # Import from options module
+    from .options import OptionContract, calculate_bs_price
+
+    # Create a contract for the current option
+    option_contract = OptionContract(
+        underlying=position.ticker,
+        expiry=expiry_date
+        if isinstance(expiry_date, datetime.datetime)
+        else datetime.datetime.combine(expiry_date, datetime.datetime.min.time()),
+        strike=position.strike,
+        option_type=position.option_type,
+        quantity=position.quantity,
+        current_price=position.price,
+        description=f"{position.ticker} {position.option_type} {position.strike}",
     )
+
+    # Calculate new value using the options module
+    implied_volatility = getattr(position, "implied_volatility", 0.3)
+    new_price = calculate_bs_price(
+        option_contract,
+        new_underlying_price,
+        risk_free_rate=0.05,
+        volatility=implied_volatility,
+    )
+
+    # Calculate new value (price per contract * quantity * 100 shares per contract)
+    new_value = new_price * position.quantity * 100
 
     # Calculate P&L
     pnl = new_value - original_value
@@ -278,17 +298,13 @@ def simulate_option_position(
     # Calculate P&L percentage
     pnl_percent = (pnl / original_value) * 100 if original_value else 0
 
-    # Get the current price from the stock position in the same group
-    # For our test, we'll use a default value
-    current_price = 150.0  # Default value for testing
-
     return {
         "ticker": position.ticker,
         "position_type": "option",
         "option_type": position.option_type,
         "strike": position.strike,
         "expiry": position.expiry,
-        "original_underlying_price": current_price,
+        "original_underlying_price": current_underlying_price,
         "new_underlying_price": new_underlying_price,
         "original_value": original_value,
         "new_value": new_value,
@@ -347,7 +363,9 @@ def simulate_position_group(
     # Simulate option positions
     if position_group.option_positions:
         for option in position_group.option_positions:
-            option_result = simulate_option_position(option, new_price)
+            option_result = simulate_option_position(
+                option, new_price, current_underlying_price=current_price
+            )
             position_results.append(option_result)
             total_original_value += option_result["original_value"]
             total_new_value += option_result["new_value"]
