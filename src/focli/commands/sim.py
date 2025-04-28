@@ -99,11 +99,25 @@ def main(
 
 def display_simulation_results(simulation_result, detailed=False):
     """Display simulation results in a formatted table."""
+    # Get current SPY price
+    try:
+        import yfinance as yf
+
+        spy_data = yf.Ticker("SPY")
+        current_spy_price = spy_data.history(period="1d")["Close"].iloc[-1]
+    except Exception:
+        # If there's an error getting the price, use a default value
+        current_spy_price = 500.0  # Default SPY price
+        console.print(
+            "[yellow]Warning: Could not get current SPY price. Using default value.[/yellow]"
+        )
+
     # Create portfolio-level table
     table = Table(title="Portfolio Simulation Results")
 
     # Add columns
     table.add_column("SPY Change", style="cyan")
+    table.add_column("SPY Price", style="blue")
     table.add_column("Portfolio Value", style="green")
     table.add_column("P&L", style="yellow")
     table.add_column("P&L %", style="magenta")
@@ -112,6 +126,11 @@ def display_simulation_results(simulation_result, detailed=False):
     # Add rows
     for i, spy_change in enumerate(simulation_result["spy_changes"]):
         spy_change_str = f"{spy_change * 100:+.1f}%"
+
+        # Calculate SPY price at this change level
+        spy_price = current_spy_price * (1 + spy_change)
+        spy_price_str = f"${spy_price:.2f}"
+
         portfolio_value = simulation_result["portfolio_values"][i]
         portfolio_pnl = simulation_result["portfolio_pnls"][i]
         portfolio_pnl_percent = simulation_result["portfolio_pnl_percents"][i]
@@ -135,6 +154,7 @@ def display_simulation_results(simulation_result, detailed=False):
         pnl_style = "green" if portfolio_pnl >= 0 else "red"
         table.add_row(
             spy_change_str,
+            spy_price_str,
             portfolio_value_str,
             f"[{pnl_style}]{portfolio_pnl_str}[/{pnl_style}]",
             f"[{pnl_style}]{portfolio_pnl_percent_str}[/{pnl_style}]",
@@ -147,7 +167,8 @@ def display_simulation_results(simulation_result, detailed=False):
     # Display portfolio values
     current_value = simulation_result.get("current_portfolio_value", 0)
     original_value = simulation_result.get("original_portfolio_value", 0)
-    console.print(f"\nCurrent Portfolio Value (0% baseline): ${current_value:,.2f}")
+    console.print(f"\nCurrent SPY Price: ${current_spy_price:.2f}")
+    console.print(f"Current Portfolio Value (0% baseline): ${current_value:,.2f}")
     console.print(f"Original Portfolio Value: ${original_value:,.2f}\n")
 
     # Display detailed position results if requested
