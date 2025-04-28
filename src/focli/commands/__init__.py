@@ -12,6 +12,7 @@ from .help import help_command
 from .portfolio import portfolio_command
 from .position import position_command
 from .sim import app as sim_app
+from .sim import shell_command as sim_shell_command
 from .simulate import simulate_command
 
 # Command registry
@@ -76,8 +77,6 @@ def execute_command(command_line: str, state: dict[str, Any], console):
         )
 
 
-# Import command modules
-
 # Register commands
 register_command("help", help_command, "Show help information")
 register_command(
@@ -88,7 +87,7 @@ register_command(
 )
 register_command(
     "sim",
-    lambda args, state, console: sim_app(args),
+    sim_shell_command,
     "Simulate portfolio performance using the improved simulator_v2",
 )
 register_command("position", position_command, "Analyze a specific position group")
@@ -98,4 +97,4 @@ register_command(
     "View and analyze portfolio",
     ["list", "summary", "load"],
 )
-register_command("exit", lambda *args: None, "Exit the application")
+register_command("exit", lambda *args: None, "Exit the application immediately")

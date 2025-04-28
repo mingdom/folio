@@ -22,6 +22,7 @@ help:
 	@echo "                        log=LEVEL (set logging level: DEBUG, INFO, WARNING, ERROR)"
 	@echo "  focli       - Start the interactive Folio CLI shell for portfolio analysis"
 	@echo "  simulate    - Run portfolio simulation using the improved simulator_v2"
+	@echo "  sim         - Alias for simulate (shorter to type)"
 	@echo "               Options: ticker=SYMBOL (focus on a specific ticker)"
 	@echo "                        detailed=1 (show detailed position-level results)"
 	@echo "                        portfolio=path/to/file.csv (use custom portfolio file)"
@@ -204,8 +205,11 @@ analyze:
 		exit 1; \
 	fi
 
+# Alias for simulate
+sim: simulate
+
 # Test targets
-.PHONY: test test-e2e simulate analyze
+.PHONY: test test-e2e simulate analyze sim
 test:
 	@echo "Running unit tests..."
 	@if ! command -v $(POETRY) &> /dev/null; then \

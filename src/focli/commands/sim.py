@@ -6,6 +6,7 @@ using the improved simulator_v2 implementation.
 """
 
 import os
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -267,6 +268,118 @@ def display_position_details(positions, spy_change):
     # Display the table
     console.print(table)
     console.print("")
+
+
+def shell_command(args: list[str], state: dict[str, Any], console: Console):
+    """
+    Execute the sim command in the shell context.
+
+    This function is called when the user types 'sim' in the Folio CLI shell.
+    It uses the portfolio already loaded in the shell's state.
+
+    Args:
+        args: Command arguments
+        state: Application state containing the loaded portfolio
+        console: Rich console for output
+    """
+    # Check if a portfolio is loaded
+    if not state.get("portfolio_groups") or not state.get("portfolio_summary"):
+        console.print("[bold red]Error:[/bold red] No portfolio loaded.")
+        console.print("Use 'portfolio load <path>' to load a portfolio.")
+        return
+
+    # Parse arguments
+    min_spy_change = -0.2
+    max_spy_change = 0.2
+    steps = 21
+    ticker = None
+    detailed = False
+
+    # Process arguments
+    i = 0
+    while i < len(args):
+        arg = args[i]
+        if arg == "--min-spy-change" and i + 1 < len(args):
+            try:
+                min_spy_change = float(args[i + 1])
+                i += 2
+            except ValueError:
+                console.print(
+                    f"[bold red]Error:[/bold red] Invalid value for --min-spy-change: {args[i + 1]}"
+                )
+                return
+        elif arg == "--max-spy-change" and i + 1 < len(args):
+            try:
+                max_spy_change = float(args[i + 1])
+                i += 2
+            except ValueError:
+                console.print(
+                    f"[bold red]Error:[/bold red] Invalid value for --max-spy-change: {args[i + 1]}"
+                )
+                return
+        elif arg == "--steps" and i + 1 < len(args):
+            try:
+                steps = int(args[i + 1])
+                i += 2
+            except ValueError:
+                console.print(
+                    f"[bold red]Error:[/bold red] Invalid value for --steps: {args[i + 1]}"
+                )
+                return
+        elif arg == "--ticker" and i + 1 < len(args):
+            ticker = args[i + 1]
+            i += 2
+        elif arg == "--detailed":
+            detailed = True
+            i += 1
+        else:
+            console.print(f"[bold red]Error:[/bold red] Unknown argument: {arg}")
+            console.print(
+                "Usage: sim [--min-spy-change VALUE] [--max-spy-change VALUE] [--steps VALUE] [--ticker TICKER] [--detailed]"
+            )
+            return
+
+    # Get portfolio groups and summary from state
+    portfolio_groups = state["portfolio_groups"]
+    portfolio_summary = state["portfolio_summary"]
+
+    # Filter portfolio groups if ticker is specified
+    if ticker:
+        portfolio_groups = [
+            g for g in portfolio_groups if g.ticker.upper() == ticker.upper()
+        ]
+        if not portfolio_groups:
+            console.print(
+                f"[bold red]Error:[/bold red] Ticker {ticker} not found in portfolio."
+            )
+            return
+
+    # Generate SPY changes
+    spy_changes = list(
+        pd.Series(np.linspace(min_spy_change, max_spy_change, steps)).round(3)
+    )
+
+    # Run simulation
+    console.print("Running portfolio simulation...")
+    simulation_result = simulate_portfolio(
+        portfolio_groups=portfolio_groups,
+        spy_changes=spy_changes,
+        cash_value=portfolio_summary.cash_like_value,
+    )
+
+    # Set the original portfolio value to the total portfolio value from the summary
+    original_portfolio_value = portfolio_summary.portfolio_estimate_value
+    simulation_result["original_portfolio_value"] = original_portfolio_value
+
+    # Recalculate the P&L % of Orig correctly
+    portfolio_pnls = simulation_result["portfolio_pnls"]
+    simulation_result["portfolio_pnl_vs_original_percents"] = [
+        (pnl / original_portfolio_value) * 100 if original_portfolio_value else 0
+        for pnl in portfolio_pnls
+    ]
+
+    # Display results
+    display_simulation_results(simulation_result, detailed)
 
 
 if __name__ == "__main__":

@@ -114,7 +114,7 @@ def help_command(args: list[str], state: dict[str, Any], console):  # noqa: ARG0
             )
 
         elif command == "exit":
-            console.print("  [green]exit[/green] - Exit the application")
+            console.print("  [green]exit[/green] - Exit the application immediately")
 
         console.print("")
 
