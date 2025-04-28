@@ -318,6 +318,7 @@ def simulate_position_group(
     position_group: PortfolioGroup,
     spy_change: float,
     stock_price: float,
+    type_filter: str | None = None,  # New parameter: 'stock', 'option', or None (all)
 ) -> dict[str, Any]:
     """
     Simulate a position group with a given SPY change.
@@ -326,14 +327,26 @@ def simulate_position_group(
         position_group: Position group to simulate
         spy_change: SPY price change as a decimal
         stock_price: Current stock price for the ticker
+        type_filter: Filter to only include specific position types ('stock', 'option', or None for all)
 
     Returns:
         Dictionary with simulation results
     """
-    # Validate position group
-    if not position_group.stock_position and not position_group.option_positions:
+    # Validate position group based on filter
+    has_valid_positions = False
+    if type_filter == "stock":
+        has_valid_positions = position_group.stock_position is not None
+    elif type_filter == "option":
+        has_valid_positions = len(position_group.option_positions) > 0
+    else:  # No filter
+        has_valid_positions = (
+            position_group.stock_position is not None
+            or len(position_group.option_positions) > 0
+        )
+
+    if not has_valid_positions:
         raise ValueError(
-            f"Cannot simulate empty position group for {position_group.ticker}"
+            f"No valid positions for {position_group.ticker} with filter {type_filter}"
         )
 
     # Validate stock price
@@ -355,16 +368,20 @@ def simulate_position_group(
     total_new_value = 0
     total_pnl = 0
 
-    # Simulate stock position
-    if position_group.stock_position:
+    # Simulate stock position if no filter or filter is 'stock'
+    if position_group.stock_position and (
+        type_filter is None or type_filter == "stock"
+    ):
         stock_result = simulate_stock_position(position_group.stock_position, new_price)
         position_results.append(stock_result)
         total_original_value += stock_result["original_value"]
         total_new_value += stock_result["new_value"]
         total_pnl += stock_result["pnl"]
 
-    # Simulate option positions
-    if position_group.option_positions:
+    # Simulate option positions if no filter or filter is 'option'
+    if position_group.option_positions and (
+        type_filter is None or type_filter == "option"
+    ):
         for option in position_group.option_positions:
             option_result = simulate_option_position(
                 option, new_price, current_underlying_price=stock_price
@@ -400,6 +417,7 @@ def simulate_portfolio(
     portfolio_groups: list[PortfolioGroup],
     spy_changes: list[float],
     cash_value: float = 0.0,
+    type_filter: str | None = None,  # New parameter
 ) -> dict[str, Any]:
     """
     Simulate portfolio performance across different SPY price changes.
@@ -416,6 +434,7 @@ def simulate_portfolio(
         portfolio_groups: Portfolio groups to simulate
         spy_changes: List of SPY price change percentages as decimals
         cash_value: Value of cash positions
+        type_filter: Filter to only include specific position types ('stock', 'option', or None for all)
 
     Returns:
         Dictionary with simulation results including:
@@ -427,6 +446,7 @@ def simulate_portfolio(
         - current_portfolio_value: The baseline portfolio value (at 0% SPY change)
         - original_portfolio_value: The original portfolio value (before simulation)
         - position_results: Detailed results for each position group
+        - type_filter: The position type filter used in the simulation
     """
     if not portfolio_groups:
         logger.warning("Cannot simulate an empty portfolio")
@@ -445,14 +465,40 @@ def simulate_portfolio(
     portfolio_values = []
     position_results = {group.ticker: [] for group in portfolio_groups}
 
-    # We'll set a default original portfolio value that will be overridden
-    # by the CLI with the actual portfolio value from the portfolio summary
-    original_portfolio_value = cash_value
+    # Filter portfolio groups based on position type
+    filtered_groups = []
     for group in portfolio_groups:
-        if group.stock_position:
-            original_portfolio_value += group.stock_position.market_value
-        for option in group.option_positions:
-            original_portfolio_value += option.market_value
+        # Check if the group has valid positions for the filter
+        if type_filter == "stock" and not group.stock_position:
+            continue
+        elif type_filter == "option" and not group.option_positions:
+            continue
+        filtered_groups.append(group)
+
+    if not filtered_groups:
+        logger.warning(f"No valid positions found with filter: {type_filter}")
+        return {
+            "spy_changes": spy_changes,
+            "portfolio_values": [cash_value] * len(spy_changes),
+            "portfolio_pnls": [0.0] * len(spy_changes),
+            "portfolio_pnl_percents": [0.0] * len(spy_changes),
+            "portfolio_pnl_vs_original_percents": [0.0] * len(spy_changes),
+            "current_portfolio_value": cash_value,
+            "original_portfolio_value": cash_value,
+            "position_results": {},
+            "type_filter": type_filter,
+        }
+
+    # Calculate original portfolio value based on filtered groups
+    original_portfolio_value = cash_value
+    for group in filtered_groups:
+        if type_filter is None or type_filter == "stock":
+            if group.stock_position:
+                original_portfolio_value += group.stock_position.market_value
+
+        if type_filter is None or type_filter == "option":
+            for option in group.option_positions:
+                original_portfolio_value += option.market_value
 
     # Find the index of 0% SPY change to use as baseline
     # If 0% is not in the list, we'll calculate baseline values separately
@@ -462,6 +508,11 @@ def simulate_portfolio(
             zero_index = i
             break
 
+    # Ensure we have a valid zero index
+    if zero_index is None:
+        # Find the closest to zero if exact zero not found
+        zero_index = min(range(len(spy_changes)), key=lambda i: abs(spy_changes[i]))
+
     # Simulate for each SPY change
     for spy_change in spy_changes:
         portfolio_value = (
@@ -469,14 +520,24 @@ def simulate_portfolio(
         )
 
         # Simulate each position group
-        for group in portfolio_groups:
-            stock_price = get_stock_price(group.ticker)
-            group_result = simulate_position_group(group, spy_change, stock_price)
-            portfolio_value += group_result["new_value"]
-            position_results[group.ticker].append(group_result)
+        for group in filtered_groups:
+            try:
+                stock_price = get_stock_price(group.ticker)
+                group_result = simulate_position_group(
+                    group, spy_change, stock_price, type_filter
+                )
+                portfolio_value += group_result["new_value"]
+                position_results[group.ticker].append(group_result)
+            except ValueError as e:
+                # Skip groups that don't have valid positions for this filter
+                logger.debug(f"Skipping {group.ticker} for {spy_change}: {e}")
+                continue
 
         # Store portfolio-level results
         portfolio_values.append(portfolio_value)
+
+    # Clean up position_results to only include valid entries
+    position_results = {k: v for k, v in position_results.items() if v}
 
     baseline_value = portfolio_values[zero_index]
 
@@ -508,4 +569,5 @@ def simulate_portfolio(
         "current_portfolio_value": current_portfolio_value,
         "original_portfolio_value": original_portfolio_value,
         "position_results": position_results,
+        "type_filter": type_filter,  # Include the filter in the result
     }

@@ -176,11 +176,11 @@ simulate:
 		exit 1; \
 	fi
 	@if [ -n "$(portfolio)" ]; then \
-		$(POETRY) run python -m src.focli.commands.sim $(portfolio) --min-spy-change -0.2 --max-spy-change 0.2 --steps 21 $(if $(ticker),--ticker $(ticker),) $(if $(detailed),--detailed,); \
+		$(POETRY) run python -m src.focli.commands.sim $(portfolio) --min-spy-change -0.1 --max-spy-change 0.1 --steps 5 $(if $(ticker),--ticker $(ticker),) $(if $(detailed),--detailed,) $(if $(type),--position-type $(type),); \
 	elif [ -f "@private-data/private-portfolio.csv" ]; then \
-		$(POETRY) run python -m src.focli.commands.sim @private-data/private-portfolio.csv --min-spy-change -0.2 --max-spy-change 0.2 --steps 21 $(if $(ticker),--ticker $(ticker),) $(if $(detailed),--detailed,); \
+		$(POETRY) run python -m src.focli.commands.sim @private-data/private-portfolio.csv --min-spy-change -0.1 --max-spy-change 0.1 --steps 5 $(if $(ticker),--ticker $(ticker),) $(if $(detailed),--detailed,) $(if $(type),--position-type $(type),); \
 	elif [ -f "private-data/portfolio-private.csv" ]; then \
-		$(POETRY) run python -m src.focli.commands.sim private-data/portfolio-private.csv --min-spy-change -0.2 --max-spy-change 0.2 --steps 21 $(if $(ticker),--ticker $(ticker),) $(if $(detailed),--detailed,); \
+		$(POETRY) run python -m src.focli.commands.sim private-data/portfolio-private.csv --min-spy-change -0.1 --max-spy-change 0.1 --steps 5 $(if $(ticker),--ticker $(ticker),) $(if $(detailed),--detailed,) $(if $(type),--position-type $(type),); \
 	else \
 		echo "Error: Portfolio file not found. Please specify a file path:"; \
 		echo "  make simulate portfolio=path/to/your/portfolio.csv"; \

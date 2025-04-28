@@ -16,23 +16,6 @@ python src/focli/focli.py
 
 This will launch the interactive shell where you can enter commands.
 
-### Direct Simulation Mode
-
-You can also run simulations directly from the command line without entering the interactive shell:
-
-```bash
-# Run simulation with default parameters
-python src/focli/focli.py --simulate
-
-# Run a quick simulation (fewer steps, smaller range)
-python src/focli/focli.py --simulate --preset quick
-
-# Run a detailed simulation (more steps)
-python src/focli/focli.py --simulate --preset detailed
-```
-
-This is useful for quickly checking how your portfolio might perform under different market conditions.
-
 ## Why Use Folio CLI?
 
 - **Speed**: Get answers in seconds without waiting for GUI elements to load
@@ -67,16 +50,17 @@ View all positions in your portfolio with filtering and sorting options:
 ### Simulation
 
 ```
-simulate [options]
+sim [options]
 ```
 See how your portfolio might perform across different market scenarios:
-- `--range 20` - Set the range of market movement to analyze (±20%)
-- `--steps 13` - Set the number of data points in the simulation
+- `--min-spy-change -0.2` - Set the minimum SPY change to simulate (-20%)
+- `--max-spy-change 0.2` - Set the maximum SPY change to simulate (+20%)
+- `--steps 21` - Set the number of data points in the simulation
+- `--ticker AAPL` - Focus on a specific ticker
 - `--detailed` - Show position-level details in the simulation
-- `--focus SPY,AAPL` - Focus on specific positions
-- `--preset <name>` - Use a saved parameter preset (default, quick, detailed)
-- `--save-preset <name>` - Save current parameters as a preset
-- `--filter options` - Run simulation only on positions with options
+- `--position-type stock` - Filter to show only stock positions
+- `--position-type option` - Filter to show only option positions
+- `--analyze-correlation` - Analyze how positions perform when SPY increases
 
 ### Position Analysis
 
@@ -87,7 +71,7 @@ Analyze specific positions in depth:
 - `position AAPL` - Show basic position details
 - `position AAPL details --detailed` - Show comprehensive position information
 - `position SPY risk` - Show risk metrics for the position
-- `position AAPL simulate` - Simulate this position with different market movements
+- `position AAPL sim` - Simulate this position with different market movements
 
 ### Help and Navigation
 
@@ -101,27 +85,59 @@ exit
 ```
 Exit the application.
 
+## Using Make Commands
+
+You can also run simulations directly from the command line using make commands:
+
+```bash
+# Run simulation with default parameters
+make sim
+
+# Run simulation for a specific portfolio file
+make sim portfolio=path/to/portfolio.csv
+
+# Run simulation focusing on a specific ticker
+make sim ticker=AAPL
+
+# Show detailed position-level results
+make sim detailed=1
+
+# Filter to show only stock positions
+make sim type=stock
+
+# Filter to show only option positions
+make sim type=option
+
+# Combine multiple options
+make sim ticker=AAPL detailed=1 type=stock
+```
+
+The `make sim` command uses these default parameters:
+- SPY change range: -10% to +10%
+- Steps: 5
+- Portfolio file: Uses @private-data/private-portfolio.csv if available
+
 ## Tips for Effective Use
 
 1. **Start with portfolio summary** to understand your overall positioning
-2. **Use simulate spy** to see how market movements might affect your portfolio
-3. **Drill down with position commands** to understand specific holdings
-4. **Save presets** for analyses you run frequently
+2. **Use `sim` to see how market movements might affect your portfolio**
+3. **Use `sim type=stock` or `sim type=option` to analyze specific position types**
+4. **Drill down with position commands** to understand specific holdings
 5. **Use filtering** to focus on segments of your portfolio
-6. **Use direct simulation mode** for quick portfolio checks
 
 ## Example Workflow
 
 ```
 folio> portfolio load private-data/portfolio-private.csv
 folio> portfolio
-folio> simulate --range 15 --steps 11
-folio> position SPY risk
-folio> position AAPL simulate --range 20
+folio> sim --min-spy-change -0.15 --max-spy-change 0.15 --steps 11
+folio> sim --ticker SPY --detailed
+folio> sim --position-type stock
+folio> position AAPL sim
 folio> portfolio list --options --sort value
 ```
 
-This workflow gives you a complete picture of your portfolio's risk profile and behavior in different market conditions, focusing on the positions that matter most. Notice how commands use sensible defaults, making the interface more intuitive and requiring fewer keystrokes for common operations.
+This workflow gives you a complete picture of your portfolio's risk profile and behavior in different market conditions, focusing on the positions that matter most.
 
 ## Getting Help
 

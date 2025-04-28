@@ -39,6 +39,9 @@ def main(
         None, help="Focus on a specific ticker (optional)"
     ),
     detailed: bool = typer.Option(False, help="Show detailed position-level results"),
+    position_type: str | None = typer.Option(
+        None, help="Filter by position type: 'stock', 'option', or None for all"
+    ),
 ):
     """
     Simulate portfolio performance under different market scenarios.
@@ -75,11 +78,28 @@ def main(
         pd.Series(np.linspace(min_spy_change, max_spy_change, steps)).round(3)
     )
 
+    # Validate position_type if provided
+    if position_type and position_type not in ["stock", "option"]:
+        error = ValueError(
+            f"Invalid position_type: {position_type}. Must be 'stock', 'option', or None."
+        )
+        console.print(f"[bold red]Error:[/bold red] {error}")
+        raise typer.Exit(code=1) from error
+
     # Run simulation
+    console.print(
+        f"[bold]Running simulation with {len(portfolio_groups)} position groups[/bold]"
+    )
+    console.print(f"SPY changes: {[f'{c * 100:.1f}%' for c in spy_changes]}")
+    console.print(f"Cash value: ${portfolio_summary.cash_like_value:,.2f}")
+    if position_type:
+        console.print(f"[bold]Filtering to show only {position_type} positions[/bold]")
+
     simulation_result = simulate_portfolio(
         portfolio_groups=portfolio_groups,
         spy_changes=spy_changes,
         cash_value=portfolio_summary.cash_like_value,
+        type_filter=position_type,
     )
 
     # Set the original portfolio value to the total portfolio value from the summary
@@ -101,16 +121,19 @@ def display_simulation_results(simulation_result, detailed=False):
     """Display simulation results in a formatted table."""
     # Get current SPY price
     try:
-        import yfinance as yf
+        from src.folio.marketdata import get_stock_price
 
-        spy_data = yf.Ticker("SPY")
-        current_spy_price = spy_data.history(period="1d")["Close"].iloc[-1]
-    except Exception:
-        # If there's an error getting the price, use a default value
-        current_spy_price = 500.0  # Default SPY price
+        # Use the same function that's used in the simulation to ensure consistency
+        current_spy_price = get_stock_price("SPY")
         console.print(
-            "[yellow]Warning: Could not get current SPY price. Using default value.[/yellow]"
+            f"[green]Using current SPY price: ${current_spy_price:.2f}[/green]"
         )
+    except Exception as e:
+        # Fail fast - don't use a default value
+        console.print(
+            f"[bold red]Error:[/bold red] Could not get current SPY price: {e}"
+        )
+        raise typer.Exit(code=1) from e
 
     # Create portfolio-level table
     table = Table(title="Portfolio Simulation Results")
@@ -167,7 +190,11 @@ def display_simulation_results(simulation_result, detailed=False):
     # Display portfolio values
     current_value = simulation_result.get("current_portfolio_value", 0)
     original_value = simulation_result.get("original_portfolio_value", 0)
+    type_filter = simulation_result.get("type_filter")
+
     console.print(f"\nCurrent SPY Price: ${current_spy_price:.2f}")
+    if type_filter:
+        console.print(f"Showing only {type_filter} positions")
     console.print(f"Current Portfolio Value (0% baseline): ${current_value:,.2f}")
     console.print(f"Original Portfolio Value: ${original_value:,.2f}\n")
 
@@ -475,7 +502,7 @@ def analyze_spy_correlation(simulation_result, console):
         console.print("Your portfolio appears to be well-positioned for up markets.")
 
 
-def shell_command(args: list[str], state: dict[str, Any], console: Console):
+def shell_command(args: list[str], state: dict[str, Any], console: Console):  # noqa: PLR0911
     """
     Execute the sim command in the shell context.
 
@@ -500,6 +527,7 @@ def shell_command(args: list[str], state: dict[str, Any], console: Console):
     ticker = None
     detailed = False
     analyze_correlation = False
+    position_type = None
 
     # Process arguments
     i = 0
@@ -541,10 +569,18 @@ def shell_command(args: list[str], state: dict[str, Any], console: Console):
         elif arg in {"--analyze-correlation", "--analyze"}:
             analyze_correlation = True
             i += 1
+        elif arg == "--position-type" and i + 1 < len(args):
+            position_type = args[i + 1]
+            if position_type not in ["stock", "option"]:
+                console.print(
+                    f"[bold red]Error:[/bold red] Invalid value for --position-type: {position_type}. Must be 'stock' or 'option'."
+                )
+                return
+            i += 2
         else:
             console.print(f"[bold red]Error:[/bold red] Unknown argument: {arg}")
             console.print(
-                "Usage: sim [--min-spy-change VALUE] [--max-spy-change VALUE] [--steps VALUE] [--ticker TICKER] [--detailed] [--analyze-correlation]"
+                "Usage: sim [--min-spy-change VALUE] [--max-spy-change VALUE] [--steps VALUE] [--ticker TICKER] [--detailed] [--analyze-correlation] [--position-type TYPE]"
             )
             return
 
@@ -570,10 +606,14 @@ def shell_command(args: list[str], state: dict[str, Any], console: Console):
 
     # Run simulation
     console.print("Running portfolio simulation...")
+    if position_type:
+        console.print(f"Filtering to show only {position_type} positions")
+
     simulation_result = simulate_portfolio(
         portfolio_groups=portfolio_groups,
         spy_changes=spy_changes,
         cash_value=portfolio_summary.cash_like_value,
+        type_filter=position_type,
     )
 
     # Set the original portfolio value to the total portfolio value from the summary
