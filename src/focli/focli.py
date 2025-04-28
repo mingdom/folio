@@ -21,7 +21,7 @@ Interactive Commands:
     portfolio list      List all positions in the portfolio
     portfolio summary   Show a summary of the portfolio
     portfolio load      Load a portfolio from a CSV file
-    exit                Exit the application
+    exit                Exit the application immediately
 """
 
 import sys

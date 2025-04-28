@@ -11,7 +11,6 @@ import traceback
 from prompt_toolkit import PromptSession
 from prompt_toolkit.completion import NestedCompleter
 from prompt_toolkit.history import FileHistory
-from prompt_toolkit.shortcuts import confirm
 from rich.console import Console
 
 from src.focli.commands import execute_command, get_command_registry
@@ -179,9 +178,9 @@ def confirm_exit():
     """Confirm exit with the user.
 
     Returns:
-        True if the user confirms, False otherwise
+        Always returns True to exit without confirmation
     """
-    return confirm("Are you sure you want to exit?")
+    return True  # Skip confirmation and exit directly
 
 
 if __name__ == "__main__":
