@@ -129,7 +129,7 @@ class TestSimulatorV2Integration(unittest.TestCase):
         )
 
         # Simulate with a SPY increase
-        result = simulate_position_group(group, 0.05)
+        result = simulate_position_group(group, 0.05, stock_price=150.0)
 
         # Check the results
         self.assertEqual(result["ticker"], "AAPL")

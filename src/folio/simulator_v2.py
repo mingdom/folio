@@ -11,6 +11,7 @@ from typing import Any
 
 from .data_model import OptionPosition, PortfolioGroup, StockPosition
 from .logger import logger
+from .marketdata import get_stock_price
 from .options import OptionContract, calculate_bs_price
 
 
@@ -316,6 +317,7 @@ def simulate_option_position(
 def simulate_position_group(
     position_group: PortfolioGroup,
     spy_change: float,
+    stock_price: float,
 ) -> dict[str, Any]:
     """
     Simulate a position group with a given SPY change.
@@ -323,28 +325,29 @@ def simulate_position_group(
     Args:
         position_group: Position group to simulate
         spy_change: SPY price change as a decimal
+        stock_price: Current stock price for the ticker
 
     Returns:
         Dictionary with simulation results
     """
+    # Validate position group
+    if not position_group.stock_position and not position_group.option_positions:
+        raise ValueError(
+            f"Cannot simulate empty position group for {position_group.ticker}"
+        )
+
+    # Validate stock price
+    if stock_price <= 0:
+        raise ValueError(
+            f"Invalid stock price ({stock_price}) for {position_group.ticker}"
+        )
+
     # Calculate price adjustment based on beta
     beta = position_group.beta
     price_adjustment = calculate_price_adjustment(spy_change, beta)
 
-    # Get current price from stock position or first option position
-    if position_group.stock_position:
-        current_price = position_group.stock_position.price
-    elif position_group.option_positions:
-        # For option groups, use the underlying price from the first option
-        current_price = getattr(
-            position_group.option_positions[0], "underlying_price", 0.0
-        )
-    else:
-        # Fallback if no positions (shouldn't happen)
-        current_price = 0.0
-
     # Calculate new underlying price
-    new_price = calculate_underlying_price(current_price, price_adjustment)
+    new_price = calculate_underlying_price(stock_price, price_adjustment)
 
     # Initialize results
     position_results = []
@@ -364,7 +367,7 @@ def simulate_position_group(
     if position_group.option_positions:
         for option in position_group.option_positions:
             option_result = simulate_option_position(
-                option, new_price, current_underlying_price=current_price
+                option, new_price, current_underlying_price=stock_price
             )
             position_results.append(option_result)
             total_original_value += option_result["original_value"]
@@ -372,14 +375,18 @@ def simulate_position_group(
             total_pnl += option_result["pnl"]
 
     # Calculate group-level metrics
-    pnl_percent = (
-        (total_pnl / total_original_value) * 100 if total_original_value else 0
-    )
+    if total_original_value == 0:
+        raise ValueError(
+            f"Total original value is zero for {position_group.ticker}, "
+            "cannot calculate P&L percentage"
+        )
+
+    pnl_percent = (total_pnl / total_original_value) * 100
 
     return {
         "ticker": position_group.ticker,
         "beta": beta,
-        "current_price": current_price,
+        "current_price": stock_price,  # Keep the key name for backward compatibility
         "new_price": new_price,
         "original_value": total_original_value,
         "new_value": total_new_value,
@@ -463,23 +470,15 @@ def simulate_portfolio(
 
         # Simulate each position group
         for group in portfolio_groups:
-            group_result = simulate_position_group(group, spy_change)
+            stock_price = get_stock_price(group.ticker)
+            group_result = simulate_position_group(group, spy_change, stock_price)
             portfolio_value += group_result["new_value"]
             position_results[group.ticker].append(group_result)
 
         # Store portfolio-level results
         portfolio_values.append(portfolio_value)
 
-    # If we don't have a 0% change in the list, calculate baseline separately
-    if zero_index is None:
-        # Calculate baseline values at 0% SPY change
-        baseline_value = cash_value
-        for group in portfolio_groups:
-            baseline_result = simulate_position_group(group, 0.0)
-            baseline_value += baseline_result["new_value"]
-    else:
-        # Use the value at 0% SPY change as baseline
-        baseline_value = portfolio_values[zero_index]
+    baseline_value = portfolio_values[zero_index]
 
     # Calculate P&L values relative to the baseline
     portfolio_pnls = [value - baseline_value for value in portfolio_values]
