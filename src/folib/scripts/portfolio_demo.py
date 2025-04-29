@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
+# ruff: noqa: T201
 """
-End-to-end test script for portfolio loading and processing.
+Portfolio Demo Script
 
-This script demonstrates the complete portfolio loading and processing workflow:
+This script demonstrates how to use the folib library for portfolio analysis:
 1. Load a portfolio from a CSV file
 2. Parse the portfolio holdings
 3. Process the portfolio into groups
@@ -10,7 +11,7 @@ This script demonstrates the complete portfolio loading and processing workflow:
 5. Display detailed portfolio information
 
 Usage:
-    python scripts/portfolio_e2e_test.py [csv_file]
+    python -m folib.scripts.portfolio_demo [csv_file]
 
 If no CSV file is specified, the script uses the default portfolio file
 at 'private-data/portfolio-private.csv'.
@@ -34,7 +35,7 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[logging.StreamHandler()],
 )
-logger = logging.getLogger("portfolio_e2e_test")
+logger = logging.getLogger("folib.demo")
 
 
 def format_currency(value: float) -> str:
@@ -48,9 +49,9 @@ def format_percentage(value: float) -> str:
 
 
 def main():
-    """Run the portfolio end-to-end test."""
+    """Run the portfolio demo."""
     # Parse command line arguments
-    parser = argparse.ArgumentParser(description="Portfolio E2E Test")
+    parser = argparse.ArgumentParser(description="Folib Portfolio Demo")
     parser.add_argument(
         "csv_file",
         nargs="?",
@@ -112,9 +113,15 @@ def main():
             print("\n" + "=" * 80)
             print("ASSET ALLOCATION".center(80))
             print("=" * 80)
-            print(f"\nStocks:  {format_percentage(stock_pct)} ({format_currency(summary.stock_value)})")
-            print(f"Options: {format_percentage(option_pct)} ({format_currency(summary.option_value)})")
-            print(f"Cash:    {format_percentage(cash_pct)} ({format_currency(summary.cash_value)})")
+            print(
+                f"\nStocks:  {format_percentage(stock_pct)} ({format_currency(summary.stock_value)})"
+            )
+            print(
+                f"Options: {format_percentage(option_pct)} ({format_currency(summary.option_value)})"
+            )
+            print(
+                f"Cash:    {format_percentage(cash_pct)} ({format_currency(summary.cash_value)})"
+            )
 
         # Display group information
         print("\n" + "=" * 80)
@@ -146,19 +153,23 @@ def main():
         stock_positions.sort(key=lambda x: abs(x.market_value), reverse=True)
 
         # Display top 10 stock positions
-        print("\n{:<6} {:<8} {:<10} {:<15} {:<15}".format(
-            "Rank", "Ticker", "Quantity", "Price", "Value"
-        ))
+        print(
+            "\n{:<6} {:<8} {:<10} {:<15} {:<15}".format(
+                "Rank", "Ticker", "Quantity", "Price", "Value"
+            )
+        )
         print("-" * 60)
 
         for i, position in enumerate(stock_positions[:10], 1):
-            print("{:<6} {:<8} {:<10} {:<15} {:<15}".format(
-                i,
-                position.ticker,
-                f"{position.quantity:,.0f}",
-                format_currency(position.price),
-                format_currency(position.market_value)
-            ))
+            print(
+                "{:<6} {:<8} {:<10} {:<15} {:<15}".format(
+                    i,
+                    position.ticker,
+                    f"{position.quantity:,.0f}",
+                    format_currency(position.price),
+                    format_currency(position.market_value),
+                )
+            )
 
         # Display option positions by type
         print("\n" + "=" * 80)
@@ -180,10 +191,14 @@ def main():
         call_value = sum(option.market_value for option in call_options)
         put_value = sum(option.market_value for option in put_options)
 
-        print(f"\nCall Options: {len(call_options)} positions, {format_currency(call_value)}")
-        print(f"Put Options: {len(put_options)} positions, {format_currency(put_value)}")
+        print(
+            f"\nCall Options: {len(call_options)} positions, {format_currency(call_value)}"
+        )
+        print(
+            f"Put Options: {len(put_options)} positions, {format_currency(put_value)}"
+        )
 
-        print("\nPortfolio E2E test completed successfully")
+        print("\nDemo completed successfully")
 
     except Exception as e:
         logger.error(f"Error: {e}", exc_info=True)
