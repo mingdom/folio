@@ -41,7 +41,7 @@ from typing import Literal
 
 import pandas as pd
 
-from ..data.stock import StockOracle, stockdata
+from ..data.stock import stockdata
 from ..domain import (
     OptionPosition,
     Portfolio,
@@ -57,7 +57,6 @@ logger = logging.getLogger(__name__)
 
 def process_portfolio(
     holdings: list[PortfolioHolding],
-    market_oracle: StockOracle,
     # update_prices parameter is reserved for future implementation
     # where we'll update prices from market data
     update_prices: bool = True,  # noqa: ARG001
@@ -95,7 +94,7 @@ def process_portfolio(
             continue
 
         # Check for cash-like positions
-        if market_oracle.is_cash_like(holding.symbol, holding.description):
+        if stockdata.is_cash_like(holding.symbol, holding.description):
             # Convert to StockPosition for cash-like holdings
             cash_position = StockPosition(
                 ticker=holding.symbol,
@@ -110,15 +109,16 @@ def process_portfolio(
             # Options will be processed in create_portfolio_groups
             non_cash_holdings.append(holding)
             logger.debug(f"Identified option position: {holding.symbol}")
+        elif stockdata.is_valid_stock_symbol(holding.symbol):
+            logger.debug(f"Identified stock position: {holding.symbol}")
+            non_cash_holdings.append(holding)
         # Check for unknown/invalid positions
-        elif not market_oracle.is_valid_stock_symbol(holding.symbol):
+        else:
             unknown_positions.append(holding)
             logger.warning(f"Identified unknown/invalid position: {holding.symbol}")
-        else:
-            non_cash_holdings.append(holding)
 
     # Create portfolio groups from non-cash, non-unknown holdings
-    groups = create_portfolio_groups(non_cash_holdings, market_oracle)
+    groups = create_portfolio_groups(non_cash_holdings)
     logger.debug(f"Created {len(groups)} portfolio groups")
 
     # Create and return the portfolio
@@ -135,10 +135,9 @@ def process_portfolio(
     return portfolio
 
 
-def create_portfolio_groups(
-    holdings: list[PortfolioHolding], market_oracle: StockOracle
-) -> list[PortfolioGroup]:
+def create_portfolio_groups(holdings: list[PortfolioHolding]) -> list[PortfolioGroup]:
     """
+    TODO: this logic is overly complicated. Maybe PortfolioGroup is a concept. Or we should be able to do everything in 1 pass.
     Create portfolio groups from holdings.
 
     This function groups related positions (stocks and their options) into PortfolioGroup objects.
@@ -254,7 +253,7 @@ def create_portfolio_groups(
 
             # Fetch the underlying price
             try:
-                underlying_price = market_oracle.get_price(ticker)
+                underlying_price = stockdata.get_price(ticker)
             except Exception as e:
                 logger.warning(f"Could not fetch price for {ticker}: {e}")
                 underlying_price = 0.0

@@ -23,7 +23,6 @@ import sys
 from pathlib import Path
 
 from src.folib.data.loader import load_portfolio_from_csv, parse_portfolio_holdings
-from src.folib.data.stock import stockdata
 from src.folib.services.portfolio_service import (
     create_portfolio_summary,
     process_portfolio,
@@ -79,7 +78,7 @@ def main():
 
         # Step 3: Process the portfolio
         logger.info("Processing portfolio")
-        portfolio = process_portfolio(holdings, stockdata)
+        portfolio = process_portfolio(holdings)
         logger.info(f"Processed portfolio with {len(portfolio.groups)} groups")
 
         # Step 4: Create portfolio summary

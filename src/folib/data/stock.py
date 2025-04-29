@@ -108,42 +108,8 @@ class StockOracle:
 
         Returns:
             The current price
-
-        Raises:
-            ValueError: If the ticker is empty
-            ValueError: If the ticker doesn't appear to be a valid stock symbol
-            ValueError: If no price data is available
-            ValueError: If the price is invalid (<=0)
-            Any exceptions from yfinance are propagated directly
         """
-        if not ticker:
-            raise ValueError("Ticker cannot be empty")
-
-        # Check if this is a cash-like position
-        if self.is_cash_like(ticker):
-            logger.debug(f"Using default price of 1.0 for cash-like position: {ticker}")
-            return 1.0
-
-        # Check if the ticker appears to be a valid stock symbol
-        if not self.is_valid_stock_symbol(ticker):
-            logger.warning(f"Invalid stock symbol format: {ticker}")
-            raise ValueError(f"Invalid stock symbol format: {ticker}")
-
-        # Fetch the latest data for the ticker
-        ticker_data = yf.Ticker(ticker)
-        df = ticker_data.history(period="1d")
-
-        if df.empty:
-            raise ValueError(f"No price data available for {ticker}")
-
-        # Get the latest close price
-        price = df.iloc[-1]["Close"]
-
-        if price <= 0:
-            raise ValueError(f"Invalid stock price ({price}) for {ticker}")
-
-        logger.debug(f"Retrieved price for {ticker}: {price}")
-        return price
+        return self.get_historical_data(ticker, period="1d")["Close"].iloc[-1]
 
     def get_beta(self, ticker: str, description: str = "") -> float:
         """
@@ -247,41 +213,12 @@ class StockOracle:
         if not ticker:
             raise ValueError("Ticker cannot be empty")
 
-        # Special case for market index
-        if ticker == self.market_index:
-            # Always allow the market index (SPY) to pass through
-            pass
-        # Check if this is a cash-like position
-        elif self.is_cash_like(ticker):
-            # For cash-like positions, return a DataFrame with constant values
-            logger.debug(
-                f"Creating synthetic historical data for cash-like position: {ticker}"
-            )
-            dates = pd.date_range(end=pd.Timestamp.now(), periods=10)
-            df = pd.DataFrame(
-                {
-                    "Open": [1.0] * 10,
-                    "High": [1.0] * 10,
-                    "Low": [1.0] * 10,
-                    "Close": [1.0] * 10,
-                    "Volume": [0] * 10,
-                },
-                index=dates,
-            )
-            return df
-        # Check if the ticker appears to be a valid stock symbol
-        elif not self.is_valid_stock_symbol(ticker):
-            logger.warning(f"Invalid stock symbol format: {ticker}")
+        if not self.is_valid_stock_symbol(ticker):
             raise ValueError(f"Invalid stock symbol format: {ticker}")
 
         # Fetch historical data for the ticker
         ticker_data = yf.Ticker(ticker)
         df = ticker_data.history(period=period)
-
-        if df.empty:
-            raise ValueError(f"No historical data available for {ticker}")
-
-        logger.debug(f"Retrieved {len(df)} historical data points for {ticker}")
         return df
 
     def is_valid_stock_symbol(self, ticker: str) -> bool:
