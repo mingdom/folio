@@ -4,7 +4,7 @@ Portfolio simulation service.
 This module provides high-level functions for portfolio simulation.
 """
 
-from ..data.market import StockOracle
+from ..data.stock import StockOracle
 from ..domain import Portfolio, PortfolioGroup, Position
 
 

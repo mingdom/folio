@@ -66,7 +66,7 @@ class StockOracle:
     _instance = None
 
     # Default period for beta calculations (3 months provides more current market behavior)
-    beta_period = "3m"
+    beta_period = "3mo"
     # Default market index for beta calculations
     market_index = "SPY"
 
@@ -138,7 +138,8 @@ class StockOracle:
         Get the beta for a ticker.
 
         This method calculates the beta (systematic risk) for a given ticker
-        by comparing its price movements to a market index (default: SPY).
+        by comparing its price movements to a market index (default: SPY) over a period
+        of time (default: 3 months).
 
         Beta measures the volatility of a security in relation to the overall market.
         A beta of 1 indicates the security's price moves with the market.
@@ -220,7 +221,7 @@ class StockOracle:
 
         Args:
             ticker: The ticker symbol
-            period: Time period (e.g., "1d", "1m", "1y")
+            period: Time period in yfinance format: "1d", "5d", "1mo", "3mo", "6mo", "1y", "2y", "5y", "10y", "ytd", "max"
 
         Returns:
             DataFrame with historical price data (columns: Open, High, Low, Close, Volume)
@@ -319,3 +320,7 @@ class StockOracle:
             return True
 
         return False
+
+
+# Pre-initialized singleton instance for easier access
+stockdata = StockOracle.get_instance()

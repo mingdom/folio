@@ -33,8 +33,8 @@ data_fetcher = get_data_fetcher()
 
 
 def get_beta(ticker: str, description: str = "") -> float:
-    # TODO: move to stockdata.py?
     """Calculates the beta (systematic risk) for a given financial instrument.
+    TODO: Deprecate
 
     Beta measures the volatility of an instrument in relation to the overall market.
     Returns 0.0 when beta cannot be meaningfully calculated (e.g., for money market funds,

@@ -4,7 +4,7 @@ P&L analysis service.
 This module provides high-level functions for P&L analysis.
 """
 
-from ..data.market import StockOracle
+from ..data.stock import StockOracle
 from ..domain import OptionPosition, PortfolioGroup, StockPosition
 
 

@@ -4,7 +4,7 @@ Portfolio processing service.
 This module provides high-level functions for portfolio processing.
 """
 
-from ..data.market import StockOracle
+from ..data.stock import StockOracle
 from ..domain import Portfolio, PortfolioGroup, PortfolioHolding, PortfolioSummary
 
 
