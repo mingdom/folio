@@ -105,6 +105,11 @@ def process_portfolio(
             )
             cash_positions.append(cash_position)
             logger.debug(f"Identified cash-like position: {holding.symbol}")
+        # Check for option positions
+        elif _is_valid_option_symbol(holding.symbol, holding.description):
+            # Options will be processed in create_portfolio_groups
+            non_cash_holdings.append(holding)
+            logger.debug(f"Identified option position: {holding.symbol}")
         # Check for unknown/invalid positions
         elif not market_oracle.is_valid_stock_symbol(holding.symbol):
             unknown_positions.append(holding)
@@ -153,10 +158,8 @@ def create_portfolio_groups(
     option_holdings = []
 
     for holding in holdings:
-        # Check if this is an option based on the symbol pattern (usually starts with a space and hyphen)
-        if holding.symbol.strip().startswith("-") or _is_option_description(
-            holding.description
-        ):
+        # Check if this is an option using our option symbol validation
+        if _is_valid_option_symbol(holding.symbol, holding.description):
             option_holdings.append(holding)
             logger.debug(f"Identified option: {holding.symbol}")
         else:
@@ -454,6 +457,39 @@ def get_portfolio_exposures(portfolio: Portfolio) -> dict:  # noqa: ARG001
 
 
 # Helper functions
+
+
+def _is_valid_option_symbol(symbol: str, description: str = "") -> bool:
+    """
+    Check if a symbol is a valid option symbol in Fidelity's format.
+
+    Fidelity option symbols typically:
+    - Start with a hyphen
+    - Are followed by the underlying ticker
+    - Have a date code (YYMMDD)
+    - Have option type (C/P)
+    - End with the strike price
+
+    Args:
+        symbol: The symbol to check
+        description: Optional description to check for option-related terms
+
+    Returns:
+        True if the symbol appears to be a valid option symbol
+    """
+    if not symbol:
+        return False
+
+    # Check if symbol starts with a hyphen (Fidelity format for options)
+    if symbol.strip().startswith("-"):
+        # Fidelity option symbols start with a hyphen
+        return True
+
+    # Also check description for option-related terms
+    if description:
+        return _is_option_description(description)
+
+    return False
 
 
 def _is_option_description(description: str) -> bool:
