@@ -40,6 +40,7 @@ Potential Issues:
 """
 
 import logging
+import re
 
 import pandas as pd
 
@@ -110,12 +111,23 @@ class StockOracle:
 
         Raises:
             ValueError: If the ticker is empty
+            ValueError: If the ticker doesn't appear to be a valid stock symbol
             ValueError: If no price data is available
             ValueError: If the price is invalid (<=0)
             Any exceptions from yfinance are propagated directly
         """
         if not ticker:
             raise ValueError("Ticker cannot be empty")
+
+        # Check if this is a cash-like position
+        if self.is_cash_like(ticker):
+            logger.debug(f"Using default price of 1.0 for cash-like position: {ticker}")
+            return 1.0
+
+        # Check if the ticker appears to be a valid stock symbol
+        if not self.is_valid_stock_symbol(ticker):
+            logger.warning(f"Invalid stock symbol format: {ticker}")
+            raise ValueError(f"Invalid stock symbol format: {ticker}")
 
         # Fetch the latest data for the ticker
         ticker_data = yf.Ticker(ticker)
@@ -228,11 +240,39 @@ class StockOracle:
 
         Raises:
             ValueError: If the ticker is empty
+            ValueError: If the ticker doesn't appear to be a valid stock symbol
             ValueError: If no historical data is available
             Any exceptions from yfinance are propagated directly
         """
         if not ticker:
             raise ValueError("Ticker cannot be empty")
+
+        # Special case for market index
+        if ticker == self.market_index:
+            # Always allow the market index (SPY) to pass through
+            pass
+        # Check if this is a cash-like position
+        elif self.is_cash_like(ticker):
+            # For cash-like positions, return a DataFrame with constant values
+            logger.debug(
+                f"Creating synthetic historical data for cash-like position: {ticker}"
+            )
+            dates = pd.date_range(end=pd.Timestamp.now(), periods=10)
+            df = pd.DataFrame(
+                {
+                    "Open": [1.0] * 10,
+                    "High": [1.0] * 10,
+                    "Low": [1.0] * 10,
+                    "Close": [1.0] * 10,
+                    "Volume": [0] * 10,
+                },
+                index=dates,
+            )
+            return df
+        # Check if the ticker appears to be a valid stock symbol
+        elif not self.is_valid_stock_symbol(ticker):
+            logger.warning(f"Invalid stock symbol format: {ticker}")
+            raise ValueError(f"Invalid stock symbol format: {ticker}")
 
         # Fetch historical data for the ticker
         ticker_data = yf.Ticker(ticker)
@@ -243,6 +283,44 @@ class StockOracle:
 
         logger.debug(f"Retrieved {len(df)} historical data points for {ticker}")
         return df
+
+    def is_valid_stock_symbol(self, ticker: str) -> bool:
+        """
+        Check if a ticker symbol is likely a valid stock symbol.
+
+        This method uses a simple regex pattern to check if a ticker symbol follows
+        common stock symbol patterns. It's designed to filter out obviously invalid
+        symbols before sending them to yfinance.
+
+        Common stock symbol patterns:
+        - 1-5 uppercase letters (most US stocks: AAPL, MSFT, GOOGL)
+        - 1-5 uppercase letters with a period (some international stocks: BHP.AX)
+        - 1-5 uppercase letters with a hyphen (some ETFs: SPY-X)
+        - 1-5 uppercase letters followed by 1-3 uppercase letters after a period (ADRs: SONY.TO)
+
+        Args:
+            ticker: The ticker symbol to check
+
+        Returns:
+            True if the ticker appears to be a valid stock symbol, False otherwise
+        """
+        if not ticker:
+            return False
+
+        # Simple regex pattern for common stock symbols
+        # This covers most US stocks, ETFs, and common international formats
+        pattern = r"^[A-Z]{1,5}(\.[A-Z]{1,3}|-[A-Z]{1})?$"
+
+        # Special case for fund symbols that often have numbers and special formats
+        fund_pattern = r"^[A-Z]{1,5}[0-9X]{0,3}$"
+
+        # Check if the ticker matches either pattern
+        if re.match(pattern, ticker) or re.match(fund_pattern, ticker):
+            return True
+
+        # Log invalid symbols for debugging
+        logger.debug(f"Symbol '{ticker}' does not match standard stock symbol patterns")
+        return False
 
     def is_cash_like(
         self, ticker: str, description: str = "", beta: float | None = None
