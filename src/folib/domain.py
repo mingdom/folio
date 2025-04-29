@@ -136,6 +136,7 @@ class Portfolio:
 
     groups: list[PortfolioGroup]
     cash_positions: list[StockPosition] = field(default_factory=list)
+    unknown_positions: list[PortfolioHolding] = field(default_factory=list)
     pending_activity_value: float = 0.0
 
 
@@ -147,6 +148,7 @@ class PortfolioSummary:
     stock_value: float
     option_value: float
     cash_value: float
+    unknown_value: float
     pending_activity_value: float
     net_market_exposure: float
     portfolio_beta: float | None = None

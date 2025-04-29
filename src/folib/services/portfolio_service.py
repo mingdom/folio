@@ -67,8 +67,9 @@ def process_portfolio(
 
     This function transforms raw portfolio holdings into a structured portfolio by:
     1. Identifying cash-like positions
-    2. Grouping related positions (stocks with their options)
-    3. Creating a portfolio object with groups and cash positions
+    2. Identifying unknown/invalid positions
+    3. Grouping related positions (stocks with their options)
+    4. Creating a portfolio object with groups, cash positions, and unknown positions
 
     Args:
         holdings: List of portfolio holdings from parse_portfolio_holdings()
@@ -76,15 +77,24 @@ def process_portfolio(
         update_prices: Whether to update prices from market data (default: True)
 
     Returns:
-        Processed portfolio with structured groups and cash positions
+        Processed portfolio with structured groups, cash positions, and unknown positions
     """
     logger.debug("Processing portfolio with %d holdings", len(holdings))
 
-    # Separate cash-like positions
+    # Separate cash-like positions and unknown positions
     non_cash_holdings = []
     cash_positions = []
+    unknown_positions = []
+    pending_activity_value = 0.0
 
     for holding in holdings:
+        # Check for pending activity
+        if holding.symbol.upper() == "PENDING ACTIVITY":
+            pending_activity_value += holding.value
+            logger.debug(f"Identified pending activity: {holding.value}")
+            continue
+
+        # Check for cash-like positions
         if market_oracle.is_cash_like(holding.symbol, holding.description):
             # Convert to StockPosition for cash-like holdings
             cash_position = StockPosition(
@@ -95,24 +105,28 @@ def process_portfolio(
             )
             cash_positions.append(cash_position)
             logger.debug(f"Identified cash-like position: {holding.symbol}")
+        # Check for unknown/invalid positions
+        elif not market_oracle.is_valid_stock_symbol(holding.symbol):
+            unknown_positions.append(holding)
+            logger.warning(f"Identified unknown/invalid position: {holding.symbol}")
         else:
             non_cash_holdings.append(holding)
 
-    # Create portfolio groups from non-cash holdings
+    # Create portfolio groups from non-cash, non-unknown holdings
     groups = create_portfolio_groups(non_cash_holdings, market_oracle)
     logger.debug(f"Created {len(groups)} portfolio groups")
-
-    # Calculate pending activity value (if any)
-    pending_activity_value = 0.0  # This would be calculated from the original CSV
 
     # Create and return the portfolio
     portfolio = Portfolio(
         groups=groups,
         cash_positions=cash_positions,
+        unknown_positions=unknown_positions,
         pending_activity_value=pending_activity_value,
     )
 
-    logger.debug("Portfolio processing complete")
+    logger.debug(
+        f"Portfolio processing complete: {len(groups)} groups, {len(cash_positions)} cash positions, {len(unknown_positions)} unknown positions"
+    )
     return portfolio
 
 
@@ -282,6 +296,7 @@ def create_portfolio_summary(portfolio: Portfolio) -> PortfolioSummary:
     - Stock value
     - Option value
     - Cash value
+    - Unknown position value
     - Pending activity value
     - Net market exposure
     - Portfolio beta
@@ -299,6 +314,7 @@ def create_portfolio_summary(portfolio: Portfolio) -> PortfolioSummary:
     stock_value = 0.0
     option_value = 0.0
     cash_value = 0.0
+    unknown_value = 0.0
     net_market_exposure = 0.0
     weighted_beta_sum = 0.0
     total_stock_value = 0.0  # For beta calculation
@@ -359,6 +375,20 @@ def create_portfolio_summary(portfolio: Portfolio) -> PortfolioSummary:
         total_value += position_value
         # Cash has zero beta, so no contribution to market exposure
 
+    # Process unknown positions
+    for unknown_position in portfolio.unknown_positions:
+        position_value = unknown_position.value
+        # Skip NaN values
+        if pd.isna(position_value):
+            logger.warning(
+                f"Skipping NaN value for unknown position {unknown_position.symbol}"
+            )
+            continue
+
+        unknown_value += position_value
+        total_value += position_value
+        # Unknown positions don't contribute to beta or market exposure
+
     # Add pending activity
     total_value += portfolio.pending_activity_value
 
@@ -373,6 +403,7 @@ def create_portfolio_summary(portfolio: Portfolio) -> PortfolioSummary:
         stock_value=stock_value,
         option_value=option_value,
         cash_value=cash_value,
+        unknown_value=unknown_value,
         pending_activity_value=portfolio.pending_activity_value,
         net_market_exposure=net_market_exposure,
         portfolio_beta=portfolio_beta,
@@ -450,7 +481,6 @@ def _is_option_description(description: str) -> bool:
 
 def _extract_option_data(
     option_holding: PortfolioHolding,
-    underlying_ticker: str | None = None,  # noqa: ARG001
 ) -> tuple[str, float, date, Literal["CALL", "PUT"], float] | None:
     """
     Extract option data from a holding.
@@ -462,74 +492,44 @@ def _extract_option_data(
     Returns:
         Tuple of (ticker, strike, expiry, option_type, quantity) or None if parsing fails
     """
-    try:
-        description = option_holding.description
-        symbol = option_holding.symbol.strip()
-        quantity = option_holding.quantity
+    description = option_holding.description
+    symbol = option_holding.symbol.strip()
+    quantity = option_holding.quantity
 
-        # Try to extract data from the description (e.g., "AMZN MAY 16 2025 $190 CALL")
-        match = re.search(
-            r"([A-Z]+)\s+(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\s+(\d{1,2})\s+(\d{4})\s+\$(\d+(?:\.\d+)?)\s+(CALL|PUT)",
-            description,
-            re.IGNORECASE,
-        )
+    # Try to extract data from the description (e.g., "AMZN MAY 16 2025 $190 CALL")
+    match = re.search(
+        r"([A-Z]+)\s+(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\s+(\d{1,2})\s+(\d{4})\s+\$(\d+(?:\.\d+)?)\s+(CALL|PUT)",
+        description,
+        re.IGNORECASE,
+    )
 
-        if match:
-            ticker = match.group(1)
-            month_str = match.group(2).upper()
-            day = int(match.group(3))
-            year = int(match.group(4))
-            strike = float(match.group(5))
-            option_type = match.group(6).upper()
+    if not match:
+        raise ValueError(f"Could not parse option data for: {symbol} - {description}")
 
-            # Convert month string to month number
-            month_map = {
-                "JAN": 1,
-                "FEB": 2,
-                "MAR": 3,
-                "APR": 4,
-                "MAY": 5,
-                "JUN": 6,
-                "JUL": 7,
-                "AUG": 8,
-                "SEP": 9,
-                "OCT": 10,
-                "NOV": 11,
-                "DEC": 12,
-            }
-            month = month_map[month_str]
+    ticker = match.group(1)
+    month_str = match.group(2).upper()
+    day = int(match.group(3))
+    year = int(match.group(4))
+    strike = float(match.group(5))
+    option_type = match.group(6).upper()
 
-            # Create expiry date
-            expiry = date(year, month, day)
+    # Convert month string to month number
+    month_map = {
+        "JAN": 1,
+        "FEB": 2,
+        "MAR": 3,
+        "APR": 4,
+        "MAY": 5,
+        "JUN": 6,
+        "JUL": 7,
+        "AUG": 8,
+        "SEP": 9,
+        "OCT": 10,
+        "NOV": 11,
+        "DEC": 12,
+    }
+    month = month_map[month_str]
 
-            return ticker, strike, expiry, option_type, quantity
-
-        # Try to extract from symbol format: " -AMZN250516C190"
-        # This is the format used in the portfolio CSV
-        match = re.search(
-            r"\s*-([A-Z]+)(\d{6})([CP])(\d+(?:\.\d+)?)",
-            symbol,
-            re.IGNORECASE,
-        )
-
-        if match:
-            ticker = match.group(1)
-            date_str = match.group(2)
-            option_type = "CALL" if match.group(3).upper() == "C" else "PUT"
-            strike = float(match.group(4))
-
-            # Parse date (YYMMDD)
-            year = 2000 + int(date_str[0:2])
-            month = int(date_str[2:4])
-            day = int(date_str[4:6])
-            expiry = date(year, month, day)
-
-            return ticker, strike, expiry, option_type, quantity
-
-        # If we couldn't parse the option data, return None
-        logger.warning(f"Could not parse option data for: {symbol} - {description}")
-        return None
-
-    except Exception as e:
-        logger.error(f"Error extracting option data: {e}", exc_info=True)
-        return None
+    # Create expiry date
+    expiry = date(year, month, day)
+    return ticker, strike, expiry, option_type, quantity

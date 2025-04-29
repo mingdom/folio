@@ -95,6 +95,7 @@ def main():
         print(f"Stock Value:       {format_currency(summary.stock_value)}")
         print(f"Option Value:      {format_currency(summary.option_value)}")
         print(f"Cash Value:        {format_currency(summary.cash_value)}")
+        print(f"Unknown Value:     {format_currency(summary.unknown_value)}")
         print(f"Pending Activity:  {format_currency(summary.pending_activity_value)}")
 
         if summary.portfolio_beta is not None:
@@ -109,18 +110,82 @@ def main():
             stock_pct = summary.stock_value / summary.total_value
             option_pct = summary.option_value / summary.total_value
             cash_pct = summary.cash_value / summary.total_value
+            unknown_pct = summary.unknown_value / summary.total_value
+            pending_pct = summary.pending_activity_value / summary.total_value
 
             print("\n" + "=" * 80)
             print("ASSET ALLOCATION".center(80))
             print("=" * 80)
             print(
-                f"\nStocks:  {format_percentage(stock_pct)} ({format_currency(summary.stock_value)})"
+                f"\nStocks:          {format_percentage(stock_pct)} ({format_currency(summary.stock_value)})"
             )
             print(
-                f"Options: {format_percentage(option_pct)} ({format_currency(summary.option_value)})"
+                f"Options:         {format_percentage(option_pct)} ({format_currency(summary.option_value)})"
             )
             print(
-                f"Cash:    {format_percentage(cash_pct)} ({format_currency(summary.cash_value)})"
+                f"Cash:            {format_percentage(cash_pct)} ({format_currency(summary.cash_value)})"
+            )
+            print(
+                f"Unknown:         {format_percentage(unknown_pct)} ({format_currency(summary.unknown_value)})"
+            )
+            print(
+                f"Pending Activity: {format_percentage(pending_pct)} ({format_currency(summary.pending_activity_value)})"
+            )
+
+        # Display cash positions
+        if portfolio.cash_positions:
+            print("\n" + "=" * 80)
+            print("CASH POSITIONS".center(80))
+            print("=" * 80)
+
+            print(
+                "\n{:<6} {:<15} {:<15} {:<15}".format(
+                    "No.", "Symbol", "Quantity", "Value"
+                )
+            )
+            print("-" * 55)
+
+            for i, position in enumerate(portfolio.cash_positions, 1):
+                print(
+                    "{:<6} {:<15} {:<15} {:<15}".format(
+                        i,
+                        position.ticker,
+                        f"{position.quantity:,.2f}",
+                        format_currency(position.market_value),
+                    )
+                )
+
+            print(
+                f"\nTotal Cash Value: {format_currency(sum(p.market_value for p in portfolio.cash_positions))}"
+            )
+
+        # Display unknown positions
+        if portfolio.unknown_positions:
+            print("\n" + "=" * 80)
+            print("UNKNOWN/INVALID POSITIONS".center(80))
+            print("=" * 80)
+
+            print(
+                "\n{:<6} {:<15} {:<30} {:<15}".format(
+                    "No.", "Symbol", "Description", "Value"
+                )
+            )
+            print("-" * 70)
+
+            for i, position in enumerate(portfolio.unknown_positions, 1):
+                # Truncate description if too long
+                description = (
+                    position.description[:27] + "..."
+                    if len(position.description) > 30
+                    else position.description
+                )
+
+                print(
+                    f"{i:<6} {position.symbol:<15} {description:<30} {format_currency(position.value):<15}"
+                )
+
+            print(
+                f"\nTotal Unknown Value: {format_currency(sum(p.value for p in portfolio.unknown_positions))}"
             )
 
         # Display group information
@@ -132,11 +197,17 @@ def main():
         stock_count = sum(1 for g in portfolio.groups if g.stock_position is not None)
         option_count = sum(len(g.option_positions) for g in portfolio.groups)
         cash_count = len(portfolio.cash_positions)
+        unknown_count = len(portfolio.unknown_positions)
 
         print(f"\nTotal Groups: {len(portfolio.groups)}")
         print(f"Stock Positions: {stock_count}")
         print(f"Option Positions: {option_count}")
         print(f"Cash Positions: {cash_count}")
+        print(f"Unknown Positions: {unknown_count}")
+        if portfolio.pending_activity_value != 0:
+            print(
+                f"Pending Activity: {format_currency(portfolio.pending_activity_value)}"
+            )
 
         # Display top holdings by value
         print("\n" + "=" * 80)
