@@ -94,16 +94,31 @@ class OptionPosition:
 
 @dataclass(frozen=True)
 class PortfolioHolding:
-    """Raw entry from a portfolio CSV file."""
+    """Raw entry from a portfolio CSV file.
+
+    This class represents the essential data from a single row in the portfolio CSV file.
+    It only includes the core fields needed for position analysis, excluding any
+    private or irrelevant information.
+
+    The source CSV format (portfolio-private.csv) contains these columns:
+    - Symbol: The ticker symbol of the security
+    - Description: Text description of the security
+    - Quantity: Number of shares or contracts
+    - Last Price: Current price per share/contract
+    - Current Value: Total value of the position
+    - Cost Basis Total: Total cost basis of the position
+
+    Other columns in the source CSV (Account Number, Account Name, Last Price Change,
+    Today's Gain/Loss, etc.) are intentionally excluded as they're either private
+    or not relevant to the core position analysis.
+    """
 
     symbol: str
     description: str
     quantity: float
-    price: float
-    value: float
-    account_type: str
-    cost_basis: float | None = None
-    percent_of_account: float | None = None
+    price: float  # Last Price in the CSV
+    value: float  # Current Value in the CSV
+    cost_basis_total: float | None = None  # Cost Basis Total in the CSV
 
 
 @dataclass(frozen=True)
