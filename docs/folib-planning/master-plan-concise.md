@@ -56,10 +56,8 @@ src/
 │   ├── domain.py              # All data classes (StockPosition, OptionPosition, PortfolioHolding, Portfolio, PortfolioSummary)
 │   ├── calculations/          # Pure calculation functions
 │   │   ├── __init__.py
-│   │   ├── beta.py            # calculate_beta()
 │   │   ├── exposure.py        # calculate_exposure(), calculate_beta_adjusted_exposure()
 │   │   ├── options.py         # calculate_option_price(), calculate_option_greeks()
-│   │   └── pnl.py             # calculate_position_pnl(), calculate_strategy_pnl()
 │   ├── data/                  # Data fetching and loading
 │   │   ├── __init__.py
 │   │   ├── stock.py          # StockOracle, fetch_prices(), fetch_historical_data(), caching logic
@@ -68,7 +66,6 @@ src/
 │       ├── __init__.py
 │       ├── portfolio_service.py # process_portfolio()
 │       ├── simulation_service.py # simulate_portfolio()
-│       └── pnl_service.py     # generate_pnl_curve()
 ```
 
 ### Module Details
