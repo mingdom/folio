@@ -4,15 +4,14 @@ Beta calculation functions.
 This module contains pure functions for calculating beta values.
 """
 
-
 import pandas as pd
 
 from ..domain import Position
 
 
-def calculate_beta(ticker: str,
-                  historical_data: pd.DataFrame,
-                  market_data: pd.DataFrame) -> float:
+def calculate_beta(
+    ticker: str, historical_data: pd.DataFrame, market_data: pd.DataFrame
+) -> float:
     """
     Calculate beta for a ticker using historical price data.
 
@@ -27,9 +26,9 @@ def calculate_beta(ticker: str,
     raise NotImplementedError("Function not yet implemented")
 
 
-def calculate_portfolio_beta(positions: list[Position],
-                            market_values: dict[str, float],
-                            betas: dict[str, float]) -> float:
+def calculate_portfolio_beta(
+    positions: list[Position], market_values: dict[str, float], betas: dict[str, float]
+) -> float:
     """
     Calculate the weighted average beta for a portfolio.
 

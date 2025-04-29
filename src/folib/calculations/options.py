@@ -8,12 +8,14 @@ from datetime import date
 from typing import Literal
 
 
-def calculate_option_price(option_type: Literal["CALL", "PUT"],
-                          strike: float,
-                          expiry: date,
-                          underlying_price: float,
-                          volatility: float = 0.3,
-                          risk_free_rate: float = 0.05) -> float:
+def calculate_option_price(
+    option_type: Literal["CALL", "PUT"],
+    strike: float,
+    expiry: date,
+    underlying_price: float,
+    volatility: float = 0.3,
+    risk_free_rate: float = 0.05,
+) -> float:
     """
     Calculate option price using Black-Scholes model.
 
@@ -31,12 +33,14 @@ def calculate_option_price(option_type: Literal["CALL", "PUT"],
     raise NotImplementedError("Function not yet implemented")
 
 
-def calculate_option_delta(option_type: Literal["CALL", "PUT"],
-                          strike: float,
-                          expiry: date,
-                          underlying_price: float,
-                          volatility: float = 0.3,
-                          risk_free_rate: float = 0.05) -> float:
+def calculate_option_delta(
+    option_type: Literal["CALL", "PUT"],
+    strike: float,
+    expiry: date,
+    underlying_price: float,
+    volatility: float = 0.3,
+    risk_free_rate: float = 0.05,
+) -> float:
     """
     Calculate option delta.
 
@@ -54,12 +58,14 @@ def calculate_option_delta(option_type: Literal["CALL", "PUT"],
     raise NotImplementedError("Function not yet implemented")
 
 
-def calculate_implied_volatility(option_type: Literal["CALL", "PUT"],
-                                strike: float,
-                                expiry: date,
-                                underlying_price: float,
-                                option_price: float,
-                                risk_free_rate: float = 0.05) -> float:
+def calculate_implied_volatility(
+    option_type: Literal["CALL", "PUT"],
+    strike: float,
+    expiry: date,
+    underlying_price: float,
+    option_price: float,
+    risk_free_rate: float = 0.05,
+) -> float:
     """
     Calculate implied volatility from option price.
 
@@ -77,10 +83,12 @@ def calculate_implied_volatility(option_type: Literal["CALL", "PUT"],
     raise NotImplementedError("Function not yet implemented")
 
 
-def parse_option_description(description: str,
-                            quantity: float = 1,
-                            price: float = 0.0,
-                            cost_basis: float | None = None) -> dict:
+def parse_option_description(
+    description: str,
+    quantity: float = 1,
+    price: float = 0.0,
+    cost_basis: float | None = None,
+) -> dict:
     """
     Parse an option description string into its components.
 

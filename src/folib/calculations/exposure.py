@@ -4,7 +4,6 @@ Exposure calculation functions.
 This module contains pure functions for calculating exposure metrics.
 """
 
-
 from ..domain import ExposureMetrics, Position
 
 
@@ -22,8 +21,7 @@ def calculate_stock_exposure(quantity: float, price: float) -> float:
     raise NotImplementedError("Function not yet implemented")
 
 
-def calculate_option_exposure(delta: float,
-                             notional_value: float) -> float:
+def calculate_option_exposure(delta: float, notional_value: float) -> float:
     """
     Calculate market exposure for an option position.
 
@@ -37,8 +35,7 @@ def calculate_option_exposure(delta: float,
     raise NotImplementedError("Function not yet implemented")
 
 
-def calculate_beta_adjusted_exposure(exposure: float,
-                                    beta: float) -> float:
+def calculate_beta_adjusted_exposure(exposure: float, beta: float) -> float:
     """
     Calculate beta-adjusted exposure.
 
@@ -52,9 +49,9 @@ def calculate_beta_adjusted_exposure(exposure: float,
     raise NotImplementedError("Function not yet implemented")
 
 
-def calculate_position_exposure(position: Position,
-                               delta: float | None = None,
-                               beta: float = 1.0) -> ExposureMetrics:
+def calculate_position_exposure(
+    position: Position, delta: float | None = None, beta: float = 1.0
+) -> ExposureMetrics:
     """
     Calculate exposure metrics for a position.
 

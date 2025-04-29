@@ -4,13 +4,12 @@ Profit and loss calculation functions.
 This module contains pure functions for calculating profit and loss.
 """
 
-
 from ..domain import OptionPosition, Position
 
 
-def calculate_stock_pnl(quantity: float,
-                       entry_price: float,
-                       current_price: float) -> float:
+def calculate_stock_pnl(
+    quantity: float, entry_price: float, current_price: float
+) -> float:
     """
     Calculate P&L for a stock position.
 
@@ -25,8 +24,7 @@ def calculate_stock_pnl(quantity: float,
     raise NotImplementedError("Function not yet implemented")
 
 
-def calculate_option_pnl(option: OptionPosition,
-                        new_underlying_price: float) -> float:
+def calculate_option_pnl(option: OptionPosition, new_underlying_price: float) -> float:
     """
     Calculate P&L for an option position.
 
@@ -40,9 +38,9 @@ def calculate_option_pnl(option: OptionPosition,
     raise NotImplementedError("Function not yet implemented")
 
 
-def calculate_position_pnl(position: Position,
-                          new_price: float,
-                          new_underlying_price: float | None = None) -> dict:
+def calculate_position_pnl(
+    position: Position, new_price: float, new_underlying_price: float | None = None
+) -> dict:
     """
     Calculate P&L for any position type.
 
@@ -57,8 +55,9 @@ def calculate_position_pnl(position: Position,
     raise NotImplementedError("Function not yet implemented")
 
 
-def calculate_strategy_pnl(positions: list[Position],
-                          price_changes: dict[str, float]) -> dict:
+def calculate_strategy_pnl(
+    positions: list[Position], price_changes: dict[str, float]
+) -> dict:
     """
     Calculate P&L for a strategy (group of positions).
 
