@@ -120,7 +120,7 @@ lint:
 	@mkdir -p $(LOGS_DIR)
 	@(echo "=== Code Check Log $(TIMESTAMP) ===" && \
 	echo "Starting checks at: $$(date)" && \
-	$(POETRY) run ruff check --fix src/ tests/ \
+	$(POETRY) run ruff check --fix --unsafe-fixes src/ tests/ \
 	2>&1) | tee $(LOGS_DIR)/code_check_latest.log
 	@echo "Check log saved to: $(LOGS_DIR)/code_check_latest.log"
 

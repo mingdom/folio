@@ -14,6 +14,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from src.folib.data.stock import stockdata
 from src.folio.portfolio import process_portfolio_data
 from src.folio.simulator_v2 import simulate_portfolio
 
@@ -121,10 +122,8 @@ def display_simulation_results(simulation_result, detailed=False):
     """Display simulation results in a formatted table."""
     # Get current SPY price
     try:
-        from src.folio.marketdata import get_stock_price
-
         # Use the same function that's used in the simulation to ensure consistency
-        current_spy_price = get_stock_price("SPY")
+        current_spy_price = stockdata.get_price("SPY")
         console.print(
             f"[green]Using current SPY price: ${current_spy_price:.2f}[/green]"
         )

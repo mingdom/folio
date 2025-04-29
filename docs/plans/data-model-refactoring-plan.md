@@ -36,7 +36,7 @@ We propose a new data model that addresses these issues by:
 
 ```
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│  MarketOracle   │     │    Position     │     │ PositionGroup   │
+│  StockOracle   │     │    Position     │     │ PositionGroup   │
 ├─────────────────┤     ├─────────────────┤     ├─────────────────┤
 │ get_price()     │     │ ticker          │     │ ticker          │
 │ get_beta()      │◄────│ quantity        │◄────│ positions       │
@@ -71,15 +71,15 @@ We propose a new data model that addresses these issues by:
 
 ### Phase 1: Create the Market Oracle
 
-1. Create a `MarketOracle` class that provides access to market data:
+1. Create a `StockOracle` class that provides access to market data:
    - `get_price(ticker)`: Get the current price for a ticker
    - `get_beta(ticker)`: Get the beta for a ticker
    - `get_volatility(ticker)`: Get the implied volatility for a ticker
    - `get_option_data(ticker, strike, expiry, option_type)`: Get data for a specific option
 
-2. Implement caching in the `MarketOracle` to avoid repeated API calls.
+2. Implement caching in the `StockOracle` to avoid repeated API calls.
 
-3. Update existing code to use the `MarketOracle` instead of storing duplicate data.
+3. Update existing code to use the `StockOracle` instead of storing duplicate data.
 
 ### Phase 2: Simplify the Position Classes
 
@@ -153,7 +153,7 @@ To minimize disruption, we'll implement this refactoring in stages:
 
 ## Benefits of the New Design
 
-1. **Reduced Duplication**: By centralizing market data in the `MarketOracle`, we eliminate duplication and inconsistencies.
+1. **Reduced Duplication**: By centralizing market data in the `StockOracle`, we eliminate duplication and inconsistencies.
 
 2. **Clearer Responsibilities**: Each class has a single, well-defined responsibility.
 
