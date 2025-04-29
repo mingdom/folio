@@ -32,23 +32,12 @@ This document outlines the detailed implementation plan for Phase 1 of the folib
 
 #### 1.1 Market Data Implementation
 
-- [ ] **Create `folib/data/market.py`**
-  - [ ] Implement `StockOracle` class with caching
-  - [ ] Implement `get_price(ticker)` method
-  - [ ] Implement `get_beta(ticker)` method
-  - [ ] Implement `get_historical_data(ticker, period)` method
-  - [ ] Add comprehensive error handling
-  - [ ] Write unit tests
+- [x] **Create `folib/data/stock.py`**
 
 #### 1.2 Portfolio Loading Implementation
 
 - [ ] **Complete `folib/data/loader.py`**
-  - [ ] Implement `load_portfolio_from_csv(file_path)` function
-  - [ ] Implement `parse_portfolio_holdings(df)` function
-  - [ ] Implement `detect_cash_positions(holdings)` function
-  - [ ] Implement `detect_pending_activity(holdings)` function
-  - [ ] Add robust error handling for CSV parsing
-  - [ ] Write unit tests
+  - [ ] TODO: figure out details below
 
 ### 2. Portfolio Processing Layer (Week 1, Days 4-5)
 
