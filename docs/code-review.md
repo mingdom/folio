@@ -11,6 +11,7 @@ This document captures key principles and examples of good code design from our 
 5. **Simplicity Over Complexity**
 6. **Avoid Special Case Logic**
 7. **Predictable Behavior**
+8. **No Silent Fallbacks**
 
 ## Examples of Good Design
 
@@ -160,9 +161,60 @@ def get_historical_data(self, ticker: str, period: str = "1y") -> pd.DataFrame:
     return df
 ```
 
+### Anti-Pattern 3: Silent Fallbacks and Error Hiding
+
+```python
+# DON'T DO THIS: Silent fallbacks and error hiding
+def get_historical_data(self, ticker: str, period: str = "1y") -> pd.DataFrame:
+    if not ticker:
+        raise ValueError("Ticker cannot be empty")
+
+    # Check cache first
+    cache_path = self._get_cache_path(ticker, period)
+    try:
+        # Try to use cache
+        if os.path.exists(cache_path):
+            logger.info(f"Loading {ticker} data from cache")
+            return pd.read_csv(cache_path, index_col=0, parse_dates=True)
+    except Exception as e:
+        # Silently ignore cache errors
+        logger.warning(f"Error reading cache for {ticker}: {e}")
+
+    # Fetch from API
+    try:
+        logger.info(f"Fetching data for {ticker} from API")
+        ticker_data = yf.Ticker(ticker)
+        df = ticker_data.history(period=period)
+
+        # Save to cache
+        try:
+            df.to_csv(cache_path)
+        except Exception as e:
+            # Silently ignore cache write errors
+            logger.warning(f"Error writing cache for {ticker}: {e}")
+
+        return df
+    except Exception as e:
+        # Try to use expired cache as fallback
+        if os.path.exists(cache_path):
+            logger.warning(f"API error, using expired cache as fallback: {e}")
+            try:
+                return pd.read_csv(cache_path, index_col=0, parse_dates=True)
+            except Exception:
+                pass  # Silently ignore fallback errors
+
+        # If all else fails, return empty DataFrame instead of raising the error
+        logger.error(f"Failed to get data for {ticker}: {e}")
+        return pd.DataFrame()  # Silent fallback to empty DataFrame
+```
+
 Problems with this approach:
-- Creates unpredictable behavior with different code paths for different inputs
-- Returns synthetic data that doesn't come from the API, violating the method's contract
+- Hides errors from the caller, making debugging difficult
+- Returns potentially invalid data (empty DataFrame) instead of failing
+- Creates complex, unpredictable control flow with multiple fallback paths
+- Makes it hard to understand when and why failures occur
+- Violates the "fail fast" principle by attempting to recover silently
+- Increases code complexity with multiple nested try/except blocks
 - Makes the code harder to understand and maintain
 - Complicates testing by introducing multiple branches and special cases
 - Violates the principle of least surprise - users expect a wrapper to the API, not synthetic data
