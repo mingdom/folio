@@ -51,17 +51,18 @@ We'll prioritize based on the natural data flow of the application:
 ## Task Tracking
 
 ### Phase 1: Portfolio Loading E2E
-- [ ] **Domain Models**
-  - [ ] Implement `Position` base structure
-  - [ ] Implement `StockPosition` with properties
-  - [ ] Implement `OptionPosition` with properties
-  - [ ] Implement `PortfolioGroup` container
-  - [ ] Implement `Portfolio` container
-  - [ ] Implement `PortfolioSummary` structure
+- [x] **Domain Models**
+  - [x] Implement `Position` base structure
+  - [x] Implement `StockPosition` with properties
+  - [x] Implement `OptionPosition` with properties
+  - [x] Implement `PortfolioGroup` container
+  - [x] Implement `Portfolio` container
+  - [x] Implement `PortfolioSummary` structure
 
-- [ ] **Data Access**
-  - [ ] Implement `StockOracle.get_price()`
-  - [ ] Implement `StockOracle.get_beta()`
+- [x] **Data Access**
+  - [x] Implement `StockOracle.get_price()`
+  - [x] Implement `StockOracle.get_beta()`
+  - [x] Implement `StockOracle.is_cash_like()`
   - [ ] Implement `load_portfolio_from_csv()`
   - [ ] Implement `parse_portfolio_holdings()`
   - [ ] Implement `detect_cash_positions()`
@@ -84,10 +85,6 @@ We'll prioritize based on the natural data flow of the application:
   - [ ] Implement `calculate_beta_adjusted_exposure()`
   - [ ] Implement `calculate_position_exposure()`
 
-- [ ] **Beta Calculations**
-  - [ ] Implement `calculate_beta()`
-  - [ ] Implement `calculate_portfolio_beta()`
-
 - [ ] **Portfolio Analysis**
   - [ ] Enhance `create_portfolio_summary()` with risk metrics
   - [ ] Implement `get_portfolio_exposures()`
@@ -103,19 +100,11 @@ We'll prioritize based on the natural data flow of the application:
   - [ ] Implement `calculate_option_delta()`
   - [ ] Implement `calculate_implied_volatility()`
 
-- [ ] **P&L Calculations**
-  - [ ] Implement `calculate_stock_pnl()`
-  - [ ] Implement `calculate_option_pnl()`
-  - [ ] Implement `calculate_position_pnl()`
-  - [ ] Implement `calculate_strategy_pnl()`
-
 - [ ] **Simulation Service**
   - [ ] Implement `generate_spy_changes()`
   - [ ] Implement `simulate_position()`
   - [ ] Implement `simulate_position_group()`
   - [ ] Implement `simulate_portfolio()`
-
-- [ ] **P&L Service**
   - [ ] Implement `generate_pnl_curve()`
   - [ ] Implement `analyze_position_risk()`
   - [ ] Implement `calculate_breakeven_points()`

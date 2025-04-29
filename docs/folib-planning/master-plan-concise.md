@@ -132,26 +132,7 @@ class OptionPosition:
 
 **Current Implementation:** `src/folio/data_model.py`
 
-#### 2. `calculations/beta.py`
-
-Pure functions for beta calculations.
-
-**Key Functions:**
-```python
-def calculate_beta(ticker: str,
-                  historical_data: pd.DataFrame,
-                  market_data: pd.DataFrame) -> float:
-    """Calculate beta for a ticker using historical price data."""
-
-def calculate_portfolio_beta(positions: list[Position],
-                            market_values: dict[str, float],
-                            betas: dict[str, float]) -> float:
-    """Calculate the weighted average beta for a portfolio."""
-```
-
-**Current Implementation:** `src/folio/utils.py` (get_beta function)
-
-#### 3. `calculations/exposure.py`
+#### 2. `calculations/exposure.py`
 
 Pure functions for exposure calculations.
 
@@ -171,7 +152,7 @@ def calculate_beta_adjusted_exposure(exposure: float,
 
 **Current Implementation:** `src/folio/portfolio_value.py`
 
-#### 4. `calculations/options.py`
+#### 3. `calculations/options.py`
 
 Pure functions for option pricing and Greeks calculations.
 
@@ -202,25 +183,7 @@ def calculate_implied_volatility(option_type: str,
 
 **Current Implementation:** `src/folio/options.py`
 
-#### 5. `calculations/pnl.py`
-
-Pure functions for profit and loss calculations.
-
-**Key Functions:**
-```python
-def calculate_stock_pnl(quantity: float,
-                       entry_price: float,
-                       current_price: float) -> float:
-    """Calculate P&L for a stock position."""
-
-def calculate_option_pnl(option: OptionPosition,
-                        new_underlying_price: float) -> float:
-    """Calculate P&L for an option position."""
-```
-
-**Current Implementation:** `src/folio/simulator_v2.py`
-
-#### 6. `data/market.py`
+#### 4. `data/stock.py`
 
 Central service for accessing market data.
 
@@ -251,7 +214,7 @@ class StockOracle:
 
 **Current Implementation:** `src/folio/marketdata.py`, `src/stockdata.py`
 
-#### 7. `data/csv_loader.py`
+#### 5. `data/loader.py`
 
 Functions for loading and parsing portfolio CSV files.
 
@@ -266,7 +229,7 @@ def parse_portfolio_holdings(df: pd.DataFrame) -> list[PortfolioHolding]:
 
 **Current Implementation:** `src/folio/portfolio.py` (process_portfolio_data function)
 
-#### 8. `services/portfolio_service.py`
+#### 6. `services/portfolio_service.py`
 
 High-level functions for portfolio processing.
 
@@ -282,9 +245,9 @@ def create_portfolio_summary(portfolio: Portfolio) -> PortfolioSummary:
 
 **Current Implementation:** `src/folio/portfolio.py`
 
-#### 9. `services/simulation_service.py`
+#### 7. `services/simulation_service.py`
 
-High-level functions for portfolio simulation.
+High-level functions for portfolio simulation and P&L analysis.
 
 **Key Functions:**
 ```python
@@ -297,9 +260,17 @@ def generate_spy_changes(min_change: float = -0.2,
                         max_change: float = 0.2,
                         steps: int = 11) -> list[float]:
     """Generate a list of SPY changes for simulation."""
+
+def generate_pnl_curve(position: StockPosition | OptionPosition | PortfolioGroup,
+                      price_range: tuple[float, float],
+                      steps: int = 21) -> dict:
+    """Generate P&L curve data for a position or group."""
+
+def calculate_breakeven_points(position: StockPosition | OptionPosition | PortfolioGroup) -> list[float]:
+    """Calculate breakeven points for a position or group."""
 ```
 
-**Current Implementation:** `src/folio/simulator_v2.py`
+**Current Implementation:** `src/folio/simulator_v2.py`, `src/folio/pnl.py`
 
 ### Integration Points
 
