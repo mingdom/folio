@@ -2,7 +2,7 @@
 Core domain models for the Folib library.
 
 This module contains the fundamental data structures used throughout the library.
-All classes are simple data containers with no methods or complex inheritance.
+All classes are simple data containers with minimal methods and a clear inheritance hierarchy.
 
 Migration Plan Notes:
 ---------------------
@@ -12,9 +12,10 @@ It replaces the functionality in src/folio/data_model.py with a cleaner, more ma
 Key differences from the old implementation:
 - Uses frozen dataclasses for immutability
 - Separates data models from business logic
-- Uses composition over inheritance
+- Uses composition over inheritance where appropriate
 - Provides minimal computed properties
 - Uses strong type hints throughout
+- Simplifies the portfolio structure with a flat list of positions
 
 Old Codebase References:
 ------------------------
@@ -34,33 +35,18 @@ Potential Issues:
 
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Literal
-
-# Use the built-in NotImplementedError exception instead of creating our own
+from typing import Literal, cast
 
 
 @dataclass(frozen=True)
 class Position:
-    """Base position data."""
-
-    ticker: str
-    quantity: float
-    position_type: Literal["stock", "option"]
-
-
-@dataclass(frozen=True)
-class StockPosition:
-    """Stock position data."""
+    """Base position data with common fields for all position types."""
 
     ticker: str
     quantity: float
     price: float
+    position_type: Literal["stock", "option", "cash", "unknown"]
     cost_basis: float | None = None
-
-    @property
-    def position_type(self) -> Literal["stock"]:
-        """Return the position type."""
-        return "stock"
 
     @property
     def market_value(self) -> float:
@@ -69,26 +55,96 @@ class StockPosition:
 
 
 @dataclass(frozen=True)
-class OptionPosition:
+class StockPosition(Position):
+    """Stock position data."""
+
+    def __init__(
+        self,
+        ticker: str,
+        quantity: float,
+        price: float,
+        cost_basis: float | None = None,
+    ):
+        object.__setattr__(self, "ticker", ticker)
+        object.__setattr__(self, "quantity", quantity)
+        object.__setattr__(self, "price", price)
+        object.__setattr__(self, "position_type", "stock")
+        object.__setattr__(self, "cost_basis", cost_basis)
+
+
+@dataclass(frozen=True)
+class OptionPosition(Position):
     """Option position data."""
 
-    ticker: str
-    quantity: float
-    strike: float
-    expiry: date
-    option_type: Literal["CALL", "PUT"]
-    price: float
-    cost_basis: float | None = None
+    # These fields are added in __init__ and not part of the base Position class
+    strike: float = field(init=False)
+    expiry: date = field(init=False)
+    option_type: Literal["CALL", "PUT"] = field(init=False)
 
-    @property
-    def position_type(self) -> Literal["option"]:
-        """Return the position type."""
-        return "option"
+    def __init__(
+        self,
+        ticker: str,
+        quantity: float,
+        price: float,
+        strike: float,
+        expiry: date,
+        option_type: Literal["CALL", "PUT"],
+        cost_basis: float | None = None,
+    ):
+        object.__setattr__(self, "ticker", ticker)
+        object.__setattr__(self, "quantity", quantity)
+        object.__setattr__(self, "price", price)
+        object.__setattr__(self, "position_type", "option")
+        object.__setattr__(self, "strike", strike)
+        object.__setattr__(self, "expiry", expiry)
+        object.__setattr__(self, "option_type", option_type)
+        object.__setattr__(self, "cost_basis", cost_basis)
 
     @property
     def market_value(self) -> float:
         """Calculate the market value of the position."""
         return self.quantity * self.price * 100  # 100 shares per contract
+
+
+@dataclass(frozen=True)
+class CashPosition(Position):
+    """Cash or cash-equivalent position."""
+
+    def __init__(
+        self,
+        ticker: str,
+        quantity: float,
+        price: float,
+        cost_basis: float | None = None,
+    ):
+        object.__setattr__(self, "ticker", ticker)
+        object.__setattr__(self, "quantity", quantity)
+        object.__setattr__(self, "price", price)
+        object.__setattr__(self, "position_type", "cash")
+        object.__setattr__(self, "cost_basis", cost_basis)
+
+
+@dataclass(frozen=True)
+class UnknownPosition(Position):
+    """Position that couldn't be classified as stock, option, or cash."""
+
+    # This field is added in __init__ and not part of the base Position class
+    description: str = field(init=False)
+
+    def __init__(
+        self,
+        ticker: str,
+        quantity: float,
+        price: float,
+        description: str,
+        cost_basis: float | None = None,
+    ):
+        object.__setattr__(self, "ticker", ticker)
+        object.__setattr__(self, "quantity", quantity)
+        object.__setattr__(self, "price", price)
+        object.__setattr__(self, "position_type", "unknown")
+        object.__setattr__(self, "description", description)
+        object.__setattr__(self, "cost_basis", cost_basis)
 
 
 @dataclass(frozen=True)
@@ -121,22 +177,37 @@ class PortfolioHolding:
 
 
 @dataclass(frozen=True)
-class PortfolioGroup:
-    """Group of related positions (stock + options)."""
-
-    ticker: str
-    stock_position: StockPosition | None = None
-    option_positions: list[OptionPosition] = field(default_factory=list)
-
-
-@dataclass(frozen=True)
 class Portfolio:
     """Container for the entire portfolio."""
 
-    groups: list[PortfolioGroup]
-    cash_positions: list[StockPosition] = field(default_factory=list)
-    unknown_positions: list[PortfolioHolding] = field(default_factory=list)
+    positions: list[Position]
     pending_activity_value: float = 0.0
+
+    @property
+    def stock_positions(self) -> list[StockPosition]:
+        """Get all stock positions."""
+        return [
+            cast(StockPosition, p) for p in self.positions if p.position_type == "stock"
+        ]
+
+    @property
+    def option_positions(self) -> list[OptionPosition]:
+        """Get all option positions."""
+        return [
+            cast(OptionPosition, p)
+            for p in self.positions
+            if p.position_type == "option"
+        ]
+
+    @property
+    def cash_positions(self) -> list[Position]:
+        """Get all cash positions."""
+        return [p for p in self.positions if p.position_type == "cash"]
+
+    @property
+    def unknown_positions(self) -> list[Position]:
+        """Get all unknown positions."""
+        return [p for p in self.positions if p.position_type == "unknown"]
 
 
 @dataclass(frozen=True)
@@ -160,3 +231,17 @@ class ExposureMetrics:
     market_exposure: float
     beta_adjusted_exposure: float | None = None
     delta_exposure: float | None = None  # For options only
+
+
+# Keep PortfolioGroup for backward compatibility during migration
+@dataclass(frozen=True)
+class PortfolioGroup:
+    """Group of related positions (stock + options).
+
+    Note: This class is deprecated and will be removed in a future version.
+    Use the helper functions in portfolio_service.py instead.
+    """
+
+    ticker: str
+    stock_position: StockPosition | None = None
+    option_positions: list[OptionPosition] = field(default_factory=list)
