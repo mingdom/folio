@@ -41,7 +41,7 @@ class SocketBlocker:
         if self.is_enabled:
             return
 
-        def guarded_socket(*args, **kwargs):
+        def guarded_socket(*_args, **_kwargs):
             raise RuntimeError("Network connections are disabled during tests")
 
         socket.socket = guarded_socket
