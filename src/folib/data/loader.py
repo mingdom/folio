@@ -208,10 +208,27 @@ def parse_portfolio_holdings(df: pd.DataFrame) -> list[PortfolioHolding]:
                 logger.debug(f"Row {index}: Skipping row with empty symbol")
                 continue
 
-            # Skip pending activity rows (will be handled separately)
-            if symbol == "Pending Activity":
-                logger.debug(f"Row {index}: Skipping Pending Activity row")
-                continue
+            # Special handling for pending activity rows
+            is_pending_activity = (
+                symbol.upper() == "PENDING ACTIVITY" or "PENDING" in symbol.upper()
+            )
+
+            if is_pending_activity:
+                logger.debug(f"Row {index}: Processing Pending Activity row")
+                # For pending activity, we care about the value, not quantity or price
+                # Set quantity to 0 or 1 (doesn't matter) and price to 0
+                quantity = 0
+                price = 0
+
+                # Make sure we get the value from the Current Value column
+                try:
+                    value = clean_currency_value(row["Current Value"])
+                    logger.debug(f"Found pending activity value: {value}")
+                except (ValueError, TypeError):
+                    logger.debug(
+                        f"Row {index}: Pending activity has invalid value: '{row['Current Value']}'. Using 0.0."
+                    )
+                    value = 0.0
 
             description = row["Description"]
 
