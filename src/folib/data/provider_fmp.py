@@ -81,77 +81,20 @@ class FMPProvider(MarketDataProvider):
         # Store cache directory for reference
         self.cache_dir = cache_dir
 
-    def get_price(self, ticker: str) -> float:
+    def try_get_beta_from_provider(self, ticker: str) -> float | None:
         """
-        Get the current price for a ticker.
+        Try to get beta directly from FMP API.
 
-        This method fetches the latest closing price for the given ticker
-        using the FMP API.
+        This method attempts to get the beta value directly from the
+        company profile in FMP API, which is more efficient than
+        calculating it manually.
 
         Args:
             ticker: The ticker symbol
 
         Returns:
-            The current price
-
-        Raises:
-            ValueError: If the ticker is invalid or no price data is available
+            The beta value from FMP, or None if not available
         """
-        if not ticker:
-            raise ValueError("Ticker cannot be empty")
-
-        # Check if the ticker appears to be a valid stock symbol
-        if not self.is_valid_stock_symbol(ticker):
-            raise ValueError(f"Invalid stock symbol format: {ticker}")
-
-        try:
-            # Using fmpsdk
-            quote_data = fmpsdk.quote(apikey=self.api_key, symbol=ticker)
-
-            if not quote_data:
-                raise ValueError(f"No quote data available for {ticker}")
-
-            price = quote_data[0].get("price")
-            if price is None:
-                raise ValueError(f"No price data available for {ticker}")
-
-            return float(price)
-        except Exception as e:
-            logger.error(f"Error getting price from FMP for {ticker}: {e}")
-
-            # Fallback to historical data
-            logger.info(f"Falling back to historical data for {ticker} price")
-            from .stock import get_current_price
-
-            historical_data = self.get_historical_data(ticker, period="1d")
-            return get_current_price(historical_data)
-
-    def get_beta(self, ticker: str) -> float | None:
-        """
-        Get the beta for a ticker.
-
-        This method fetches the beta value for the given ticker using the FMP API.
-        If the beta is not available directly, it calculates it manually using
-        historical price data.
-
-        Args:
-            ticker: The ticker symbol
-
-        Returns:
-            The beta value, or None if beta cannot be calculated
-        """
-        # Only proceed if this is a valid stock symbol
-        if not self.is_valid_stock_symbol(ticker):
-            logger.warning(f"Invalid stock symbol format: {ticker}")
-            return None
-
-        # Check cache first
-        cache_path = self.cache.get_beta_cache_path(ticker)
-        beta = self.cache.read_value_from_cache(cache_path)
-        if beta is not None:
-            return beta
-
-        # Try to get beta directly from FMP
         try:
             # Using fmpsdk
             profile_data = fmpsdk.company_profile(apikey=self.api_key, symbol=ticker)
@@ -163,41 +106,12 @@ class FMPProvider(MarketDataProvider):
                     logger.debug(
                         f"Got beta of {beta:.2f} for {ticker} directly from FMP"
                     )
-
-                    # Cache the beta value
-                    self.cache.write_value_to_cache(beta, cache_path)
-
                     return beta
 
             logger.debug(f"Beta not available in FMP profile for {ticker}")
+            return None
         except Exception as e:
             logger.debug(f"Error getting beta from FMP for {ticker}: {e}")
-
-        # If FMP beta retrieval failed, calculate it manually
-        logger.debug(f"Calculating beta manually for {ticker}")
-
-        try:
-            # Import the utility function
-            from .stock import calculate_beta_from_history
-
-            # Get historical data for the ticker and market index
-            stock_data = self.get_historical_data(ticker, period=self.beta_period)
-            market_data = self.get_historical_data(
-                self.market_index, period=self.beta_period
-            )
-
-            # Calculate beta using the utility function
-            beta = calculate_beta_from_history(
-                stock_data=stock_data,
-                market_data=market_data,
-                cache_instance=self.cache,
-                ticker=ticker,
-            )
-
-            logger.debug(f"Calculated beta of {beta:.2f} for {ticker}")
-            return beta
-        except Exception as e:
-            logger.error(f"Error calculating beta for {ticker}: {e}")
             return None
 
     def get_historical_data(

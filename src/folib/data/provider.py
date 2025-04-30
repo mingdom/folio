@@ -30,25 +30,6 @@ class MarketDataProvider(ABC):
     market_index = "SPY"
 
     @abstractmethod
-    def get_beta(self, ticker: str) -> float | None:
-        """
-        Get the beta for a ticker.
-
-        Beta measures the volatility of a security in relation to the overall market.
-        A beta of 1 indicates the security's price moves with the market.
-        A beta less than 1 means the security is less volatile than the market.
-        A beta greater than 1 indicates the security is more volatile than the market.
-
-        Args:
-            ticker: The ticker symbol
-
-        Returns:
-            The beta value, or None if beta cannot be calculated
-            (e.g., for invalid stock symbols, insufficient data points, or calculation errors)
-        """
-        pass
-
-    @abstractmethod
     def get_historical_data(
         self,
         ticker: str,
@@ -70,3 +51,40 @@ class MarketDataProvider(ABC):
             ValueError: If the ticker is invalid or no historical data is available
         """
         pass
+
+    def try_get_beta_from_provider(self, ticker: str) -> float | None:  # noqa: ARG002
+        """
+        Try to get beta directly from the provider's API.
+
+        This method should be implemented by providers that can fetch beta directly.
+        If not implemented or if the provider doesn't support direct beta retrieval,
+        it should return None.
+
+        Args:
+            ticker: The ticker symbol
+
+        Returns:
+            The beta value from the provider, or None if not available
+        """
+        # Unused argument is intentional - this is a base method that subclasses will override
+        # with their own implementation that uses the ticker parameter
+        return None
+
+    def is_valid_stock_symbol(self, ticker: str) -> bool:
+        """
+        Check if a ticker symbol is likely a valid stock symbol.
+
+        This method uses a simple regex pattern to check if a ticker symbol follows
+        common stock symbol patterns. It's designed to filter out obviously invalid
+        symbols before sending them to the provider API.
+
+        Args:
+            ticker: The ticker symbol to check
+
+        Returns:
+            True if the ticker appears to be a valid stock symbol, False otherwise
+        """
+        # Import here to avoid circular imports
+        from .stock import is_valid_stock_symbol
+
+        return is_valid_stock_symbol(ticker)

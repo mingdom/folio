@@ -59,6 +59,71 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 
+def get_current_price(historical_data: pd.DataFrame) -> float:
+    """
+    Get the current price from historical data.
+
+    This function extracts the latest closing price from historical data.
+    It can be used by any provider that returns historical data in a DataFrame
+    with a 'Close' column.
+
+    Args:
+        historical_data: DataFrame with historical price data (must have 'Close' column)
+
+    Returns:
+        The latest closing price
+
+    Raises:
+        ValueError: If the historical data is empty or doesn't have a 'Close' column
+    """
+    if historical_data.empty:
+        raise ValueError("Historical data is empty")
+
+    if "Close" not in historical_data.columns:
+        raise ValueError("Historical data doesn't have a 'Close' column")
+
+    return historical_data["Close"].iloc[-1]
+
+
+def is_valid_stock_symbol(ticker: str) -> bool:
+    """
+    Check if a ticker symbol is likely a valid stock symbol.
+
+    This function uses a simple regex pattern to check if a ticker symbol follows
+    common stock symbol patterns. It's designed to filter out obviously invalid
+    symbols before sending them to provider APIs.
+
+    Common stock symbol patterns:
+    - 1-5 uppercase letters (most US stocks: AAPL, MSFT, GOOGL)
+    - 1-5 uppercase letters with a period (some international stocks: BHP.AX)
+    - 1-5 uppercase letters with a hyphen (some ETFs: SPY-X)
+    - 1-5 uppercase letters followed by 1-3 uppercase letters after a period (ADRs: SONY.TO)
+
+    Args:
+        ticker: The ticker symbol to check
+
+    Returns:
+        True if the ticker appears to be a valid stock symbol, False otherwise
+    """
+    if not ticker:
+        return False
+
+    # Simple regex pattern for common stock symbols
+    # This covers most US stocks, ETFs, and common international formats
+    pattern = r"^[A-Z]{1,5}(\.[A-Z]{1,3}|-[A-Z]{1})?$"
+
+    # Special case for fund symbols that often have numbers and special formats
+    fund_pattern = r"^[A-Z]{1,5}[0-9X]{0,3}$"
+
+    # Check if the ticker matches either pattern
+    if re.match(pattern, ticker) or re.match(fund_pattern, ticker):
+        return True
+
+    # Log invalid symbols for debugging
+    logger.debug(f"Symbol '{ticker}' does not match standard stock symbol patterns")
+    return False
+
+
 def calculate_beta_from_history(
     stock_data: pd.DataFrame,
     market_data: pd.DataFrame,
@@ -266,14 +331,24 @@ class StockOracle:
         Raises:
             ValueError: If the ticker is invalid or no price data is available
         """
-        return self.provider.get_price(ticker)
+        # Validate ticker
+        if not is_valid_stock_symbol(ticker):
+            raise ValueError(f"Invalid stock symbol format: {ticker}")
+
+        # Get historical data for the most recent day
+        historical_data = self.get_historical_data(ticker, period="1d")
+
+        # Extract the current price
+        return get_current_price(historical_data)
 
     def get_beta(self, ticker: str) -> float | None:
         """
         Get the beta for a ticker.
 
-        This method fetches the beta value for the given ticker using the
-        selected market data provider.
+        This method first tries to get beta directly from the provider.
+        If that fails, it calculates the beta (systematic risk) for a given ticker
+        by comparing its price movements to a market index (default: SPY) over a period
+        of time (default: 3 months). Results are cached to improve performance.
 
         Beta measures the volatility of a security in relation to the overall market.
         A beta of 1 indicates the security's price moves with the market.
@@ -290,7 +365,57 @@ class StockOracle:
         Raises:
             ValueError: If market variance calculation results in NaN
         """
-        return self.provider.get_beta(ticker)
+        # Validate ticker
+        if not is_valid_stock_symbol(ticker):
+            logger.warning(f"Invalid stock symbol format: {ticker}")
+            return None
+
+        # Check cache first
+        from .cache import DataCache
+
+        cache = getattr(self.provider, "cache", None)
+        if cache and isinstance(cache, DataCache):
+            cache_path = cache.get_beta_cache_path(ticker)
+            beta = cache.read_value_from_cache(cache_path)
+            if beta is not None:
+                return beta
+
+        # Try to get beta directly from the provider
+        beta = self.provider.try_get_beta_from_provider(ticker)
+        if beta is not None:
+            # Cache the result if possible
+            if cache and isinstance(cache, DataCache):
+                cache.write_value_to_cache(beta, cache_path)
+            return beta
+
+        # If provider beta retrieval failed, calculate it manually
+        logger.debug(f"Calculating beta manually for {ticker}")
+
+        # Get historical data for the ticker and market index
+        try:
+            # Get the beta period and market index from the provider if available
+            beta_period = getattr(self.provider, "beta_period", "3mo")
+            market_index = getattr(self.provider, "market_index", "SPY")
+
+            # Get historical data
+            stock_data = self.get_historical_data(ticker, period=beta_period)
+            market_data = self.get_historical_data(market_index, period=beta_period)
+
+            # Calculate beta
+            beta = calculate_beta_from_history(
+                stock_data=stock_data,
+                market_data=market_data,
+                cache_instance=cache,
+                ticker=ticker,
+            )
+
+            if beta is not None:
+                logger.debug(f"Calculated beta of {beta:.2f} for {ticker}")
+            return beta
+
+        except Exception as e:
+            logger.error(f"Error calculating beta for {ticker}: {e}")
+            return None
 
     def get_historical_data(
         self,
@@ -326,13 +451,7 @@ class StockOracle:
 
         This method uses a simple regex pattern to check if a ticker symbol follows
         common stock symbol patterns. It's designed to filter out obviously invalid
-        symbols before sending them to yfinance.
-
-        Common stock symbol patterns:
-        - 1-5 uppercase letters (most US stocks: AAPL, MSFT, GOOGL)
-        - 1-5 uppercase letters with a period (some international stocks: BHP.AX)
-        - 1-5 uppercase letters with a hyphen (some ETFs: SPY-X)
-        - 1-5 uppercase letters followed by 1-3 uppercase letters after a period (ADRs: SONY.TO)
+        symbols before sending them to the provider API.
 
         Args:
             ticker: The ticker symbol to check
@@ -340,23 +459,7 @@ class StockOracle:
         Returns:
             True if the ticker appears to be a valid stock symbol, False otherwise
         """
-        if not ticker:
-            return False
-
-        # Simple regex pattern for common stock symbols
-        # This covers most US stocks, ETFs, and common international formats
-        pattern = r"^[A-Z]{1,5}(\.[A-Z]{1,3}|-[A-Z]{1})?$"
-
-        # Special case for fund symbols that often have numbers and special formats
-        fund_pattern = r"^[A-Z]{1,5}[0-9X]{0,3}$"
-
-        # Check if the ticker matches either pattern
-        if re.match(pattern, ticker) or re.match(fund_pattern, ticker):
-            return True
-
-        # Log invalid symbols for debugging
-        logger.debug(f"Symbol '{ticker}' does not match standard stock symbol patterns")
-        return False
+        return is_valid_stock_symbol(ticker)
 
     def is_cash_like(self, ticker: str, description: str = "") -> bool:
         """

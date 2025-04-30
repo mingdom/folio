@@ -59,32 +59,11 @@ class YFinanceProvider(MarketDataProvider):
         # Store cache directory for reference
         self.cache_dir = cache_dir
 
-    def get_price(self, ticker: str) -> float:
-        """
-        Get the current price for a ticker.
-
-        This method fetches the latest closing price for the given ticker
-        using the Yahoo Finance API.
-
-        Args:
-            ticker: The ticker symbol
-
-        Returns:
-            The current price
-
-        Raises:
-            ValueError: If the ticker is invalid or no price data is available
-        """
-        from .stock import get_current_price
-
-        historical_data = self.get_historical_data(ticker, period="1d")
-        return get_current_price(historical_data)
-
-    def _get_beta_yfinance(self, ticker: str) -> float | None:
+    def try_get_beta_from_provider(self, ticker: str) -> float | None:
         """
         Try to get beta directly from Yahoo Finance API.
 
-        This internal method attempts to get the beta value directly from the
+        This method attempts to get the beta value directly from the
         ticker's info property in yfinance, which is more efficient than
         calculating it manually.
 
@@ -110,67 +89,6 @@ class YFinanceProvider(MarketDataProvider):
         except Exception as e:
             logger.debug(f"Error getting beta from Yahoo Finance for {ticker}: {e}")
             return None
-
-    def get_beta(self, ticker: str) -> float | None:
-        """
-        Get the beta for a ticker.
-
-        This method first tries to get beta directly from Yahoo Finance.
-        If that fails, it calculates the beta (systematic risk) for a given ticker
-        by comparing its price movements to a market index (default: SPY) over a period
-        of time (default: 3 months). Results are cached to improve performance.
-
-        Beta measures the volatility of a security in relation to the overall market.
-        A beta of 1 indicates the security's price moves with the market.
-        A beta less than 1 means the security is less volatile than the market.
-        A beta greater than 1 indicates the security is more volatile than the market.
-
-        Args:
-            ticker: The ticker symbol
-
-        Returns:
-            The calculated beta value, or None if beta cannot be calculated
-            (e.g., for invalid stock symbols, insufficient data points, or calculation errors)
-
-        Raises:
-            ValueError: If market variance calculation results in NaN
-        """
-        # Only proceed if this is a valid stock symbol
-        if not self.is_valid_stock_symbol(ticker):
-            logger.warning(f"Invalid stock symbol format: {ticker}")
-            return None
-
-        # Check cache first
-        cache_path = self.cache.get_beta_cache_path(ticker)
-        beta = self.cache.read_value_from_cache(cache_path)
-        if beta is not None:
-            return beta
-
-        # Try to get beta directly from Yahoo Finance
-        beta = self._get_beta_yfinance(ticker)
-        if not beta:
-            # If Yahoo Finance beta retrieval failed, calculate it manually
-            logger.debug(f"Calculating beta manually for {ticker}")
-
-            # Import the utility function
-            from .stock import calculate_beta_from_history
-
-            # Get historical data for the ticker and market index
-            stock_data = self.get_historical_data(ticker, period=self.beta_period)
-            market_data = self.get_historical_data(
-                self.market_index, period=self.beta_period
-            )
-
-            # Calculate beta using the utility function
-            beta = calculate_beta_from_history(
-                stock_data=stock_data,
-                market_data=market_data,
-                cache_instance=self.cache,
-                ticker=ticker,
-            )
-
-        logger.debug(f"Calculated beta of {beta:.2f} for {ticker}")
-        return beta
 
     def get_historical_data(
         self,
