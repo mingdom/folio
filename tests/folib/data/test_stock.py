@@ -352,7 +352,7 @@ def test_stockdata_singleton():
     # variable is a StockOracle instance and that the singleton pattern works
 
     # Import the module to get the pre-initialized singleton
-    from src.folib.data.stock import stockdata
+    from src.folib.data.stock import StockOracle, stockdata
 
     # Verify it's a StockOracle instance
     assert isinstance(stockdata, StockOracle)

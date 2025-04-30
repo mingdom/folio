@@ -55,7 +55,7 @@ env:
 	@echo "Creating Poetry virtual environment..."
 	@$(POETRY) env use $(PYTHON)
 	@echo "Virtual environment created successfully."
-	@echo "NOTE: To activate the virtual environment in your current shell, run: `source .venv/bin/activate`"
+	@echo "NOTE: To activate the virtual environment in your current shell, run: source .venv/bin/activate"
 	@echo "The virtual environment will be automatically activated for all make commands."
 
 # Install dependencies
