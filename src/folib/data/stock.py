@@ -23,6 +23,7 @@ Key differences from the old implementation:
 - Provides direct methods for common operations (get_price, get_beta) instead of generic fetch_data
 - Simplifies the API by hiding implementation details
 - Implements the Singleton pattern for consistent access throughout the application
+- Supports multiple data providers (Yahoo Finance, Financial Modeling Prep) through a provider interface
 
 Old Codebase References:
 ------------------------
@@ -34,6 +35,7 @@ Old Codebase References:
 Potential Issues:
 ----------------
 - Yahoo Finance API may have rate limits or change its interface
+- FMP API requires an API key and has its own rate limits
 - Beta calculation requires sufficient historical data
 - Some tickers may not have data available
 - Market data fetching can be slow
@@ -42,14 +44,145 @@ Potential Issues:
 import logging
 import os
 import re
-import time
+from typing import Any
 
 import pandas as pd
+from dotenv import load_dotenv
 
-import yfinance as yf
+from .provider_fmp import FMPProvider
+from .provider_yfinance import YFinanceProvider
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Set up logging
 logger = logging.getLogger(__name__)
+
+
+def get_current_price(historical_data: pd.DataFrame) -> float:
+    """
+    Get the current price from historical data.
+
+    This function extracts the latest closing price from historical data.
+    It can be used by any provider that returns historical data in a DataFrame
+    with a 'Close' column.
+
+    Args:
+        historical_data: DataFrame with historical price data (must have 'Close' column)
+
+    Returns:
+        The latest closing price
+
+    Raises:
+        ValueError: If the historical data is empty or doesn't have a 'Close' column
+    """
+    if historical_data.empty:
+        raise ValueError("Historical data is empty")
+
+    if "Close" not in historical_data.columns:
+        raise ValueError("Historical data doesn't have a 'Close' column")
+
+    return historical_data["Close"].iloc[-1]
+
+
+def is_valid_stock_symbol(ticker: str) -> bool:
+    """
+    Check if a ticker symbol is likely a valid stock symbol.
+
+    This function uses a simple regex pattern to check if a ticker symbol follows
+    common stock symbol patterns. It's designed to filter out obviously invalid
+    symbols before sending them to provider APIs.
+
+    Common stock symbol patterns:
+    - 1-5 uppercase letters (most US stocks: AAPL, MSFT, GOOGL)
+    - 1-5 uppercase letters with a period (some international stocks: BHP.AX)
+    - 1-5 uppercase letters with a hyphen (some ETFs: SPY-X)
+    - 1-5 uppercase letters followed by 1-3 uppercase letters after a period (ADRs: SONY.TO)
+
+    Args:
+        ticker: The ticker symbol to check
+
+    Returns:
+        True if the ticker appears to be a valid stock symbol, False otherwise
+    """
+    if not ticker:
+        return False
+
+    # Simple regex pattern for common stock symbols
+    # This covers most US stocks, ETFs, and common international formats
+    pattern = r"^[A-Z]{1,5}(\.[A-Z]{1,3}|-[A-Z]{1})?$"
+
+    # Special case for fund symbols that often have numbers and special formats
+    fund_pattern = r"^[A-Z]{1,5}[0-9X]{0,3}$"
+
+    # Check if the ticker matches either pattern
+    if re.match(pattern, ticker) or re.match(fund_pattern, ticker):
+        return True
+
+    # Log invalid symbols for debugging
+    logger.debug(f"Symbol '{ticker}' does not match standard stock symbol patterns")
+    return False
+
+
+def calculate_beta_from_history(
+    stock_data: pd.DataFrame,
+    market_data: pd.DataFrame,
+    cache_instance: Any | None = None,
+    ticker: str | None = None,
+) -> float | None:
+    """
+    Calculate beta from historical stock and market data.
+
+    Beta measures the volatility of a security in relation to the overall market.
+    A beta of 1 indicates the security's price moves with the market.
+    A beta less than 1 means the security is less volatile than the market.
+    A beta greater than 1 indicates the security is more volatile than the market.
+
+    Args:
+        stock_data: DataFrame with historical price data for the stock (must have 'Close' column)
+        market_data: DataFrame with historical price data for the market index (must have 'Close' column)
+        cache_instance: Optional DataCache instance for caching the result
+        ticker: Optional ticker symbol (required if cache_instance is provided)
+
+    Returns:
+        The calculated beta value, or None if beta cannot be calculated
+        (e.g., insufficient data points or calculation errors)
+
+    Raises:
+        ValueError: If market variance calculation results in NaN
+    """
+    # Calculate returns
+    stock_returns = stock_data["Close"].pct_change(fill_method=None).dropna()
+    market_returns = market_data["Close"].pct_change(fill_method=None).dropna()
+
+    # Align data by index
+    aligned_stock, aligned_market = stock_returns.align(market_returns, join="inner")
+
+    if aligned_stock.empty or len(aligned_stock) < 2:
+        logger.debug(
+            "Insufficient overlapping data points, cannot calculate meaningful beta"
+        )
+        return None
+
+    # Calculate beta components
+    market_variance = aligned_market.var()
+    covariance = aligned_stock.cov(aligned_market)
+
+    if pd.isna(market_variance):
+        raise ValueError("Market variance calculation resulted in NaN")
+
+    if pd.isna(covariance):
+        logger.warning("Covariance calculation resulted in NaN")
+        return None
+
+    beta = covariance / market_variance
+
+    # Cache the calculated beta if a cache instance is provided
+    if cache_instance and ticker:
+        cache_path = cache_instance.get_beta_cache_path(ticker)
+        cache_instance.write_value_to_cache(beta, cache_path)
+
+    return beta
 
 
 class StockOracle:
@@ -61,44 +194,81 @@ class StockOracle:
     only one instance exists throughout the application.
 
     Usage:
+        # Using default YFinance provider
         oracle = StockOracle.get_instance()
+        price = oracle.get_price("AAPL")
+
+        # Using FMP provider
+        oracle = StockOracle.get_instance(provider_name="fmp", fmp_api_key="your_api_key")
         price = oracle.get_price("AAPL")
     """
 
     # Singleton instance
     _instance = None
 
-    # Default period for beta calculations (3 months provides more current market behavior)
-    beta_period = "3mo"
-    # Default market index for beta calculations
-    market_index = "SPY"
+    # Available providers
+    PROVIDER_YFINANCE = "yfinance"
+    PROVIDER_FMP = "fmp"
 
     @classmethod
-    def get_instance(cls, cache_dir=None, cache_ttl=None):
+    def get_instance(
+        cls, provider_name=None, fmp_api_key=None, cache_dir=None, cache_ttl=None
+    ):
         """
         Get the singleton instance of StockOracle.
 
         Args:
-            cache_dir: Directory to store cached data (default: .cache_yf)
+            provider_name: Name of the market data provider to use ("yfinance" or "fmp")
+                           If None, will use the DATA_SOURCE environment variable or default to "yfinance"
+            fmp_api_key: API key for FMP provider (required if provider_name is "fmp")
+                         If None, will use the FMP_API_KEY environment variable
+            cache_dir: Directory to store cached data (default: .cache_yf or .cache_fmp based on provider)
             cache_ttl: Cache TTL in seconds (default: 86400 - 1 day)
 
         Returns:
             The singleton StockOracle instance
+
+        Raises:
+            ValueError: If provider_name is "fmp" but no API key is provided
         """
+        # If no instance exists, create one
         if cls._instance is None:
-            cls._instance = cls(cache_dir=cache_dir, cache_ttl=cache_ttl)
+            # Get provider name from arguments or environment variable
+            if provider_name is None:
+                provider_name = os.environ.get("DATA_SOURCE", "yfinance").lower()
+
+            # Get FMP API key from arguments or environment variable
+            if fmp_api_key is None and provider_name == "fmp":
+                fmp_api_key = os.environ.get("FMP_API_KEY")
+
+            # Create the instance
+            cls._instance = cls(
+                provider_name=provider_name,
+                fmp_api_key=fmp_api_key,
+                cache_dir=cache_dir,
+                cache_ttl=cache_ttl,
+            )
+
         return cls._instance
 
-    def __init__(self, cache_dir=None, cache_ttl=None):
+    def __init__(
+        self, provider_name="yfinance", fmp_api_key=None, cache_dir=None, cache_ttl=None
+    ):
         """
         Initialize the StockOracle.
 
         Args:
-            cache_dir: Directory to store cached data (default: .cache_yf)
+            provider_name: Name of the market data provider to use ("yfinance" or "fmp")
+            fmp_api_key: API key for FMP provider (required if provider_name is "fmp")
+            cache_dir: Directory to store cached data (default: .cache_yf or .cache_fmp based on provider)
             cache_ttl: Cache TTL in seconds (default: 86400 - 1 day)
 
         Note:
             This should not be called directly. Use StockOracle.get_instance() instead.
+
+        Raises:
+            ValueError: If provider_name is "fmp" but no API key is provided
+            ValueError: If provider_name is not recognized
         """
         # Check if an instance already exists to enforce singleton pattern
         if StockOracle._instance is not None:
@@ -106,76 +276,76 @@ class StockOracle:
                 "StockOracle instance already exists. Use StockOracle.get_instance() instead."
             )
 
-        # Set default cache directory
-        # Special case for Hugging Face Spaces
+        # Validate provider name
+        if provider_name not in [self.PROVIDER_YFINANCE, self.PROVIDER_FMP]:
+            raise ValueError(f"Unknown provider: {provider_name}")
+
+        # Validate FMP API key if FMP provider is selected
+        if provider_name == self.PROVIDER_FMP and not fmp_api_key:
+            raise ValueError("API key is required for FMP provider")
+
+        # Set default cache directory based on provider
         if cache_dir is None:
+            # Special case for Hugging Face Spaces
             if (
                 os.environ.get("HF_SPACE") == "1"
                 or os.environ.get("SPACE_ID") is not None
             ):
-                cache_dir = "/tmp/cache_yf"
+                cache_dir = f"/tmp/cache_{provider_name}"
             else:
-                cache_dir = ".cache_yf"
-
-        self.cache_dir = cache_dir
-
-        # Create cache directory if it doesn't exist
-        os.makedirs(cache_dir, exist_ok=True)
+                cache_dir = f".cache_{provider_name}"
 
         # Set cache TTL (default: 1 day)
-        self.cache_ttl = 86400 if cache_ttl is None else cache_ttl
+        cache_ttl = 86400 if cache_ttl is None else cache_ttl
+
+        # Initialize the appropriate provider
+        if provider_name == self.PROVIDER_YFINANCE:
+            self.provider = YFinanceProvider(cache_dir=cache_dir, cache_ttl=cache_ttl)
+        elif provider_name == self.PROVIDER_FMP:
+            self.provider = FMPProvider(
+                api_key=fmp_api_key, cache_dir=cache_dir, cache_ttl=cache_ttl
+            )
+
+        # Store provider name for reference
+        self.provider_name = provider_name
+
+        # Store cache directory and TTL for reference
+        self.cache_dir = cache_dir
+        self.cache_ttl = cache_ttl
+
+        logger.info(f"Initialized StockOracle with {provider_name} provider")
 
     def get_price(self, ticker: str) -> float:
         """
         Get the current price for a ticker.
 
         This method fetches the latest closing price for the given ticker
-        using the Yahoo Finance API.
+        using the selected market data provider.
 
         Args:
             ticker: The ticker symbol
 
         Returns:
             The current price
+
+        Raises:
+            ValueError: If the ticker is invalid or no price data is available
         """
-        return self.get_historical_data(ticker, period="1d")["Close"].iloc[-1]
+        # Validate ticker
+        if not is_valid_stock_symbol(ticker):
+            raise ValueError(f"Invalid stock symbol format: {ticker}")
 
-    def _get_beta_yfinance(self, ticker: str) -> float | None:
-        """
-        Try to get beta directly from Yahoo Finance API.
+        # Get historical data for the most recent day
+        historical_data = self.get_historical_data(ticker, period="1d")
 
-        This internal method attempts to get the beta value directly from the
-        ticker's info property in yfinance, which is more efficient than
-        calculating it manually.
-
-        Args:
-            ticker: The ticker symbol
-
-        Returns:
-            The beta value from Yahoo Finance, or None if not available
-        """
-        try:
-            ticker_obj = yf.Ticker(ticker)
-            ticker_info = ticker_obj.info
-
-            if "beta" in ticker_info and ticker_info["beta"] is not None:
-                beta_value = float(ticker_info["beta"])
-                logger.debug(
-                    f"Got beta of {beta_value:.2f} for {ticker} directly from Yahoo Finance"
-                )
-                return beta_value
-            else:
-                logger.debug(f"Beta not available in Yahoo Finance info for {ticker}")
-                return None
-        except Exception as e:
-            logger.debug(f"Error getting beta from Yahoo Finance for {ticker}: {e}")
-            return None
+        # Extract the current price
+        return get_current_price(historical_data)
 
     def get_beta(self, ticker: str) -> float | None:
         """
         Get the beta for a ticker.
 
-        This method first tries to get beta directly from Yahoo Finance.
+        This method first tries to get beta directly from the provider.
         If that fails, it calculates the beta (systematic risk) for a given ticker
         by comparing its price movements to a market index (default: SPY) over a period
         of time (default: 3 months). Results are cached to improve performance.
@@ -195,78 +365,57 @@ class StockOracle:
         Raises:
             ValueError: If market variance calculation results in NaN
         """
-        # Only proceed if this is a valid stock symbol
-        if not self.is_valid_stock_symbol(ticker):
+        # Validate ticker
+        if not is_valid_stock_symbol(ticker):
             logger.warning(f"Invalid stock symbol format: {ticker}")
             return None
 
         # Check cache first
-        cache_path = self._get_beta_cache_path(ticker)
-        if os.path.exists(cache_path) and not self._is_cache_expired(
-            os.path.getmtime(cache_path)
-        ):
-            try:
-                with open(cache_path) as f:
-                    beta = float(f.read().strip())
-                logger.debug(f"Loaded beta for {ticker} from cache: {beta:.3f}")
+        from .cache import DataCache
+
+        cache = getattr(self.provider, "cache", None)
+        if cache and isinstance(cache, DataCache):
+            cache_path = cache.get_beta_cache_path(ticker)
+            beta = cache.read_value_from_cache(cache_path)
+            if beta is not None:
                 return beta
-            except Exception as e:
-                logger.warning(f"Error reading beta cache for {ticker}: {e}")
-                # Continue to calculate beta if cache read fails
 
-        # Try to get beta directly from Yahoo Finance
-        beta = self._get_beta_yfinance(ticker)
-        if not beta:
-            # If Yahoo Finance beta retrieval failed, calculate it manually
-            logger.debug(f"Calculating beta manually for {ticker}")
+        # Try to get beta directly from the provider
+        beta = self.provider.try_get_beta_from_provider(ticker)
+        if beta is not None:
+            # Cache the result if possible
+            if cache and isinstance(cache, DataCache):
+                cache.write_value_to_cache(beta, cache_path)
+            return beta
 
-            # Get historical data for the ticker and market index
-            stock_data = self.get_historical_data(ticker, period=self.beta_period)
-            market_data = self.get_historical_data(
-                self.market_index, period=self.beta_period
-            )
+        # If provider beta retrieval failed, calculate it manually
+        logger.debug(f"Calculating beta manually for {ticker}")
 
-            # Calculate returns
-            stock_returns = stock_data["Close"].pct_change(fill_method=None).dropna()
-            market_returns = market_data["Close"].pct_change(fill_method=None).dropna()
-
-            # Align data by index
-            aligned_stock, aligned_market = stock_returns.align(
-                market_returns, join="inner"
-            )
-
-            if aligned_stock.empty or len(aligned_stock) < 2:
-                logger.debug(
-                    f"Insufficient overlapping data points for {ticker}, cannot calculate meaningful beta"
-                )
-                return None
-
-            # Calculate beta components
-            market_variance = aligned_market.var()
-            covariance = aligned_stock.cov(aligned_market)
-
-            if pd.isna(market_variance):
-                raise ValueError(
-                    f"Market variance calculation resulted in NaN for {ticker}"
-                )
-
-            if pd.isna(covariance):
-                logger.warning(f"Covariance calculation resulted in NaN for {ticker}")
-                return None
-
-            beta = covariance / market_variance
-
-        # Cache the calculated beta
+        # Get historical data for the ticker and market index
         try:
-            with open(cache_path, "w") as f:
-                f.write(f"{beta:.6f}")
-            logger.debug(f"Cached beta for {ticker}: {beta:.3f}")
-        except Exception as e:
-            logger.warning(f"Error writing beta cache for {ticker}: {e}")
-            # Continue even if cache write fails
+            # Get the beta period and market index from the provider if available
+            beta_period = getattr(self.provider, "beta_period", "3mo")
+            market_index = getattr(self.provider, "market_index", "SPY")
 
-        logger.debug(f"Calculated beta of {beta:.2f} for {ticker}")
-        return beta
+            # Get historical data
+            stock_data = self.get_historical_data(ticker, period=beta_period)
+            market_data = self.get_historical_data(market_index, period=beta_period)
+
+            # Calculate beta
+            beta = calculate_beta_from_history(
+                stock_data=stock_data,
+                market_data=market_data,
+                cache_instance=cache,
+                ticker=ticker,
+            )
+
+            if beta is not None:
+                logger.debug(f"Calculated beta of {beta:.2f} for {ticker}")
+            return beta
+
+        except Exception as e:
+            logger.error(f"Error calculating beta for {ticker}: {e}")
+            return None
 
     def get_historical_data(
         self,
@@ -278,13 +427,13 @@ class StockOracle:
         Get historical price data for a ticker.
 
         This method fetches historical price data for the given ticker
-        using the Yahoo Finance API, with caching to improve performance
+        using the selected market data provider, with caching to improve performance
         and reduce API calls.
 
         Args:
             ticker: The ticker symbol
-            period: Time period in yfinance format: "1d", "5d", "1mo", "3mo", "6mo", "1y", "2y", "5y", "10y", "ytd", "max"
-            interval: Data interval ("1d", "1wk", "1mo", etc.)
+            period: Time period in provider format (e.g., "1d", "5d", "1mo", "3mo", "6mo", "1y", "2y", "5y", "10y", "ytd", "max")
+            interval: Data interval (e.g., "1d", "1wk", "1mo")
 
         Returns:
             DataFrame with historical price data (columns: Open, High, Low, Close, Volume)
@@ -293,44 +442,8 @@ class StockOracle:
             ValueError: If the ticker is empty
             ValueError: If the ticker doesn't appear to be a valid stock symbol
             ValueError: If no historical data is available
-            Any exceptions from yfinance are propagated directly
         """
-        if not ticker:
-            raise ValueError("Ticker cannot be empty")
-
-        # Check if the ticker appears to be a valid stock symbol
-        if not self.is_valid_stock_symbol(ticker):
-            raise ValueError(f"Invalid stock symbol format: {ticker}")
-
-        # Check cache first
-        cache_path = self._get_cache_path(ticker, period, interval)
-        if os.path.exists(cache_path) and not self._is_cache_expired(
-            os.path.getmtime(cache_path)
-        ):
-            try:
-                logger.info(f"Loading {ticker} data from cache")
-                return pd.read_csv(cache_path, index_col=0, parse_dates=True)
-            except Exception as e:
-                logger.warning(f"Error reading cache for {ticker}: {e}")
-                # Continue to fetch from API if cache read fails
-
-        # Fetch from yfinance
-        logger.info(f"Fetching data for {ticker} from yfinance: {period}, {interval}")
-        ticker_data = yf.Ticker(ticker)
-        df = ticker_data.history(period=period, interval=interval)
-
-        if df.empty:
-            raise ValueError(f"No historical data available for {ticker}")
-
-        # Save to cache
-        try:
-            df.to_csv(cache_path)
-            logger.debug(f"Cached historical data for {ticker}")
-        except Exception as e:
-            logger.warning(f"Error writing cache for {ticker}: {e}")
-            # Continue even if cache write fails
-
-        return df
+        return self.provider.get_historical_data(ticker, period, interval)
 
     def is_valid_stock_symbol(self, ticker: str) -> bool:
         """
@@ -338,13 +451,7 @@ class StockOracle:
 
         This method uses a simple regex pattern to check if a ticker symbol follows
         common stock symbol patterns. It's designed to filter out obviously invalid
-        symbols before sending them to yfinance.
-
-        Common stock symbol patterns:
-        - 1-5 uppercase letters (most US stocks: AAPL, MSFT, GOOGL)
-        - 1-5 uppercase letters with a period (some international stocks: BHP.AX)
-        - 1-5 uppercase letters with a hyphen (some ETFs: SPY-X)
-        - 1-5 uppercase letters followed by 1-3 uppercase letters after a period (ADRs: SONY.TO)
+        symbols before sending them to the provider API.
 
         Args:
             ticker: The ticker symbol to check
@@ -352,63 +459,7 @@ class StockOracle:
         Returns:
             True if the ticker appears to be a valid stock symbol, False otherwise
         """
-        if not ticker:
-            return False
-
-        # Simple regex pattern for common stock symbols
-        # This covers most US stocks, ETFs, and common international formats
-        pattern = r"^[A-Z]{1,5}(\.[A-Z]{1,3}|-[A-Z]{1})?$"
-
-        # Special case for fund symbols that often have numbers and special formats
-        fund_pattern = r"^[A-Z]{1,5}[0-9X]{0,3}$"
-
-        # Check if the ticker matches either pattern
-        if re.match(pattern, ticker) or re.match(fund_pattern, ticker):
-            return True
-
-        # Log invalid symbols for debugging
-        logger.debug(f"Symbol '{ticker}' does not match standard stock symbol patterns")
-        return False
-
-    def _get_cache_path(self, ticker, period, interval="1d"):
-        """
-        Get the path to the cache file for a ticker.
-
-        Args:
-            ticker: Stock ticker symbol
-            period: Time period
-            interval: Data interval
-
-        Returns:
-            Path to cache file
-        """
-        return os.path.join(self.cache_dir, f"{ticker}_{period}_{interval}.csv")
-
-    def _get_beta_cache_path(self, ticker):
-        """
-        Get the path to the beta cache file for a ticker.
-
-        Args:
-            ticker: Stock ticker symbol
-
-        Returns:
-            Path to beta cache file
-        """
-        return os.path.join(self.cache_dir, f"{ticker}_beta.txt")
-
-    def _is_cache_expired(self, cache_timestamp):
-        """
-        Determine if cache should be considered expired based on TTL.
-
-        Args:
-            cache_timestamp: The timestamp of when the cache was created/modified
-
-        Returns:
-            True if cache should be considered expired, False otherwise
-        """
-        # Check TTL
-        cache_age = time.time() - cache_timestamp
-        return cache_age >= self.cache_ttl
+        return is_valid_stock_symbol(ticker)
 
     def is_cash_like(self, ticker: str, description: str = "") -> bool:
         """
@@ -457,7 +508,7 @@ class StockOracle:
             logger.debug(f"Identified {ticker} as cash-like based on ticker pattern")
             return True
 
-        # 3. Check for money market terms in description
+        # Check for money market terms in description
         if description:
             money_market_terms = [
                 "MONEY MARKET",
@@ -481,5 +532,18 @@ class StockOracle:
         return False
 
 
+# Get provider configuration from environment variables
+DATA_SOURCE = os.environ.get("DATA_SOURCE", "yfinance").lower()
+FMP_API_KEY = os.environ.get("FMP_API_KEY")
+
 # Pre-initialized singleton instance for easier access
-stockdata = StockOracle.get_instance()
+if DATA_SOURCE == "fmp" and FMP_API_KEY:
+    logger.info("Using FMP provider from environment configuration")
+    stockdata = StockOracle.get_instance(provider_name="fmp", fmp_api_key=FMP_API_KEY)
+else:
+    if DATA_SOURCE == "fmp" and not FMP_API_KEY:
+        logger.warning(
+            "FMP provider selected in environment but no API key provided, falling back to yfinance"
+        )
+    logger.info("Using YFinance provider")
+    stockdata = StockOracle.get_instance()
