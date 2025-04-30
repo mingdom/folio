@@ -221,9 +221,11 @@ class StockOracle:
             logger.debug(f"Calculating beta manually for {ticker}")
 
             # Get historical data for the ticker and market index
-            stock_data = self.get_historical_data(ticker, period=self.beta_period)
+            stock_data = self.get_historical_data(
+                ticker, period=self.beta_period, skip_cash_check=True
+            )
             market_data = self.get_historical_data(
-                self.market_index, period=self.beta_period
+                self.market_index, period=self.beta_period, skip_cash_check=True
             )
 
             # Calculate returns
@@ -269,7 +271,11 @@ class StockOracle:
         return beta
 
     def get_historical_data(
-        self, ticker: str, period: str = "1y", interval: str = "1d"
+        self,
+        ticker: str,
+        period: str = "1y",
+        interval: str = "1d",
+        skip_cash_check: bool = False,
     ) -> pd.DataFrame:
         """
         Get historical price data for a ticker.
@@ -282,6 +288,7 @@ class StockOracle:
             ticker: The ticker symbol
             period: Time period in yfinance format: "1d", "5d", "1mo", "3mo", "6mo", "1y", "2y", "5y", "10y", "ytd", "max"
             interval: Data interval ("1d", "1wk", "1mo", etc.)
+            skip_cash_check: If True, skip checking if the ticker is cash-like (to avoid circular dependencies)
 
         Returns:
             DataFrame with historical price data (columns: Open, High, Low, Close, Volume)
@@ -295,24 +302,41 @@ class StockOracle:
         if not ticker:
             raise ValueError("Ticker cannot be empty")
 
-        # Special case for cash-like positions
-        if self.is_cash_like(ticker):
-            # For cash-like positions, return a DataFrame with constant values
-            logger.debug(
-                f"Creating synthetic historical data for cash-like position: {ticker}"
-            )
-            dates = pd.date_range(end=pd.Timestamp.now(), periods=10)
-            df = pd.DataFrame(
-                {
-                    "Open": [1.0] * 10,
-                    "High": [1.0] * 10,
-                    "Low": [1.0] * 10,
-                    "Close": [1.0] * 10,
-                    "Volume": [0] * 10,
-                },
-                index=dates,
-            )
-            return df
+        # Special case for cash-like positions, but only if not skipping the check
+        if not skip_cash_check:
+            # Check for obvious cash symbols without calling is_cash_like
+            ticker_upper = ticker.upper()
+            if ticker_upper in ["CASH", "USD"] or any(
+                pattern in ticker_upper
+                for pattern in [
+                    "MM",
+                    "CASH",
+                    "MONEY",
+                    "TREASURY",
+                    "GOVT",
+                    "GOV",
+                    "SPAXX",
+                    "FDRXX",
+                    "SPRXX",
+                    "FZFXX",
+                ]
+            ):
+                # For cash-like positions, return a DataFrame with constant values
+                logger.debug(
+                    f"Creating synthetic historical data for cash-like position: {ticker}"
+                )
+                dates = pd.date_range(end=pd.Timestamp.now(), periods=10)
+                df = pd.DataFrame(
+                    {
+                        "Open": [1.0] * 10,
+                        "High": [1.0] * 10,
+                        "Low": [1.0] * 10,
+                        "Close": [1.0] * 10,
+                        "Volume": [0] * 10,
+                    },
+                    index=dates,
+                )
+                return df
 
         # Check if the ticker appears to be a valid stock symbol
         if not self.is_valid_stock_symbol(ticker):
@@ -494,11 +518,14 @@ class StockOracle:
                 logger.debug(f"Identified {ticker} as cash-like based on description")
                 return True
 
-        # 4. Check for very low beta (near zero)
-        beta = self.get_beta(ticker)
-        if beta is not None and abs(beta) < 0.1:
-            logger.debug(f"Identified {ticker} as cash-like based on low beta: {beta}")
-            return True
+        # 4. Check for very low beta (near zero), but only for valid stock symbols
+        if self.is_valid_stock_symbol(ticker):
+            beta = self.get_beta(ticker)
+            if beta is not None and abs(beta) < 0.1:
+                logger.debug(
+                    f"Identified {ticker} as cash-like based on low beta: {beta}"
+                )
+                return True
 
         return False
 

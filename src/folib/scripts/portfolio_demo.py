@@ -30,10 +30,15 @@ from src.folib.services.portfolio_service import (
 
 # Set up logging
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,  # Changed from INFO to DEBUG
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[logging.StreamHandler()],
 )
+# Set specific loggers to DEBUG level
+logging.getLogger("folib").setLevel(logging.DEBUG)
+logging.getLogger("src.folib").setLevel(logging.DEBUG)
+# Keep yfinance at INFO level to avoid too much output
+logging.getLogger("yfinance").setLevel(logging.INFO)
 logger = logging.getLogger("folib.demo")
 
 
