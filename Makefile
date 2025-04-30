@@ -211,7 +211,7 @@ sim: simulate
 # Test targets
 .PHONY: test test-e2e simulate analyze sim
 test:
-	@echo "Running unit tests..."
+	@echo "Running unit tests (excluding e2e tests)..."
 	@if ! command -v $(POETRY) &> /dev/null; then \
 		echo "Poetry not found. Please run 'make env' first."; \
 		exit 1; \
@@ -219,7 +219,7 @@ test:
 	@mkdir -p $(LOGS_DIR)
 	@(echo "=== Test Run Log $(TIMESTAMP) ===" && \
 	echo "Starting tests at: $$(date)" && \
-	$(POETRY) run pytest tests/ -v 2>&1) | tee $(LOGS_DIR)/test_latest.log
+	$(POETRY) run pytest tests/ --ignore=tests/e2e/ -v 2>&1) | tee $(LOGS_DIR)/test_latest.log
 	@echo "Test log saved to: $(LOGS_DIR)/test_latest.log"
 
 test-e2e:

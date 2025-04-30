@@ -40,6 +40,9 @@ Potential Issues:
 """
 
 import logging
+import os
+import re
+import time
 
 import pandas as pd
 
@@ -71,20 +74,28 @@ class StockOracle:
     market_index = "SPY"
 
     @classmethod
-    def get_instance(cls):
+    def get_instance(cls, cache_dir=None, cache_ttl=None):
         """
         Get the singleton instance of StockOracle.
+
+        Args:
+            cache_dir: Directory to store cached data (default: .cache_yf)
+            cache_ttl: Cache TTL in seconds (default: 86400 - 1 day)
 
         Returns:
             The singleton StockOracle instance
         """
         if cls._instance is None:
-            cls._instance = cls()
+            cls._instance = cls(cache_dir=cache_dir, cache_ttl=cache_ttl)
         return cls._instance
 
-    def __init__(self):
+    def __init__(self, cache_dir=None, cache_ttl=None):
         """
         Initialize the StockOracle.
+
+        Args:
+            cache_dir: Directory to store cached data (default: .cache_yf)
+            cache_ttl: Cache TTL in seconds (default: 86400 - 1 day)
 
         Note:
             This should not be called directly. Use StockOracle.get_instance() instead.
@@ -94,6 +105,25 @@ class StockOracle:
             logger.warning(
                 "StockOracle instance already exists. Use StockOracle.get_instance() instead."
             )
+
+        # Set default cache directory
+        # Special case for Hugging Face Spaces
+        if cache_dir is None:
+            if (
+                os.environ.get("HF_SPACE") == "1"
+                or os.environ.get("SPACE_ID") is not None
+            ):
+                cache_dir = "/tmp/cache_yf"
+            else:
+                cache_dir = ".cache_yf"
+
+        self.cache_dir = cache_dir
+
+        # Create cache directory if it doesn't exist
+        os.makedirs(cache_dir, exist_ok=True)
+
+        # Set cache TTL (default: 1 day)
+        self.cache_ttl = 86400 if cache_ttl is None else cache_ttl
 
     def get_price(self, ticker: str) -> float:
         """
@@ -107,31 +137,8 @@ class StockOracle:
 
         Returns:
             The current price
-
-        Raises:
-            ValueError: If the ticker is empty
-            ValueError: If no price data is available
-            ValueError: If the price is invalid (<=0)
-            Any exceptions from yfinance are propagated directly
         """
-        if not ticker:
-            raise ValueError("Ticker cannot be empty")
-
-        # Fetch the latest data for the ticker
-        ticker_data = yf.Ticker(ticker)
-        df = ticker_data.history(period="1d")
-
-        if df.empty:
-            raise ValueError(f"No price data available for {ticker}")
-
-        # Get the latest close price
-        price = df.iloc[-1]["Close"]
-
-        if price <= 0:
-            raise ValueError(f"Invalid stock price ({price}) for {ticker}")
-
-        logger.debug(f"Retrieved price for {ticker}: {price}")
-        return price
+        return self.get_historical_data(ticker, period="1d")["Close"].iloc[-1]
 
     def get_beta(self, ticker: str, description: str = "") -> float:
         """
@@ -139,7 +146,7 @@ class StockOracle:
 
         This method calculates the beta (systematic risk) for a given ticker
         by comparing its price movements to a market index (default: SPY) over a period
-        of time (default: 3 months).
+        of time (default: 3 months). Results are cached to improve performance.
 
         Beta measures the volatility of a security in relation to the overall market.
         A beta of 1 indicates the security's price moves with the market.
@@ -165,6 +172,20 @@ class StockOracle:
         if self.is_cash_like(ticker, description):
             logger.debug(f"Using default beta of 0.0 for cash-like position: {ticker}")
             return 0.0
+
+        # Check cache first
+        cache_path = self._get_beta_cache_path(ticker)
+        if os.path.exists(cache_path) and not self._is_cache_expired(
+            os.path.getmtime(cache_path)
+        ):
+            try:
+                with open(cache_path) as f:
+                    beta = float(f.read().strip())
+                logger.debug(f"Loaded beta for {ticker} from cache: {beta:.3f}")
+                return beta
+            except Exception as e:
+                logger.warning(f"Error reading beta cache for {ticker}: {e}")
+                # Continue to calculate beta if cache read fails
 
         # Get historical data for the ticker and market index
         stock_data = self.get_historical_data(ticker, period=self.beta_period)
@@ -209,40 +230,175 @@ class StockOracle:
         if pd.isna(beta):
             raise ValueError(f"Beta calculation resulted in NaN for {ticker}")
 
+        # Cache the calculated beta
+        try:
+            with open(cache_path, "w") as f:
+                f.write(f"{beta:.6f}")
+            logger.debug(f"Cached beta for {ticker}: {beta:.3f}")
+        except Exception as e:
+            logger.warning(f"Error writing beta cache for {ticker}: {e}")
+            # Continue even if cache write fails
+
         logger.debug(f"Calculated beta of {beta:.2f} for {ticker}")
         return beta
 
-    def get_historical_data(self, ticker: str, period: str = "1y") -> pd.DataFrame:
+    def get_historical_data(
+        self, ticker: str, period: str = "1y", interval: str = "1d"
+    ) -> pd.DataFrame:
         """
         Get historical price data for a ticker.
 
         This method fetches historical price data for the given ticker
-        using the Yahoo Finance API.
+        using the Yahoo Finance API, with caching to improve performance
+        and reduce API calls.
 
         Args:
             ticker: The ticker symbol
             period: Time period in yfinance format: "1d", "5d", "1mo", "3mo", "6mo", "1y", "2y", "5y", "10y", "ytd", "max"
+            interval: Data interval ("1d", "1wk", "1mo", etc.)
 
         Returns:
             DataFrame with historical price data (columns: Open, High, Low, Close, Volume)
 
         Raises:
             ValueError: If the ticker is empty
+            ValueError: If the ticker doesn't appear to be a valid stock symbol
             ValueError: If no historical data is available
             Any exceptions from yfinance are propagated directly
         """
         if not ticker:
             raise ValueError("Ticker cannot be empty")
 
-        # Fetch historical data for the ticker
+        # Special case for cash-like positions
+        if self.is_cash_like(ticker):
+            # For cash-like positions, return a DataFrame with constant values
+            logger.debug(
+                f"Creating synthetic historical data for cash-like position: {ticker}"
+            )
+            dates = pd.date_range(end=pd.Timestamp.now(), periods=10)
+            df = pd.DataFrame(
+                {
+                    "Open": [1.0] * 10,
+                    "High": [1.0] * 10,
+                    "Low": [1.0] * 10,
+                    "Close": [1.0] * 10,
+                    "Volume": [0] * 10,
+                },
+                index=dates,
+            )
+            return df
+
+        # Check if the ticker appears to be a valid stock symbol
+        if not self.is_valid_stock_symbol(ticker):
+            raise ValueError(f"Invalid stock symbol format: {ticker}")
+
+        # Check cache first
+        cache_path = self._get_cache_path(ticker, period, interval)
+        if os.path.exists(cache_path) and not self._is_cache_expired(
+            os.path.getmtime(cache_path)
+        ):
+            try:
+                logger.info(f"Loading {ticker} data from cache")
+                return pd.read_csv(cache_path, index_col=0, parse_dates=True)
+            except Exception as e:
+                logger.warning(f"Error reading cache for {ticker}: {e}")
+                # Continue to fetch from API if cache read fails
+
+        # Fetch from yfinance
+        logger.info(f"Fetching data for {ticker} from Yahoo Finance")
         ticker_data = yf.Ticker(ticker)
-        df = ticker_data.history(period=period)
+        df = ticker_data.history(period=period, interval=interval)
 
         if df.empty:
             raise ValueError(f"No historical data available for {ticker}")
 
-        logger.debug(f"Retrieved {len(df)} historical data points for {ticker}")
+        # Save to cache
+        try:
+            df.to_csv(cache_path)
+            logger.debug(f"Cached historical data for {ticker}")
+        except Exception as e:
+            logger.warning(f"Error writing cache for {ticker}: {e}")
+            # Continue even if cache write fails
+
         return df
+
+    def is_valid_stock_symbol(self, ticker: str) -> bool:
+        """
+        Check if a ticker symbol is likely a valid stock symbol.
+
+        This method uses a simple regex pattern to check if a ticker symbol follows
+        common stock symbol patterns. It's designed to filter out obviously invalid
+        symbols before sending them to yfinance.
+
+        Common stock symbol patterns:
+        - 1-5 uppercase letters (most US stocks: AAPL, MSFT, GOOGL)
+        - 1-5 uppercase letters with a period (some international stocks: BHP.AX)
+        - 1-5 uppercase letters with a hyphen (some ETFs: SPY-X)
+        - 1-5 uppercase letters followed by 1-3 uppercase letters after a period (ADRs: SONY.TO)
+
+        Args:
+            ticker: The ticker symbol to check
+
+        Returns:
+            True if the ticker appears to be a valid stock symbol, False otherwise
+        """
+        if not ticker:
+            return False
+
+        # Simple regex pattern for common stock symbols
+        # This covers most US stocks, ETFs, and common international formats
+        pattern = r"^[A-Z]{1,5}(\.[A-Z]{1,3}|-[A-Z]{1})?$"
+
+        # Special case for fund symbols that often have numbers and special formats
+        fund_pattern = r"^[A-Z]{1,5}[0-9X]{0,3}$"
+
+        # Check if the ticker matches either pattern
+        if re.match(pattern, ticker) or re.match(fund_pattern, ticker):
+            return True
+
+        # Log invalid symbols for debugging
+        logger.debug(f"Symbol '{ticker}' does not match standard stock symbol patterns")
+        return False
+
+    def _get_cache_path(self, ticker, period, interval="1d"):
+        """
+        Get the path to the cache file for a ticker.
+
+        Args:
+            ticker: Stock ticker symbol
+            period: Time period
+            interval: Data interval
+
+        Returns:
+            Path to cache file
+        """
+        return os.path.join(self.cache_dir, f"{ticker}_{period}_{interval}.csv")
+
+    def _get_beta_cache_path(self, ticker):
+        """
+        Get the path to the beta cache file for a ticker.
+
+        Args:
+            ticker: Stock ticker symbol
+
+        Returns:
+            Path to beta cache file
+        """
+        return os.path.join(self.cache_dir, f"{ticker}_beta.txt")
+
+    def _is_cache_expired(self, cache_timestamp):
+        """
+        Determine if cache should be considered expired based on TTL.
+
+        Args:
+            cache_timestamp: The timestamp of when the cache was created/modified
+
+        Returns:
+            True if cache should be considered expired, False otherwise
+        """
+        # Check TTL
+        cache_age = time.time() - cache_timestamp
+        return cache_age >= self.cache_ttl
 
     def is_cash_like(
         self, ticker: str, description: str = "", beta: float | None = None
