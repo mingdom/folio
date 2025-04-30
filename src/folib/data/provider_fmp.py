@@ -7,7 +7,6 @@ via the fmpsdk package.
 
 import logging
 import os
-import re
 from datetime import datetime, timedelta
 from typing import ClassVar
 
@@ -386,38 +385,6 @@ class FMPProvider(MarketDataProvider):
         except Exception as e:
             logger.error(f"Error getting historical data from FMP for {ticker}: {e}")
             raise ValueError(f"Failed to get historical data for {ticker}: {e}") from e
-
-    def is_valid_stock_symbol(self, ticker: str) -> bool:
-        """
-        Check if a ticker symbol is likely a valid stock symbol.
-
-        This method uses a simple regex pattern to check if a ticker symbol follows
-        common stock symbol patterns. It's designed to filter out obviously invalid
-        symbols before sending them to the FMP API.
-
-        Args:
-            ticker: The ticker symbol to check
-
-        Returns:
-            True if the ticker appears to be a valid stock symbol, False otherwise
-        """
-        if not ticker:
-            return False
-
-        # Simple regex pattern for common stock symbols
-        # This covers most US stocks, ETFs, and common international formats
-        pattern = r"^[A-Z]{1,5}(\.[A-Z]{1,3}|-[A-Z]{1})?$"
-
-        # Special case for fund symbols that often have numbers and special formats
-        fund_pattern = r"^[A-Z]{1,5}[0-9X]{0,3}$"
-
-        # Check if the ticker matches either pattern
-        if re.match(pattern, ticker) or re.match(fund_pattern, ticker):
-            return True
-
-        # Log invalid symbols for debugging
-        logger.debug(f"Symbol '{ticker}' does not match standard stock symbol patterns")
-        return False
 
     def _map_period_to_days(self, period: str) -> str:
         """

@@ -30,22 +30,6 @@ class MarketDataProvider(ABC):
     market_index = "SPY"
 
     @abstractmethod
-    def get_price(self, ticker: str) -> float:
-        """
-        Get the current price for a ticker.
-
-        Args:
-            ticker: The ticker symbol
-
-        Returns:
-            The current price
-
-        Raises:
-            ValueError: If the ticker is invalid or no price data is available
-        """
-        pass
-
-    @abstractmethod
     def get_beta(self, ticker: str) -> float | None:
         """
         Get the beta for a ticker.
@@ -84,18 +68,5 @@ class MarketDataProvider(ABC):
 
         Raises:
             ValueError: If the ticker is invalid or no historical data is available
-        """
-        pass
-
-    @abstractmethod
-    def is_valid_stock_symbol(self, ticker: str) -> bool:
-        """
-        Check if a ticker symbol is likely a valid stock symbol.
-
-        Args:
-            ticker: The ticker symbol to check
-
-        Returns:
-            True if the ticker appears to be a valid stock symbol, False otherwise
         """
         pass
