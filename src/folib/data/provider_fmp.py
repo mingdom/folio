@@ -8,7 +8,6 @@ via the fmpsdk package.
 import logging
 import os
 from datetime import datetime, timedelta
-from typing import ClassVar
 
 import fmpsdk
 import pandas as pd
@@ -33,20 +32,7 @@ class FMPProvider(MarketDataProvider):
     # Default market index for beta calculations
     market_index = "SPY"
 
-    # Period mapping from yfinance format to FMP days
-    period_mapping: ClassVar[dict[str, str]] = {
-        "1d": "1",
-        "5d": "5",
-        "1mo": "30",
-        "3mo": "90",
-        "6mo": "180",
-        "1y": "365",
-        "2y": "730",
-        "5y": "1825",
-        "10y": "3650",
-        "ytd": "ytd",
-        "max": "max",
-    }
+    # No longer using static period mapping - using dynamic parsing instead
 
     def __init__(self, api_key: str, cache_dir=None, cache_ttl=None):
         """
@@ -302,36 +288,89 @@ class FMPProvider(MarketDataProvider):
 
     def _map_period_to_days(self, period: str) -> str:
         """
-        Map yfinance period format to FMP days.
+        Parse a period string into days for FMP API.
+
+        Handles formats like:
+        - Nd: N days (e.g., "1d", "5d")
+        - Nmo: N months (e.g., "1mo", "3mo")
+        - Ny: N years (e.g., "1y", "5y")
+        - Special cases: "ytd", "max"
 
         Args:
-            period: Period in yfinance format
+            period: Period string in yfinance format
 
         Returns:
-            Period in FMP format (days)
+            Number of days as string, or special value ("ytd", "max")
+
+        Raises:
+            ValueError: If the period format cannot be parsed
         """
-        return self.period_mapping.get(period, "365")  # Default to 1 year
+        # Handle special cases
+        if period in ["ytd", "max"]:
+            return period
+
+        # Parse the numeric part and unit
+        import re
+
+        match = re.match(r"(\d+)([dmy].*)", period)
+        if not match:
+            raise ValueError(f"Unsupported period format: {period}")
+
+        value, unit = match.groups()
+        value = int(value)
+
+        # Convert to days based on unit
+        if unit.startswith("d"):
+            return str(value)
+        elif unit.startswith("mo"):
+            return str(value * 30)  # Approximate
+        elif unit.startswith("y"):
+            return str(value * 365)  # Approximate
+        else:
+            raise ValueError(f"Unsupported period unit: {unit}")
 
     def _map_interval_to_fmp(self, interval: str) -> str:
         """
-        Map yfinance interval format to FMP interval.
+        Parse an interval string into FMP API format.
+
+        Converts formats like:
+        - Nm: N minutes (e.g., "1m", "5m") → "Nmin"
+        - Nh: N hours (e.g., "1h", "4h") → "Nhour"
+        - 1d: daily
+        - 1wk: weekly
+        - 1mo: monthly
 
         Args:
-            interval: Interval in yfinance format
+            interval: Interval string in yfinance format
 
         Returns:
             Interval in FMP format
+
+        Raises:
+            ValueError: If the interval format cannot be parsed
         """
-        # FMP has limited interval options
-        interval_mapping = {
-            "1m": "1min",
-            "5m": "5min",
-            "15m": "15min",
-            "30m": "30min",
-            "1h": "1hour",
-            "4h": "4hour",
-            "1d": "daily",
-            "1wk": "weekly",
-            "1mo": "monthly",
-        }
-        return interval_mapping.get(interval, "daily")  # Default to daily
+        # Handle special cases first
+        if interval == "1d":
+            return "daily"
+        elif interval == "1wk":
+            return "weekly"
+        elif interval == "1mo":
+            return "monthly"
+
+        # Parse the numeric part and unit
+        import re
+
+        match = re.match(r"(\d+)([mh])", interval)
+        if not match:
+            raise ValueError(f"Unsupported interval format: {interval}")
+
+        value, unit = match.groups()
+
+        # Convert unit to FMP format
+        if unit == "m":
+            return f"{value}min"
+        elif unit == "h":
+            return f"{value}hour"
+        else:
+            # This shouldn't happen due to the regex, but just in case
+            raise ValueError(f"Unsupported interval unit: {unit}")
