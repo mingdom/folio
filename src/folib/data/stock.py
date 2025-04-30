@@ -171,7 +171,7 @@ class StockOracle:
             logger.debug(f"Error getting beta from Yahoo Finance for {ticker}: {e}")
             return None
 
-    def get_beta(self, ticker: str) -> float:
+    def get_beta(self, ticker: str) -> float | None:
         """
         Get the beta for a ticker.
 
@@ -185,15 +185,15 @@ class StockOracle:
         A beta less than 1 means the security is less volatile than the market.
         A beta greater than 1 indicates the security is more volatile than the market.
 
-        Returns 0.0 when beta cannot be meaningfully calculated (e.g., for cash-like instruments,
-        instruments with insufficient price history, or when market variance is near-zero).
-
         Args:
             ticker: The ticker symbol
-            description: Description of the security, used to identify cash-like positions
 
         Returns:
-            The calculated beta value. None if it cannot be calculated for any reason
+            The calculated beta value, or None if beta cannot be calculated
+            (e.g., for invalid stock symbols, insufficient data points, or calculation errors)
+
+        Raises:
+            ValueError: If market variance calculation results in NaN
         """
         # Only proceed if this is a valid stock symbol
         if not self.is_valid_stock_symbol(ticker):
@@ -431,13 +431,13 @@ class StockOracle:
         Determine if a position should be considered cash or cash-like.
 
         This function checks if a position is likely cash or a cash-like instrument
-        based on its ticker, beta, and description. Cash-like instruments include
-        money market funds, short-term bond funds, and other low-volatility assets.
+        based on its ticker, description, and beta (calculated internally if needed).
+        Cash-like instruments include money market funds, short-term bond funds,
+        and other low-volatility assets.
 
         Args:
             ticker: The ticker symbol to check
             description: The description of the security (optional)
-            beta: The calculated beta value for the position (optional)
 
         Returns:
             True if the position is likely cash or cash-like, False otherwise
