@@ -140,11 +140,43 @@ class StockOracle:
         """
         return self.get_historical_data(ticker, period="1d")["Close"].iloc[-1]
 
-    def get_beta(self, ticker: str, description: str = "") -> float:
+    def _get_beta_yfinance(self, ticker: str) -> float | None:
+        """
+        Try to get beta directly from Yahoo Finance API.
+
+        This internal method attempts to get the beta value directly from the
+        ticker's info property in yfinance, which is more efficient than
+        calculating it manually.
+
+        Args:
+            ticker: The ticker symbol
+
+        Returns:
+            The beta value from Yahoo Finance, or None if not available
+        """
+        try:
+            ticker_obj = yf.Ticker(ticker)
+            ticker_info = ticker_obj.info
+
+            if "beta" in ticker_info and ticker_info["beta"] is not None:
+                beta_value = float(ticker_info["beta"])
+                logger.debug(
+                    f"Got beta of {beta_value:.2f} for {ticker} directly from Yahoo Finance"
+                )
+                return beta_value
+            else:
+                logger.debug(f"Beta not available in Yahoo Finance info for {ticker}")
+                return None
+        except Exception as e:
+            logger.debug(f"Error getting beta from Yahoo Finance for {ticker}: {e}")
+            return None
+
+    def get_beta(self, ticker: str) -> float | None:
         """
         Get the beta for a ticker.
 
-        This method calculates the beta (systematic risk) for a given ticker
+        This method first tries to get beta directly from Yahoo Finance.
+        If that fails, it calculates the beta (systematic risk) for a given ticker
         by comparing its price movements to a market index (default: SPY) over a period
         of time (default: 3 months). Results are cached to improve performance.
 
@@ -153,25 +185,20 @@ class StockOracle:
         A beta less than 1 means the security is less volatile than the market.
         A beta greater than 1 indicates the security is more volatile than the market.
 
-        Returns 0.0 when beta cannot be meaningfully calculated (e.g., for cash-like instruments,
-        instruments with insufficient price history, or when market variance is near-zero).
-
         Args:
             ticker: The ticker symbol
-            description: Description of the security, used to identify cash-like positions
 
         Returns:
-            The calculated beta value, or 0.0 if beta cannot be meaningfully calculated
+            The calculated beta value, or None if beta cannot be calculated
+            (e.g., for invalid stock symbols, insufficient data points, or calculation errors)
 
         Raises:
-            ValueError: If market variance or covariance calculations result in NaN
-            ValueError: If beta calculation results in NaN
-            Any exceptions from get_historical_data() are propagated directly
+            ValueError: If market variance calculation results in NaN
         """
-        # For cash-like instruments, return 0 without calculation
-        if self.is_cash_like(ticker, description):
-            logger.debug(f"Using default beta of 0.0 for cash-like position: {ticker}")
-            return 0.0
+        # Only proceed if this is a valid stock symbol
+        if not self.is_valid_stock_symbol(ticker):
+            logger.warning(f"Invalid stock symbol format: {ticker}")
+            return None
 
         # Check cache first
         cache_path = self._get_beta_cache_path(ticker)
@@ -187,48 +214,49 @@ class StockOracle:
                 logger.warning(f"Error reading beta cache for {ticker}: {e}")
                 # Continue to calculate beta if cache read fails
 
-        # Get historical data for the ticker and market index
-        stock_data = self.get_historical_data(ticker, period=self.beta_period)
-        market_data = self.get_historical_data(
-            self.market_index, period=self.beta_period
-        )
+        # Try to get beta directly from Yahoo Finance
+        beta = self._get_beta_yfinance(ticker)
+        if not beta:
+            # If Yahoo Finance beta retrieval failed, calculate it manually
+            logger.debug(f"Calculating beta manually for {ticker}")
 
-        # Calculate returns
-        stock_returns = stock_data["Close"].pct_change(fill_method=None).dropna()
-        market_returns = market_data["Close"].pct_change(fill_method=None).dropna()
-
-        # Align data by index
-        aligned_stock, aligned_market = stock_returns.align(
-            market_returns, join="inner"
-        )
-
-        if aligned_stock.empty or len(aligned_stock) < 2:
-            logger.debug(
-                f"Insufficient overlapping data points for {ticker}, cannot calculate meaningful beta"
+            # Get historical data for the ticker and market index
+            stock_data = self.get_historical_data(
+                ticker, period=self.beta_period, skip_cash_check=True
             )
-            return 0.0
-
-        # Calculate beta components
-        market_variance = aligned_market.var()
-        covariance = aligned_stock.cov(aligned_market)
-
-        if pd.isna(market_variance):
-            raise ValueError(
-                f"Market variance calculation resulted in NaN for {ticker}"
+            market_data = self.get_historical_data(
+                self.market_index, period=self.beta_period, skip_cash_check=True
             )
 
-        if abs(market_variance) < 1e-12:
-            logger.debug(
-                f"Market variance is near-zero for {ticker}, cannot calculate meaningful beta"
+            # Calculate returns
+            stock_returns = stock_data["Close"].pct_change(fill_method=None).dropna()
+            market_returns = market_data["Close"].pct_change(fill_method=None).dropna()
+
+            # Align data by index
+            aligned_stock, aligned_market = stock_returns.align(
+                market_returns, join="inner"
             )
-            return 0.0
 
-        if pd.isna(covariance):
-            raise ValueError(f"Covariance calculation resulted in NaN for {ticker}")
+            if aligned_stock.empty or len(aligned_stock) < 2:
+                logger.debug(
+                    f"Insufficient overlapping data points for {ticker}, cannot calculate meaningful beta"
+                )
+                return None
 
-        beta = covariance / market_variance
-        if pd.isna(beta):
-            raise ValueError(f"Beta calculation resulted in NaN for {ticker}")
+            # Calculate beta components
+            market_variance = aligned_market.var()
+            covariance = aligned_stock.cov(aligned_market)
+
+            if pd.isna(market_variance):
+                raise ValueError(
+                    f"Market variance calculation resulted in NaN for {ticker}"
+                )
+
+            if pd.isna(covariance):
+                logger.warning(f"Covariance calculation resulted in NaN for {ticker}")
+                return None
+
+            beta = covariance / market_variance
 
         # Cache the calculated beta
         try:
@@ -243,7 +271,11 @@ class StockOracle:
         return beta
 
     def get_historical_data(
-        self, ticker: str, period: str = "1y", interval: str = "1d"
+        self,
+        ticker: str,
+        period: str = "1y",
+        interval: str = "1d",
+        skip_cash_check: bool = False,
     ) -> pd.DataFrame:
         """
         Get historical price data for a ticker.
@@ -256,6 +288,7 @@ class StockOracle:
             ticker: The ticker symbol
             period: Time period in yfinance format: "1d", "5d", "1mo", "3mo", "6mo", "1y", "2y", "5y", "10y", "ytd", "max"
             interval: Data interval ("1d", "1wk", "1mo", etc.)
+            skip_cash_check: If True, skip checking if the ticker is cash-like (to avoid circular dependencies)
 
         Returns:
             DataFrame with historical price data (columns: Open, High, Low, Close, Volume)
@@ -269,24 +302,41 @@ class StockOracle:
         if not ticker:
             raise ValueError("Ticker cannot be empty")
 
-        # Special case for cash-like positions
-        if self.is_cash_like(ticker):
-            # For cash-like positions, return a DataFrame with constant values
-            logger.debug(
-                f"Creating synthetic historical data for cash-like position: {ticker}"
-            )
-            dates = pd.date_range(end=pd.Timestamp.now(), periods=10)
-            df = pd.DataFrame(
-                {
-                    "Open": [1.0] * 10,
-                    "High": [1.0] * 10,
-                    "Low": [1.0] * 10,
-                    "Close": [1.0] * 10,
-                    "Volume": [0] * 10,
-                },
-                index=dates,
-            )
-            return df
+        # Special case for cash-like positions, but only if not skipping the check
+        if not skip_cash_check:
+            # Check for obvious cash symbols without calling is_cash_like
+            ticker_upper = ticker.upper()
+            if ticker_upper in ["CASH", "USD"] or any(
+                pattern in ticker_upper
+                for pattern in [
+                    "MM",
+                    "CASH",
+                    "MONEY",
+                    "TREASURY",
+                    "GOVT",
+                    "GOV",
+                    "SPAXX",
+                    "FDRXX",
+                    "SPRXX",
+                    "FZFXX",
+                ]
+            ):
+                # For cash-like positions, return a DataFrame with constant values
+                logger.debug(
+                    f"Creating synthetic historical data for cash-like position: {ticker}"
+                )
+                dates = pd.date_range(end=pd.Timestamp.now(), periods=10)
+                df = pd.DataFrame(
+                    {
+                        "Open": [1.0] * 10,
+                        "High": [1.0] * 10,
+                        "Low": [1.0] * 10,
+                        "Close": [1.0] * 10,
+                        "Volume": [0] * 10,
+                    },
+                    index=dates,
+                )
+                return df
 
         # Check if the ticker appears to be a valid stock symbol
         if not self.is_valid_stock_symbol(ticker):
@@ -400,20 +450,18 @@ class StockOracle:
         cache_age = time.time() - cache_timestamp
         return cache_age >= self.cache_ttl
 
-    def is_cash_like(
-        self, ticker: str, description: str = "", beta: float | None = None
-    ) -> bool:
+    def is_cash_like(self, ticker: str, description: str = "") -> bool:
         """
         Determine if a position should be considered cash or cash-like.
 
         This function checks if a position is likely cash or a cash-like instrument
-        based on its ticker, beta, and description. Cash-like instruments include
-        money market funds, short-term bond funds, and other low-volatility assets.
+        based on its ticker, description, and beta (calculated internally if needed).
+        Cash-like instruments include money market funds, short-term bond funds,
+        and other low-volatility assets.
 
         Args:
             ticker: The ticker symbol to check
             description: The description of the security (optional)
-            beta: The calculated beta value for the position (optional)
 
         Returns:
             True if the position is likely cash or cash-like, False otherwise
@@ -470,10 +518,14 @@ class StockOracle:
                 logger.debug(f"Identified {ticker} as cash-like based on description")
                 return True
 
-        # 4. Check for very low beta (near zero)
-        if beta is not None and abs(beta) < 0.1:
-            logger.debug(f"Identified {ticker} as cash-like based on low beta: {beta}")
-            return True
+        # 4. Check for very low beta (near zero), but only for valid stock symbols
+        if self.is_valid_stock_symbol(ticker):
+            beta = self.get_beta(ticker)
+            if beta is not None and abs(beta) < 0.1:
+                logger.debug(
+                    f"Identified {ticker} as cash-like based on low beta: {beta}"
+                )
+                return True
 
         return False
 
