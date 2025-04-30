@@ -37,7 +37,9 @@ class DataCache:
         # Create cache directory if it doesn't exist
         os.makedirs(cache_dir, exist_ok=True)
 
-    def get_cache_path(self, ticker: str, period: str | None = None, interval: str | None = None) -> str:
+    def get_cache_path(
+        self, ticker: str, period: str | None = None, interval: str | None = None
+    ) -> str:
         """
         Get the path to the cache file for a ticker.
 
