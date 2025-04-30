@@ -315,7 +315,7 @@ class StockOracle:
                 # Continue to fetch from API if cache read fails
 
         # Fetch from yfinance
-        logger.info(f"Fetching data for {ticker} from Yahoo Finance")
+        logger.info(f"Fetching data for {ticker} from yfinance: {period}, {interval}")
         ticker_data = yf.Ticker(ticker)
         df = ticker_data.history(period=period, interval=interval)
 
@@ -433,14 +433,9 @@ class StockOracle:
         ticker_upper = ticker.upper()
         description_upper = description.upper() if description else ""
 
-        # 1. Check if it's a cash symbol
-        if ticker_upper in ["CASH", "USD"]:
-            logger.debug(f"Identified {ticker} as cash based on symbol")
-            return True
-
-        # 2. Check common patterns for cash-like instruments in ticker
-        cash_patterns = [
-            "MM",
+        # Check common patterns for cash-like instruments in ticker
+        cash_or_bond_patterns = [
+            "MMKT",
             "CASH",
             "MONEY",
             "TREASURY",
@@ -448,13 +443,17 @@ class StockOracle:
             "GOV",
             "SPAXX",
             "FDRXX",
-            "SPRXX",
+            "FZDXX",
+            "FMPXX",
             "FZFXX",
             "FDIC",
             "BANK",
+            "SGOV",
+            "TLT",
+            "USD",
         ]
 
-        if any(pattern in ticker_upper for pattern in cash_patterns):
+        if any(pattern in ticker_upper for pattern in cash_or_bond_patterns):
             logger.debug(f"Identified {ticker} as cash-like based on ticker pattern")
             return True
 
@@ -472,19 +471,11 @@ class StockOracle:
                 "LIQUIDITY FUND",
                 "CASH FUND",
                 "RESERVE FUND",
+                "MMKT",  # Money Market
             ]
 
             if any(term in description_upper for term in money_market_terms):
                 logger.debug(f"Identified {ticker} as cash-like based on description")
-                return True
-
-        # 4. Check for very low beta (near zero), but only for valid stock symbols
-        if self.is_valid_stock_symbol(ticker):
-            beta = self.get_beta(ticker)
-            if beta is not None and abs(beta) < 0.1:
-                logger.debug(
-                    f"Identified {ticker} as cash-like based on low beta: {beta}"
-                )
                 return True
 
         return False

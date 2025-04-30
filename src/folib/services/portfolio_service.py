@@ -80,19 +80,18 @@ def process_portfolio(
     """
     logger.debug("Processing portfolio with %d holdings", len(holdings))
 
+    # Extract pending activity value
+    pending_activity_value = _get_pending_activity(holdings)
+
+    # Filter out pending activity from holdings
+    filtered_holdings = [h for h in holdings if not _is_pending_activity(h.symbol)]
+
     # Separate cash-like positions and unknown positions
     non_cash_holdings = []
     cash_positions = []
     unknown_positions = []
-    pending_activity_value = 0.0
 
-    for holding in holdings:
-        # Check for pending activity
-        if holding.symbol.upper() == "PENDING ACTIVITY":
-            pending_activity_value += holding.value
-            logger.debug(f"Identified pending activity: {holding.value}")
-            continue
-
+    for holding in filtered_holdings:
         # Check for cash-like positions
         if stockdata.is_cash_like(holding.symbol, holding.description):
             # Convert to StockPosition for cash-like holdings
@@ -222,7 +221,6 @@ def create_portfolio_groups(holdings: list[PortfolioHolding]) -> list[PortfolioG
                     expiry=data["expiry"],
                     option_type=data["option_type"],
                     price=data["holding"].price,
-                    underlying_price=stock_holding.price,
                     cost_basis=data["holding"].cost_basis_total,
                 )
 
@@ -251,13 +249,6 @@ def create_portfolio_groups(holdings: list[PortfolioHolding]) -> list[PortfolioG
             if i in processed_option_indices:
                 continue
 
-            # Fetch the underlying price
-            try:
-                underlying_price = stockdata.get_price(ticker)
-            except Exception as e:
-                logger.warning(f"Could not fetch price for {ticker}: {e}")
-                underlying_price = 0.0
-
             # Create option position
             option_position = OptionPosition(
                 ticker=data["ticker"],
@@ -266,7 +257,6 @@ def create_portfolio_groups(holdings: list[PortfolioHolding]) -> list[PortfolioG
                 expiry=data["expiry"],
                 option_type=data["option_type"],
                 price=data["holding"].price,
-                underlying_price=underlying_price,
                 cost_basis=data["holding"].cost_basis_total,
             )
 
@@ -337,15 +327,16 @@ def create_portfolio_summary(portfolio: Portfolio) -> PortfolioSummary:
             total_value += position_value
 
             # Get beta for exposure calculation
+            beta = 1.0
             try:
                 beta = stockdata.get_beta(group.stock_position.ticker)
-                weighted_beta_sum += beta * position_value
-                total_stock_value += position_value
-                net_market_exposure += position_value * beta
             except Exception as e:
                 logger.warning(
                     f"Could not calculate beta for {group.stock_position.ticker}: {e}"
                 )
+            weighted_beta_sum += beta * position_value
+            total_stock_value += position_value
+            net_market_exposure += position_value * beta
 
         # Process option positions
         for option in group.option_positions:
@@ -456,6 +447,83 @@ def get_portfolio_exposures(portfolio: Portfolio) -> dict:  # noqa: ARG001
 
 
 # Helper functions
+
+
+def _is_pending_activity(symbol: str) -> bool:
+    """
+    Check if a symbol represents pending activity.
+
+    Args:
+        symbol: The symbol to check
+
+    Returns:
+        True if the symbol represents pending activity, False otherwise
+    """
+    if not symbol:
+        return False
+
+    # Convert to uppercase for case-insensitive matching
+    symbol_upper = symbol.upper()
+
+    # Check for common pending activity patterns
+    pending_patterns = [
+        "PENDING ACTIVITY",
+        "PENDING",
+        "UNSETTLED",
+    ]
+
+    return any(pattern in symbol_upper for pattern in pending_patterns)
+
+
+def _get_pending_activity(holdings: list[PortfolioHolding]) -> float:
+    """
+    Extract pending activity value from portfolio holdings.
+
+    This function identifies and calculates the total value of pending activity
+    in the portfolio (e.g., unsettled trades, dividends, etc.).
+
+    The function checks for pending activity by:
+    1. Looking for holdings with "PENDING ACTIVITY" or similar in the symbol
+    2. Checking the value in the holding
+
+    In the old implementation, multiple columns were checked for the pending activity value
+    because the column containing the value could vary between CSV files. In the new
+    implementation, this is handled during CSV parsing, and the value is already
+    stored in the holding.value field.
+
+    Args:
+        holdings: List of portfolio holdings
+
+    Returns:
+        Total value of pending activity
+    """
+    logger.debug("Extracting pending activity value")
+
+    pending_activity_value = 0.0
+
+    # Find holdings that represent pending activity
+    pending_holdings = [h for h in holdings if _is_pending_activity(h.symbol)]
+
+    if not pending_holdings:
+        logger.debug("No pending activity found")
+        return 0.0
+
+    # Sum up the values of all pending activity holdings
+    for holding in pending_holdings:
+        if holding.value != 0:
+            pending_activity_value += holding.value
+            logger.debug(
+                f"Found pending activity: {holding.symbol} with value {holding.value}"
+            )
+
+    # If we found pending activity holdings but all had zero value, log a warning
+    if pending_holdings and pending_activity_value == 0:
+        logger.warning(
+            f"Found {len(pending_holdings)} pending activity holdings, but all had zero value"
+        )
+
+    logger.debug(f"Total pending activity value: {pending_activity_value}")
+    return pending_activity_value
 
 
 def _is_valid_option_symbol(symbol: str, description: str = "") -> bool:

@@ -78,7 +78,6 @@ class OptionPosition:
     expiry: date
     option_type: Literal["CALL", "PUT"]
     price: float
-    underlying_price: float
     cost_basis: float | None = None
 
     @property

@@ -1920,14 +1920,14 @@ watchdog = ["watchdog (>=2.3)"]
 
 [[package]]
 name = "yfinance"
-version = "0.2.56"
+version = "0.2.57"
 description = "Download market data from Yahoo! Finance API"
 optional = false
 python-versions = "*"
 groups = ["main"]
 files = [
-    {file = "yfinance-0.2.56-py2.py3-none-any.whl", hash = "sha256:199cd293b6f3f9070ba2c747beac9a014233674ad51e1dab4b160839e7a5790b"},
-    {file = "yfinance-0.2.56.tar.gz", hash = "sha256:33f8b052b3a09c1d9a4e8fc22aee5dda4fad67de2ef21916071b089813b1156b"},
+    {file = "yfinance-0.2.57-py2.py3-none-any.whl", hash = "sha256:b630c333da74798090fab5ee11d0961fd6e4b394ad150be7a6bd8f7f52990536"},
+    {file = "yfinance-0.2.57.tar.gz", hash = "sha256:7b16349a97b1148d4611d24bcaab45ccb643144001b51ecb093607950264f3b1"},
 ]
 
 [package.dependencies]
@@ -1968,4 +1968,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.9"
-content-hash = "0c784890ed499590b7fdf63a276a24072ea46c3f7cfb3419b0ddf6b8edf93883"
+content-hash = "d7da19b82c6bdb4a7f45b21cb86d32baa525efb5ab4b20f4d4e512d642134b2a"
