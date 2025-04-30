@@ -11,6 +11,9 @@ This script demonstrates how to use the folib library for portfolio analysis:
 5. Display detailed portfolio information
 
 Usage:
+    python src/folib/scripts/portfolio_demo.py [csv_file]
+
+Alternative usage (as a module):
     python -m folib.scripts.portfolio_demo [csv_file]
 
 If no CSV file is specified, the script uses the default portfolio file
@@ -19,8 +22,15 @@ at 'private-data/portfolio-private.csv'.
 
 import argparse
 import logging
+import os
 import sys
 from pathlib import Path
+
+# Import YFRateLimitError for explicit handling
+from yfinance.exceptions import YFRateLimitError
+
+# Add the src directory to the Python path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))
 
 from src.folib.data.loader import load_portfolio_from_csv, parse_portfolio_holdings
 from src.folib.services.portfolio_service import (
@@ -275,6 +285,16 @@ def main():
 
         print("\nDemo completed successfully")
 
+    except YFRateLimitError as e:
+        logger.error(
+            f"Yahoo Finance rate limit exceeded: {e}\n"
+            "This error occurs when too many requests are made to Yahoo Finance in a short period.\n"
+            "Possible solutions:\n"
+            "1. Wait a few minutes and try again\n"
+            "2. Use cached data if available\n"
+            "3. Implement a retry mechanism with exponential backoff"
+        )
+        sys.exit(1)
     except Exception as e:
         logger.error(f"Error: {e}", exc_info=True)
         sys.exit(1)

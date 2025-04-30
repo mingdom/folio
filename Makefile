@@ -52,15 +52,10 @@ help:
 .PHONY: env
 env:
 	@echo "Setting up virtual environment with Poetry..."
-	@if ! command -v $(POETRY) &> /dev/null; then \
-		echo "Poetry not found. Installing..."; \
-		curl -sSL https://install.python-poetry.org | $(PYTHON) -; \
-	fi
-	@$(POETRY) config virtualenvs.in-project true
 	@echo "Creating Poetry virtual environment..."
 	@$(POETRY) env use $(PYTHON)
 	@echo "Virtual environment created successfully."
-	@echo "NOTE: To activate the virtual environment in your current shell, run: poetry shell"
+	@echo "NOTE: To activate the virtual environment in your current shell, run: `source .venv/bin/activate`"
 	@echo "The virtual environment will be automatically activated for all make commands."
 
 # Install dependencies
@@ -68,7 +63,7 @@ env:
 install:
 	@echo "Installing dependencies..."
 	@if ! command -v $(POETRY) &> /dev/null; then \
-		echo "Poetry not found. Please run 'make env' first."; \
+		echo "Poetry not found. Please install it first"; \
 		exit 1; \
 	fi
 	@mkdir -p $(LOGS_DIR)
