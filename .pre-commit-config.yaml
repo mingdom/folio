@@ -1,15 +1,13 @@
 repos:
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.11.4
+  - repo: local
     hooks:
-      - id: ruff
-        args: [--fix]
-        files: ^(src|tests)/
+      - id: lint
+        name: lint
+        entry: make lint
+        language: system
+        pass_filenames: false
+        always_run: true
         stages: [pre-commit]
-      - id: ruff-format
-        files: ^(src|tests)/
-        types_or: [python, pyi]
-        stages: [pre-push]
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.5.0

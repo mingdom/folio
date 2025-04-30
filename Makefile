@@ -104,10 +104,10 @@ clean:
 		echo "Cache cleared."; \
 	fi
 
-# Lint Python code
+# Lint and format Python code
 .PHONY: lint
 lint:
-	@echo "Running linter (ruff)..."
+	@echo "Running linter and formatter (ruff)..."
 	@if ! command -v $(POETRY) &> /dev/null; then \
 		echo "Poetry not found. Please run 'make env' first."; \
 		exit 1; \
@@ -115,7 +115,8 @@ lint:
 	@mkdir -p $(LOGS_DIR)
 	@(echo "=== Code Check Log $(TIMESTAMP) ===" && \
 	echo "Starting checks at: $$(date)" && \
-	$(POETRY) run ruff check --fix --unsafe-fixes src/ tests/ \
+	$(POETRY) run ruff check --fix --unsafe-fixes src/ tests/ && \
+	$(POETRY) run ruff format src/ tests/ \
 	2>&1) | tee $(LOGS_DIR)/code_check_latest.log
 	@echo "Check log saved to: $(LOGS_DIR)/code_check_latest.log"
 

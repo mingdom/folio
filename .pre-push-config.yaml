@@ -1,10 +1,4 @@
 repos:
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.11.4
-    hooks:
-      - id: ruff-format
-        files: ^(src|tests)/
-        types_or: [python, pyi]
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.5.0
