@@ -10,8 +10,10 @@ compares the results to identify discrepancies.
 """
 
 import argparse
+import hashlib
 import logging
 import os
+import pickle
 import sys
 from pathlib import Path
 from typing import Any
@@ -703,8 +705,6 @@ def save_old_implementation_cache(old_groups, old_summary, portfolio_path):
         old_summary: Summary from old implementation
         portfolio_path: Path to the portfolio CSV file
     """
-    import hashlib
-    import pickle
 
     # Create a hash of the portfolio file path to use in the cache filename
     portfolio_hash = hashlib.md5(portfolio_path.encode()).hexdigest()
@@ -730,8 +730,6 @@ def load_old_implementation_cache(portfolio_path):
     Returns:
         Tuple of (old_groups, old_summary) or None if cache doesn't exist
     """
-    import hashlib
-    import pickle
 
     # Create a hash of the portfolio file path to use in the cache filename
     portfolio_hash = hashlib.md5(portfolio_path.encode()).hexdigest()

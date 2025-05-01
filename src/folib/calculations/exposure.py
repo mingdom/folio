@@ -51,23 +51,21 @@ def calculate_option_exposure(
     # Standard contract multiplier for equity options
     CONTRACT_SIZE = 100
 
-    # In the old implementation (src/folio/options.py), the notional value is calculated as:
-    # notional_value = 100 * abs(quantity) * underlying_price
-    # And then the delta exposure is calculated as:
-    # delta_exposure = delta * notional_value
-    # This means the sign of the exposure is determined by the delta, not the quantity
-
     # Calculate notional value (always positive)
     notional_value = CONTRACT_SIZE * abs(quantity) * underlying_price
 
+    # Adjust delta based on position direction (quantity)
+    # For short positions (quantity < 0), negate the delta
+    # This matches the behavior of the old implementation
+    adjusted_delta = delta if quantity >= 0 else -delta
+
     # Calculate exposure
-    # IMPORTANT: In the old implementation, the delta is already adjusted for position direction
-    # in the calculate_option_delta function. We just need to multiply by the notional value here.
-    exposure = delta * notional_value
+    exposure = adjusted_delta * notional_value
 
     # Log detailed calculation steps
     logger.debug(
-        f"Option exposure calculation: {delta} delta * ({CONTRACT_SIZE} shares * {abs(quantity)} contracts * ${underlying_price} price) = ${exposure}"
+        f"Option exposure calculation: {quantity} contracts, {delta} raw delta, {adjusted_delta} adjusted delta * "
+        f"({CONTRACT_SIZE} shares * {abs(quantity)} contracts * ${underlying_price} price) = ${exposure}"
     )
 
     # If include_sign is False, return the absolute value

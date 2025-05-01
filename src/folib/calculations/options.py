@@ -138,6 +138,8 @@ def calculate_option_delta(
 
     Returns:
         The calculated option delta.
+        - For calls: positive value between 0 and 1
+        - For puts: negative value between -1 and 0
 
     Raises:
         RuntimeError: If QuantLib encounters an error during calculation.
@@ -207,8 +209,11 @@ def calculate_option_delta(
         # Catch potential QuantLib calculation errors
         raise RuntimeError(f"QuantLib calculation failed: {e}") from e
 
-    # Note: This returns the raw delta. The caller is responsible
-    # for adjusting based on position quantity (long/short).
+    logger.debug(
+        f"Option delta for {option_type} {strike} (underlying: {underlying_price}): "
+        f"delta={delta:.4f}"
+    )
+
     return delta
 
 
