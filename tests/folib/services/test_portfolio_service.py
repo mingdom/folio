@@ -259,6 +259,9 @@ class TestProcessPortfolio:
             assert stock1.price == 150
             assert stock1.cost_basis == 1400
             assert stock1.market_value == 1500
+            assert stock1.raw_data is not None
+            assert stock1.raw_data["symbol"] == "AAPL"
+            assert stock1.raw_data["description"] == "APPLE INC"
 
             # Check the second stock position
             stock2 = portfolio.stock_positions[1]
@@ -305,6 +308,9 @@ class TestProcessPortfolio:
             assert cash.cost_basis == 1000
             assert cash.market_value == 1000
             assert cash.position_type == "cash"
+            assert cash.raw_data is not None
+            assert cash.raw_data["symbol"] == "FMPXX"
+            assert cash.raw_data["description"] == "FIDELITY MONEY MARKET"
 
     def test_process_portfolio_with_option_positions(self):
         """Test that process_portfolio correctly processes option positions."""
@@ -364,6 +370,11 @@ class TestProcessPortfolio:
                     assert option.cost_basis == 450
                     assert option.market_value == 500
                     assert option.position_type == "option"
+                    assert option.raw_data is not None
+                    assert option.raw_data["symbol"] == "-AAPL"
+                    assert (
+                        option.raw_data["description"] == "AAPL JUN 20 2025 $160 CALL"
+                    )
 
     def test_process_portfolio_with_unknown_positions(self):
         """Test that process_portfolio correctly processes unknown positions."""
@@ -410,6 +421,9 @@ class TestProcessPortfolio:
                 assert unknown.market_value == 10
                 assert unknown.position_type == "unknown"
                 assert unknown.description == "UNKNOWN SECURITY"
+                assert unknown.raw_data is not None
+                assert unknown.raw_data["symbol"] == "UNKNOWN"
+                assert unknown.raw_data["description"] == "UNKNOWN SECURITY"
 
     def test_process_portfolio_with_pending_activity(self):
         """Test that process_portfolio correctly handles pending activity."""

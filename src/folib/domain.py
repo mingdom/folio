@@ -47,6 +47,7 @@ class Position:
     price: float
     position_type: Literal["stock", "option", "cash", "unknown"]
     cost_basis: float | None = None
+    raw_data: dict | None = None  # Original CSV data for debugging and recalculation
 
     @property
     def market_value(self) -> float:
@@ -64,12 +65,14 @@ class StockPosition(Position):
         quantity: float,
         price: float,
         cost_basis: float | None = None,
+        raw_data: dict | None = None,
     ):
         object.__setattr__(self, "ticker", ticker)
         object.__setattr__(self, "quantity", quantity)
         object.__setattr__(self, "price", price)
         object.__setattr__(self, "position_type", "stock")
         object.__setattr__(self, "cost_basis", cost_basis)
+        object.__setattr__(self, "raw_data", raw_data)
 
 
 @dataclass(frozen=True)
@@ -90,6 +93,7 @@ class OptionPosition(Position):
         expiry: date,
         option_type: Literal["CALL", "PUT"],
         cost_basis: float | None = None,
+        raw_data: dict | None = None,
     ):
         object.__setattr__(self, "ticker", ticker)
         object.__setattr__(self, "quantity", quantity)
@@ -99,6 +103,7 @@ class OptionPosition(Position):
         object.__setattr__(self, "expiry", expiry)
         object.__setattr__(self, "option_type", option_type)
         object.__setattr__(self, "cost_basis", cost_basis)
+        object.__setattr__(self, "raw_data", raw_data)
 
     @property
     def market_value(self) -> float:
@@ -116,12 +121,14 @@ class CashPosition(Position):
         quantity: float,
         price: float,
         cost_basis: float | None = None,
+        raw_data: dict | None = None,
     ):
         object.__setattr__(self, "ticker", ticker)
         object.__setattr__(self, "quantity", quantity)
         object.__setattr__(self, "price", price)
         object.__setattr__(self, "position_type", "cash")
         object.__setattr__(self, "cost_basis", cost_basis)
+        object.__setattr__(self, "raw_data", raw_data)
 
 
 @dataclass(frozen=True)
@@ -138,6 +145,7 @@ class UnknownPosition(Position):
         price: float,
         description: str,
         cost_basis: float | None = None,
+        raw_data: dict | None = None,
     ):
         object.__setattr__(self, "ticker", ticker)
         object.__setattr__(self, "quantity", quantity)
@@ -145,6 +153,7 @@ class UnknownPosition(Position):
         object.__setattr__(self, "position_type", "unknown")
         object.__setattr__(self, "description", description)
         object.__setattr__(self, "cost_basis", cost_basis)
+        object.__setattr__(self, "raw_data", raw_data)
 
 
 @dataclass(frozen=True)

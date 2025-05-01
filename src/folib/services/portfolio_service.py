@@ -239,6 +239,7 @@ def process_portfolio(
                 quantity=holding.quantity,
                 price=holding.price,
                 cost_basis=holding.cost_basis_total,
+                raw_data=holding.__dict__,
             )
             positions.append(cash_position)
             logger.debug(f"Identified cash-like position: {holding.symbol}")
@@ -258,6 +259,7 @@ def process_portfolio(
                         expiry=expiry,
                         option_type=option_type,
                         cost_basis=holding.cost_basis_total,
+                        raw_data=holding.__dict__,
                     )
                     positions.append(option_position)
                     logger.debug(f"Identified option position: {holding.symbol}")
@@ -270,6 +272,7 @@ def process_portfolio(
                     price=holding.price,
                     description=holding.description,
                     cost_basis=holding.cost_basis_total,
+                    raw_data=holding.__dict__,
                 )
                 positions.append(unknown_position)
 
@@ -280,6 +283,7 @@ def process_portfolio(
                 quantity=holding.quantity,
                 price=holding.price,
                 cost_basis=holding.cost_basis_total,
+                raw_data=holding.__dict__,
             )
             positions.append(stock_position)
             logger.debug(f"Identified stock position: {holding.symbol}")
@@ -292,6 +296,7 @@ def process_portfolio(
                 price=holding.price,
                 description=holding.description,
                 cost_basis=holding.cost_basis_total,
+                raw_data=holding.__dict__,
             )
             positions.append(unknown_position)
             logger.warning(f"Identified unknown position: {holding.symbol}")
