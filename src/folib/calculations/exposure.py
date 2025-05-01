@@ -9,15 +9,12 @@ Key functions follow the functional programming paradigm:
 - No side effects
 - No state
 - No class hierarchies
-
-TODO:
-- Finish implementation
-- Integrate with portfolio_service.py
 """
 
 from collections.abc import Sequence
+from typing import cast
 
-from ..domain import ExposureMetrics, Position
+from ..domain import ExposureMetrics, OptionPosition, Position, StockPosition
 
 
 def calculate_stock_exposure(
@@ -116,4 +113,35 @@ def calculate_position_exposure(
     Returns:
         Exposure metrics for the position
     """
-    raise NotImplementedError("Function not yet implemented")
+    if position.position_type == "stock":
+        stock_position = cast(StockPosition, position)
+        market_exposure = calculate_stock_exposure(
+            stock_position.quantity, stock_position.price
+        )
+        beta_adjusted = calculate_beta_adjusted_exposure(market_exposure, beta)
+        return ExposureMetrics(
+            market_exposure=market_exposure,
+            beta_adjusted_exposure=beta_adjusted,
+        )
+    elif position.position_type == "option":
+        if delta is None:
+            raise ValueError("Delta must be provided for option positions")
+
+        option_position = cast(OptionPosition, position)
+        market_exposure = calculate_option_exposure(
+            option_position.quantity,
+            option_position.price,  # Using option price as a proxy for underlying
+            delta,
+        )
+        beta_adjusted = calculate_beta_adjusted_exposure(market_exposure, beta)
+        return ExposureMetrics(
+            market_exposure=market_exposure,
+            beta_adjusted_exposure=beta_adjusted,
+            delta_exposure=market_exposure,
+        )
+    else:
+        # For cash or unknown positions, exposure is zero
+        return ExposureMetrics(
+            market_exposure=0.0,
+            beta_adjusted_exposure=0.0,
+        )
