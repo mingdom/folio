@@ -1,8 +1,8 @@
 """
 Financial Modeling Prep (FMP) market data provider.
 
-This module implements the MarketDataProvider interface using the Financial Modeling Prep API
-via the fmpsdk package.
+This module implements the MarketDataProvider interface using the fmpsdk package,
+providing access to stock prices, historical data, and beta values from the FMP API.
 """
 
 import logging

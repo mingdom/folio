@@ -7,33 +7,11 @@ This module provides high-level functions for portfolio processing, including:
 - Calculating portfolio summary metrics
 - Computing exposure metrics for risk analysis
 
-Migration Plan Notes:
----------------------
-This module is part of Phase 1 of the folib migration plan, focusing on Portfolio Loading E2E.
-It replaces the portfolio processing functionality in src/folio/portfolio.py with a cleaner,
-more maintainable design that separates data processing from data loading.
-
-Key differences from the old implementation:
-- Uses immutable data structures for thread safety and predictability
-- Separates portfolio processing from CSV loading
-- Provides clear interfaces between components
-- Uses composition over inheritance
-- Follows functional programming principles where possible
-- Uses a flat list of positions instead of nested groups
-
-Old Codebase References:
-------------------------
-- src/folio/portfolio.py: Contains the original process_portfolio_data function
-- src/folio/portfolio_value.py: Contains functions for calculating portfolio values and metrics
-- src/folio/data_model.py: Contains the original Position,
-    UnknownPosition, PortfolioGroup, and PortfolioSummary classes
-
-Potential Issues:
-----------------
-- The old codebase mixed data loading with business logic
-- The old implementation used mutable classes, while the new design uses immutable dataclasses
-- Some field types have changed (e.g., expiry is now a date object instead of a string)
-- The old implementation had many computed properties that are now moved to utility functions
+Key functions:
+- process_portfolio: Convert raw portfolio data into a structured portfolio
+- create_portfolio_summary: Generate summary metrics for a portfolio
+- group_positions_by_ticker: Group positions by underlying ticker
+- get_portfolio_exposures: Calculate exposures for a portfolio
 """
 
 import logging

@@ -4,33 +4,12 @@ Core domain models for the Folib library.
 This module contains the fundamental data structures used throughout the library.
 All classes are simple data containers with minimal methods and a clear inheritance hierarchy.
 
-Migration Plan Notes:
----------------------
-This module is part of Phase 1 of the folib migration plan, focusing on Portfolio Loading E2E.
-It replaces the functionality in src/folio/data_model.py with a cleaner, more maintainable design.
-
-Key differences from the old implementation:
+Key design principles:
 - Uses frozen dataclasses for immutability
 - Separates data models from business logic
 - Uses composition over inheritance where appropriate
 - Provides minimal computed properties
 - Uses strong type hints throughout
-- Simplifies the portfolio structure with a flat list of positions
-
-Old Codebase References:
-------------------------
-- src/folio/data_model.py: Contains the original Position, StockPosition, OptionPosition,
-  PortfolioGroup, and PortfolioSummary classes
-- src/folio/portfolio_value.py: Contains functions for calculating exposures and portfolio metrics
-- src/folio/options.py: Contains functions for option pricing and greeks calculations
-
-Potential Issues:
-----------------
-- The old codebase mixed data models with business logic, which needs to be separated
-- The old Position class used inheritance, while the new design uses composition
-- The old implementation had many computed properties that are now moved to utility functions
-- The old implementation used mutable classes, while the new design uses immutable dataclasses
-- Some field types have changed (e.g., expiry is now a date object instead of a string)
 """
 
 from dataclasses import dataclass, field

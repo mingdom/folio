@@ -1,8 +1,8 @@
 """
 Yahoo Finance market data provider.
 
-This module implements the MarketDataProvider interface using the Yahoo Finance API
-via the yfinance package.
+This module implements the MarketDataProvider interface using the yfinance package,
+providing access to stock prices, historical data, and beta values from Yahoo Finance.
 """
 
 import logging

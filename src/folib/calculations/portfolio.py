@@ -1,16 +1,10 @@
 """
 Portfolio-level calculation functions.
 
-This module provides pure functions for portfolio-level calculations, including:
+This module provides functions for portfolio-level calculations, including:
 - Value breakdowns
 - Portfolio metrics
 - Aggregation functions
-
-These functions follow the functional programming paradigm:
-- Take all inputs as parameters
-- No side effects
-- No state
-- No class hierarchies
 """
 
 

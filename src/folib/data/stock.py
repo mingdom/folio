@@ -12,33 +12,11 @@ Example usage:
     price = oracle.get_price("AAPL")
     beta = oracle.get_beta("MSFT")
 
-Migration Plan Notes:
----------------------
-This module is part of Phase 1 of the folib migration plan, focusing on Portfolio Loading E2E.
-It consolidates market data functionality from src/stockdata.py and src/yfinance.py into a
-cleaner, more maintainable design with a single entry point for all market data needs.
-
-Key differences from the old implementation:
-- Uses a Singleton StockOracle class instead of separate DataFetcherInterface and YFinanceDataFetcher
-- Provides direct methods for common operations (get_price, get_beta) instead of generic fetch_data
-- Simplifies the API by hiding implementation details
-- Implements the Singleton pattern for consistent access throughout the application
-- Supports multiple data providers (Yahoo Finance, Financial Modeling Prep) through a provider interface
-
-Old Codebase References:
-------------------------
-- src/stockdata.py: Contains the DataFetcherInterface
-- src/yfinance.py: Contains the YFinanceDataFetcher implementation
-- src/folio/utils.py: Contains the get_beta function
-- src/folio/marketdata.py: Contains the get_stock_price function
-
-Potential Issues:
-----------------
-- Yahoo Finance API may have rate limits or change its interface
-- FMP API requires an API key and has its own rate limits
-- Beta calculation requires sufficient historical data
-- Some tickers may not have data available
-- Market data fetching can be slow
+Features:
+- Supports multiple data providers (Yahoo Finance, Financial Modeling Prep)
+- Implements caching to improve performance and reduce API calls
+- Provides validation for stock symbols
+- Calculates beta values when not available directly from providers
 """
 
 import logging

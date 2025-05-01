@@ -1,6 +1,13 @@
 """
 Position analysis service.
-Provides high-level functions for analyzing individual positions.
+
+This module provides high-level functions for analyzing individual positions,
+calculating metrics like market exposure, beta-adjusted exposure, and P&L.
+
+Key functions:
+- analyze_position: Analyze a single position, calculating all relevant metrics
+- analyze_stock_position: Calculate metrics for a stock position
+- analyze_option_position: Calculate metrics for an option position
 """
 
 from typing import Protocol

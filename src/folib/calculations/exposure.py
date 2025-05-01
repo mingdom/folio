@@ -1,14 +1,8 @@
 """
 Market exposure calculations for stocks and options positions.
 
-This module provides pure functions for calculating market exposure for different
-position types, as well as aggregating exposures across positions.
-
-Key functions follow the functional programming paradigm:
-- Take all inputs as parameters
-- No side effects
-- No state
-- No class hierarchies
+This module provides functions for calculating market exposure for different
+position types and aggregating exposures across positions.
 """
 
 from collections.abc import Sequence

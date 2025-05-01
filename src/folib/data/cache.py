@@ -1,8 +1,8 @@
 """
 Cache utilities for market data providers.
 
-This module provides caching functionality for market data providers,
-including cache path generation, expiration checking, and data reading/writing.
+This module provides file-based caching functionality for market data providers,
+with support for TTL-based expiration and methods for caching DataFrames and values.
 """
 
 import logging

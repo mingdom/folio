@@ -1,14 +1,8 @@
 """
-Pure functions for option pricing and Greeks calculations using QuantLib.
+Pure functions for option pricing and Greeks calculations.
 
-This module provides pure functions for option pricing and Greeks calculations,
-using QuantLib directly without any dependencies on other folib modules.
-
-Key functions follow the functional programming paradigm:
-- Take all inputs as parameters
-- No side effects
-- No state
-- No class hierarchies
+This module provides functions for option pricing and Greeks calculations using QuantLib.
+All functions follow functional programming principles with no side effects or state.
 """
 
 import datetime
