@@ -60,14 +60,10 @@ def calculate_option_exposure(
     # Calculate notional value (always positive)
     notional_value = CONTRACT_SIZE * abs(quantity) * underlying_price
 
-    # Calculate exposure (sign determined by delta)
-    # For short positions, the old implementation inverts the delta
-    # This is critical for matching the old implementation's behavior
-    if quantity < 0:  # Short position
-        # For short positions, invert the sign of delta
-        exposure = -delta * notional_value
-    else:  # Long position
-        exposure = delta * notional_value
+    # Calculate exposure
+    # IMPORTANT: In the old implementation, the delta is already adjusted for position direction
+    # in the calculate_option_delta function. We just need to multiply by the notional value here.
+    exposure = delta * notional_value
 
     # Log detailed calculation steps
     logger.debug(

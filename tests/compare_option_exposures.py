@@ -245,6 +245,9 @@ def calculate_new_exposure(test_case):
         underlying_price=test_case["underlying_price"],
         volatility=test_case["volatility"],
         use_fallback=True,  # Enable fallback to match old implementation
+        quantity=test_case[
+            "quantity"
+        ],  # Pass quantity to adjust delta based on position direction
     )
 
     # Calculate exposure using the new implementation

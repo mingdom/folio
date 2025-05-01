@@ -412,8 +412,6 @@ def create_portfolio_summary(portfolio: Portfolio) -> PortfolioSummary:
                 strike=position.strike,
                 expiry=position.expiry,
                 underlying_price=underlying_price,
-                quantity=position.quantity,  # Pass quantity to adjust delta based on position direction
-                use_fallback=True,  # Enable fallback to match old implementation
             )
             logger.debug(
                 f"Option delta for {position.ticker} {position.option_type} {position.strike}: {delta}"

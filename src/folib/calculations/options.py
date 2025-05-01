@@ -122,116 +122,94 @@ def calculate_option_delta(
     strike: float,
     expiry: datetime.date,
     underlying_price: float,
-    volatility: float = 0.3,
+    volatility: float | None = None,
     risk_free_rate: float = 0.05,
-    use_fallback: bool = True,  # New parameter to control fallback behavior
-    quantity: float = 1.0,  # New parameter to adjust delta based on position direction
 ) -> float:
-    """Calculate option delta using QuantLib with American-style options.
+    """
+    Calculate American option delta using QuantLib's Binomial Tree engine.
 
     Args:
-        option_type: "CALL" or "PUT"
-        strike: Strike price
-        expiry: Option expiration date
-        underlying_price: Current price of underlying
-        volatility: Option volatility, default 0.3 (30%)
-        risk_free_rate: Risk-free rate, default 0.05 (5%)
-        use_fallback: Whether to use fallback values on error, default True
-        quantity: Number of contracts (negative for short positions), default 1.0
+        option_type: "CALL" or "PUT".
+        strike: Option strike price.
+        expiry: Option expiration date (datetime.date object).
+        underlying_price: Current price of the underlying asset.
+        volatility: Implied volatility of the underlying asset.
+        risk_free_rate: Risk-free interest rate.
 
     Returns:
-        Option delta between -1.0 and 1.0, adjusted for position direction
+        The calculated option delta.
 
     Raises:
-        ValueError: If any inputs are invalid and use_fallback is False
+        RuntimeError: If QuantLib encounters an error during calculation.
+        ValueError: If inputs are fundamentally invalid (e.g., expiry in the past).
     """
+    if volatility is None:
+        # TODO: use calculate_implied_volatility later
+        volatility = calculate_implied_volatility(
+            option_type, strike, expiry, underlying_price, risk_free_rate
+        )
+
+    # --- 1. Setup Dates ---
+    calculation_date = ql.Date().todaysDate()
+    ql.Settings.instance().evaluationDate = calculation_date
+    # Ensure expiry_ql is a valid QuantLib date object and is in the future
     try:
-        validate_option_inputs(option_type, strike, expiry, underlying_price)
-        if volatility <= 0:
-            raise ValueError(f"Invalid volatility: {volatility}. Must be positive")
-        if risk_free_rate < 0:
-            raise ValueError(
-                f"Invalid risk-free rate: {risk_free_rate}. Must be non-negative"
-            )
-
-        # Set up QuantLib date objects
-        calculation_date = ql.Date().todaysDate()
-        ql.Settings.instance().evaluationDate = calculation_date
-
         expiry_ql = ql.Date(expiry.day, expiry.month, expiry.year)
         if expiry_ql <= calculation_date:
-            expiry_ql = calculation_date + 1
-
-        # Set up the option
-        payoff = ql.PlainVanillaPayoff(
-            ql.Option.Call if option_type == "CALL" else ql.Option.Put, strike
-        )
-        exercise = ql.AmericanExercise(calculation_date, expiry_ql)
-        option = ql.VanillaOption(payoff, exercise)
-
-        # Set up the pricing environment
-        spot_handle = ql.QuoteHandle(ql.SimpleQuote(underlying_price))
-        riskfree_handle = ql.YieldTermStructureHandle(
-            ql.FlatForward(calculation_date, risk_free_rate, ql.Actual365Fixed())
-        )
-        dividend_handle = ql.YieldTermStructureHandle(
-            ql.FlatForward(calculation_date, 0.0, ql.Actual365Fixed())
-        )
-        volatility_handle = ql.BlackVolTermStructureHandle(
-            ql.BlackConstantVol(
-                calculation_date,
-                ql.UnitedStates(
-                    ql.UnitedStates.NYSE
-                ),  # Use NYSE calendar to match old implementation
-                volatility,
-                ql.Actual365Fixed(),
-            )
-        )
-
-        # Create the pricing engine
-        process = ql.BlackScholesMertonProcess(
-            spot_handle, dividend_handle, riskfree_handle, volatility_handle
-        )
-        steps = 100
-        engine = ql.BinomialVanillaEngine(process, "crr", steps)
-        option.setPricingEngine(engine)
-
-        # Calculate raw delta
-        raw_delta = option.delta()
-
-        # Adjust for position direction (short positions have inverted delta)
-        # This matches the behavior in the old implementation (src/folio/options.py)
-        adjusted_delta = raw_delta if quantity >= 0 else -raw_delta
-
-        logger.debug(
-            f"Calculated delta for {option_type} {strike} (underlying: {underlying_price}): raw={raw_delta}, adjusted={adjusted_delta}"
-        )
-        return adjusted_delta
-
+            # Basic validation: expiry must be in the future
+            raise ValueError("Expiry date must be in the future.")
     except Exception as e:
-        logger.error(
-            f"Error calculating delta for {option_type} {strike} (underlying: {underlying_price}): {e}"
+        # Catch potential QuantLib date creation errors
+        raise ValueError(f"Invalid expiry date: {expiry}") from e
+
+    # --- 2. Define Option ---
+    ql_option_type = ql.Option.Call if option_type == "CALL" else ql.Option.Put
+    payoff = ql.PlainVanillaPayoff(ql_option_type, strike)
+    exercise = ql.AmericanExercise(calculation_date, expiry_ql)
+    option = ql.VanillaOption(payoff, exercise)
+
+    # --- 3. Setup Market Data Handles ---
+    spot_handle = ql.QuoteHandle(ql.SimpleQuote(underlying_price))
+    # FlatForward creates a simple yield term structure (curve)
+    riskfree_curve_handle = ql.YieldTermStructureHandle(
+        ql.FlatForward(calculation_date, risk_free_rate, ql.Actual365Fixed())
+    )
+    # Assuming no dividends for simplicity
+    dividend_curve_handle = ql.YieldTermStructureHandle(
+        ql.FlatForward(calculation_date, 0.0, ql.Actual365Fixed())
+    )
+    # Flat volatility term structure
+    volatility_curve_handle = ql.BlackVolTermStructureHandle(
+        ql.BlackConstantVol(
+            calculation_date, ql.TARGET(), volatility, ql.Actual365Fixed()
         )
+    )
 
-        if not use_fallback:
-            raise
+    # --- 4. Create Stochastic Process ---
+    # Black-Scholes-Merton process describes how the underlying price evolves
+    process = ql.BlackScholesMertonProcess(
+        spot_handle,
+        dividend_curve_handle,
+        riskfree_curve_handle,
+        volatility_curve_handle,
+    )
 
-        # Calculate a reasonable default delta based on option type and moneyness
-        # This matches the fallback logic in the old implementation
-        if option_type == "CALL":
-            raw_fallback_delta = 0.5 if underlying_price > strike else 0.1
-        else:  # PUT
-            raw_fallback_delta = -0.5 if underlying_price < strike else -0.1
+    # --- 5. Setup Pricing Engine ---
+    # Using Binomial Tree (Cox-Ross-Rubinstein) engine, suitable for American options
+    steps = 101  # Number of steps in the binomial tree
+    engine = ql.BinomialVanillaEngine(process, "crr", steps)
+    option.setPricingEngine(engine)
 
-        # Adjust for position direction (short positions have inverted delta)
-        adjusted_fallback_delta = (
-            raw_fallback_delta if quantity >= 0 else -raw_fallback_delta
-        )
+    # --- 6. Calculate Delta ---
+    try:
+        delta = option.delta()
+    except Exception as e:
+        # Catch potential QuantLib calculation errors
+        raise RuntimeError(f"QuantLib calculation failed: {e}") from e
 
-        logger.debug(
-            f"Using fallback delta for {option_type} {strike}: raw={raw_fallback_delta}, adjusted={adjusted_fallback_delta}"
-        )
-        return adjusted_fallback_delta
+    # Note: This returns the raw delta. The caller is responsible
+    # for adjusting based on position quantity (long/short).
+    return delta
 
 
 def categorize_option_by_delta(delta: float) -> str:
@@ -247,6 +225,8 @@ def categorize_option_by_delta(delta: float) -> str:
     Returns:
         'long' for positive delta, 'short' for negative delta
     """
+    # In the old implementation, options are categorized based on the sign of delta
+    # This is critical for matching the old implementation's behavior
     return "long" if delta >= 0 else "short"
 
 
@@ -259,6 +239,7 @@ def calculate_implied_volatility(
     risk_free_rate: float = 0.05,  # noqa: ARG001
 ) -> float:
     """Calculate implied volatility using QuantLib with American-style options.
+    TODO: Implement
 
     Args:
         option_type: "CALL" or "PUT"
