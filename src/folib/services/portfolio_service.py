@@ -48,6 +48,7 @@ from ..domain import (
     PortfolioGroup,
     PortfolioHolding,
     PortfolioSummary,
+    Position,
     StockPosition,
 )
 
@@ -328,7 +329,10 @@ def create_portfolio_summary(portfolio: Portfolio) -> PortfolioSummary:
         calculate_option_exposure,
         calculate_stock_exposure,
     )
-    from ..calculations.options import calculate_option_delta
+    from ..calculations.options import (
+        calculate_option_delta,
+        categorize_option_by_delta,
+    )
 
     # Initialize exposure breakdowns
     long_stocks = {"value": 0.0, "beta_adjusted": 0.0}
@@ -402,17 +406,26 @@ def create_portfolio_summary(portfolio: Portfolio) -> PortfolioSummary:
                 # Fallback to using a reasonable proxy for underlying price
                 underlying_price = position.strike  # Using strike as fallback
 
-            # Calculate option exposures using the calculation module
+            # Calculate option exposures using the calculation module with fallback
             delta = calculate_option_delta(
                 option_type=position.option_type,
                 strike=position.strike,
                 expiry=position.expiry,
                 underlying_price=underlying_price,
+                quantity=position.quantity,  # Pass quantity to adjust delta based on position direction
+                use_fallback=True,  # Enable fallback to match old implementation
             )
+            logger.debug(
+                f"Option delta for {position.ticker} {position.option_type} {position.strike}: {delta}"
+            )
+            # Use underlying price for exposure calculation, not option price
             market_exposure = calculate_option_exposure(
                 quantity=position.quantity,
-                underlying_price=underlying_price,
+                underlying_price=underlying_price,  # Use underlying price, not option price
                 delta=delta,
+            )
+            logger.debug(
+                f"Option exposure for {position.ticker} {position.option_type} {position.strike}: {market_exposure} (delta: {delta}, underlying: {underlying_price})"
             )
             beta_adjusted = calculate_beta_adjusted_exposure(market_exposure, beta)
 
@@ -420,11 +433,24 @@ def create_portfolio_summary(portfolio: Portfolio) -> PortfolioSummary:
             # based on delta exposure, not quantity or market value:
             # - Positive delta exposure (long calls, short puts) => Long position
             # - Negative delta exposure (short calls, long puts) => Short position
-            if market_exposure >= 0:  # Positive delta exposure = Long position
+            option_category = categorize_option_by_delta(delta)
+
+            if (
+                option_category == "long"
+            ):  # Positive delta = Long position (regardless of quantity)
+                # For long positions with positive delta (long calls, short puts)
+                # or short positions with negative delta (short puts)
                 long_options["value"] += position_value
                 long_options["beta_adjusted"] += beta_adjusted
-                long_options["delta_exposure"] += market_exposure
-            else:  # Negative delta exposure = Short position
+                long_options["delta_exposure"] += abs(
+                    market_exposure
+                )  # Use absolute value for delta exposure
+                logger.debug(
+                    f"Categorized as LONG option exposure: {position.ticker} {position.option_type} {position.strike} (delta: {delta}, exposure: {abs(market_exposure)})"
+                )
+            else:  # option_category == "short" - Negative delta = Short position (regardless of quantity)
+                # For long positions with negative delta (long puts)
+                # or short positions with positive delta (short calls)
                 # In the old implementation, short option values are stored as negative values
                 # This is critical for matching the old implementation's behavior
                 short_options["value"] += (
@@ -433,7 +459,14 @@ def create_portfolio_summary(portfolio: Portfolio) -> PortfolioSummary:
                 short_options["beta_adjusted"] += (
                     beta_adjusted  # Already negative from market_exposure
                 )
-                short_options["delta_exposure"] += market_exposure  # Already negative
+                # In the old implementation, short_options["delta_exposure"] is stored as a negative value
+                # But we need to make sure it's negative regardless of the market_exposure sign
+                short_options["delta_exposure"] += -abs(
+                    market_exposure
+                )  # Store as negative value
+                logger.debug(
+                    f"Categorized as SHORT option exposure: {position.ticker} {position.option_type} {position.strike} (delta: {delta}, exposure: {-abs(market_exposure)})"
+                )
 
         elif position.position_type == "cash":
             cash_value += position_value
@@ -531,7 +564,10 @@ def get_portfolio_exposures(portfolio: Portfolio) -> dict:
         calculate_option_exposure,
         calculate_stock_exposure,
     )
-    from ..calculations.options import calculate_option_delta
+    from ..calculations.options import (
+        calculate_option_delta,
+        categorize_option_by_delta,
+    )
 
     # Initialize exposure metrics
     exposures = {
@@ -585,15 +621,26 @@ def get_portfolio_exposures(portfolio: Portfolio) -> dict:
             underlying_price = position.strike
             beta = 1.0  # Use beta of 1.0 as fallback
 
-        # Calculate option exposures using the calculation modules
+        # Calculate option exposures using the calculation modules with fallback
         delta = calculate_option_delta(
             option_type=position.option_type,
             strike=position.strike,
             expiry=position.expiry,
             underlying_price=underlying_price,
+            quantity=position.quantity,  # Pass quantity to adjust delta based on position direction
+            use_fallback=True,  # Enable fallback to match old implementation
         )
+        logger.debug(
+            f"Exposure calculation - Option delta for {position.ticker} {position.option_type} {position.strike}: {delta}"
+        )
+        # Use underlying price for exposure calculation, not option price
         market_exposure = calculate_option_exposure(
-            quantity=position.quantity, underlying_price=underlying_price, delta=delta
+            quantity=position.quantity,
+            underlying_price=underlying_price,  # Use underlying price, not option price
+            delta=delta,
+        )
+        logger.debug(
+            f"Portfolio exposure - Option exposure for {position.ticker} {position.option_type} {position.strike}: {market_exposure} (delta: {delta}, underlying: {underlying_price})"
         )
         beta_adjusted = calculate_beta_adjusted_exposure(market_exposure, beta)
         exposures["beta_adjusted_exposure"] += beta_adjusted
@@ -601,10 +648,25 @@ def get_portfolio_exposures(portfolio: Portfolio) -> dict:
         # In the old implementation, options are categorized based on delta exposure, not quantity
         # Long Call / Short Put => Positive Delta Exposure => Long position
         # Short Call / Long Put => Negative Delta Exposure => Short position
-        if market_exposure > 0:
-            exposures["long_option_exposure"] += market_exposure
-        else:
+        option_category = categorize_option_by_delta(delta)
+
+        # In the old implementation, options are categorized based on delta sign, not quantity
+        # But the exposure value should always be positive for long_option_exposure and short_option_exposure
+        # This is because the sign is implied by the category (long vs short)
+        if (
+            option_category == "long"
+        ):  # Positive delta = Long position (regardless of quantity)
+            # For long exposure, we want a positive value
+            exposures["long_option_exposure"] += abs(market_exposure)
+            logger.debug(
+                f"Categorized as LONG option exposure in get_portfolio_exposures: {position.ticker} {position.option_type} {position.strike} (delta: {delta}, exposure: {abs(market_exposure)})"
+            )
+        else:  # option_category == "short" - Negative delta = Short position (regardless of quantity)
+            # For short exposure, we also want a positive value (will be subtracted in net calculation)
             exposures["short_option_exposure"] += abs(market_exposure)
+            logger.debug(
+                f"Categorized as SHORT option exposure in get_portfolio_exposures: {position.ticker} {position.option_type} {position.strike} (delta: {delta}, exposure: {abs(market_exposure)})"
+            )
 
     # Calculate net market exposure
     exposures["net_market_exposure"] = (
@@ -808,3 +870,101 @@ def _extract_option_data(
     # Create expiry date
     expiry = date(year, month, day)
     return ticker, strike, expiry, option_type, quantity
+
+
+def get_positions_by_type(
+    positions: list[Position], position_type: str
+) -> list[Position]:
+    """
+    Get positions of a specific type.
+
+    Args:
+        positions: List of positions
+        position_type: Type of position to filter for (e.g., 'stock', 'option', 'cash')
+
+    Returns:
+        List of positions of the specified type
+    """
+    return [p for p in positions if p.position_type == position_type]
+
+
+def create_portfolio_groups_from_positions(
+    positions: list[Position],
+) -> list[PortfolioGroup]:
+    """
+    Create portfolio groups from a list of positions.
+
+    This function groups related positions (stocks and their options) into PortfolioGroup objects.
+    It's similar to create_portfolio_groups but works with Position objects instead of PortfolioHolding objects.
+
+    Args:
+        positions: List of positions (StockPosition, OptionPosition, etc.)
+
+    Returns:
+        List of portfolio groups, each containing a stock position and its related option positions
+    """
+    logger.debug("Creating portfolio groups from %d positions", len(positions))
+
+    # Separate positions by type
+    stock_positions = get_positions_by_type(positions, "stock")
+    option_positions = get_positions_by_type(positions, "option")
+
+    # Create a map of ticker -> stock position
+    ticker_to_stock = {p.ticker: p for p in stock_positions}
+
+    # Create a map of ticker -> option positions
+    ticker_to_options = {}
+    for option in option_positions:
+        ticker = option.ticker
+        if ticker not in ticker_to_options:
+            ticker_to_options[ticker] = []
+        ticker_to_options[ticker].append(option)
+
+    # Create groups
+    groups = []
+
+    # First, process stocks and their related options
+    for ticker, stock_position in ticker_to_stock.items():
+        # Find related options
+        option_positions = ticker_to_options.get(ticker, [])
+
+        # Create portfolio group
+        group = PortfolioGroup(
+            ticker=ticker,
+            stock_position=stock_position,
+            option_positions=option_positions,
+        )
+        groups.append(group)
+        logger.debug(
+            f"Created portfolio group for {ticker} with {len(option_positions)} options"
+        )
+
+    # Process orphaned options (options without a matching stock position)
+    for ticker, options in ticker_to_options.items():
+        # Skip if we already have a stock for this ticker
+        if ticker in ticker_to_stock:
+            continue
+
+        # Create a placeholder stock position with quantity 0
+        from ..domain import StockPosition
+
+        stock_position = StockPosition(
+            ticker=ticker,
+            quantity=0,
+            price=0.0,
+            cost_basis=0.0,
+        )
+
+        # Create portfolio group with the placeholder stock position and the options
+        group = PortfolioGroup(
+            ticker=ticker,
+            stock_position=stock_position,
+            option_positions=options,
+        )
+        groups.append(group)
+        logger.debug(
+            f"Created orphaned option group for {ticker} with placeholder stock position and {len(options)} options"
+        )
+
+    logger.debug(f"Created {len(groups)} portfolio groups from positions")
+    return groups

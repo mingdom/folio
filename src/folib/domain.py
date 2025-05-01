@@ -163,6 +163,27 @@ class PortfolioHolding:
     value: float  # Current Value in the CSV
     cost_basis_total: float | None = None  # Cost Basis Total in the CSV
 
+    @property
+    def market_value(self) -> float:
+        """Alias for value to maintain compatibility with Position class."""
+        return self.value
+
+    @property
+    def position_type(self) -> str:
+        """
+        Determine the position type based on the description.
+        This is a compatibility property to match the Position class interface.
+
+        Returns:
+            'option' if the description matches option patterns, 'stock' otherwise
+        """
+        # Simple check for option description patterns
+        if self.description and any(
+            x in self.description.upper() for x in [" CALL", " PUT"]
+        ):
+            return "option"
+        return "stock"
+
 
 @dataclass(frozen=True)
 class Portfolio:

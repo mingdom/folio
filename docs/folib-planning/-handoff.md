@@ -4,6 +4,14 @@ date: "2025-05-01"
 status: "IN PROGRESS"
 ---
 
+# How to use this document:
+1. Run `python tests/compare_portfolio_implementations.py -v -p private-data/portfolio-private.csv --use-cache` to compare the difference between the old and new implementations.
+2. Read The rest of this document and pick the most important change to fix
+3. Run the script again and compare
+4. Iterate (steps 1-3 above) until every issue is fixed
+
+---
+
 # Portfolio Implementation Differences Handoff Document
 
 This document analyzes the differences between the old and new portfolio implementations, focusing on exposure calculations and option delta calculations. It serves as a handoff document for the next engineer to understand the current state and what needs to be addressed.
