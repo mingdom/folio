@@ -1,12 +1,12 @@
 ---
 description: Master task tracking document for folib implementation
-lastUpdated: "2025-04-30"
+lastUpdated: "2025-05-01"
 status: "IN PROGRESS"
 ---
 
 # Folib Implementation Task Tracker
 
-> 🎯 **Current Focus**: Complete portfolio loading functionality before CLI integration
+> 🎯 **Current Focus**: Phase 2 - Simulation Service Implementation
 
 ## 📊 Implementation Progress
 
@@ -16,82 +16,73 @@ status: "IN PROGRESS"
 | `calculations/options.py` | ✅ DONE | 100% | Pure functions with direct QuantLib integration |
 | `calculations/exposure.py` | ✅ DONE | 100% | All exposure calculations implemented |
 | `services/position_service.py` | ✅ DONE | 100% | Position analysis complete |
-| `services/portfolio_service.py` | ✅ DONE | 100% | Portfolio calculations complete |
+| `services/portfolio_service.py` | ✅ DONE | 100% | Portfolio calculations complete with calculation module integration |
+| `services/simulation_service.py` | 🟡 IN PROGRESS | 20% | Core simulation functions being implemented |
 | `data/stock.py` | ✅ DONE | 100% | Using existing implementation |
 | `data/loader.py` | ✅ DONE | 100% | CSV loading and parsing complete |
-| CLI Integration | 🟡 PLANNING | 20% | Integration plan created |
-| REST API | ❌ NOT STARTED | 0% | Planned for Phase 3 |
+| CLI Integration | 🟡 PLANNED | 0% | Phase 3 |
+| REST API | ❌ NOT STARTED | 0% | Future phase |
 
 ## 🎯 Current Focus
 
-Integration with CLI application:
-1. Created detailed integration plan in `focli-integration-plan.md`
-2. Implemented pure functions for options calculations:
-   - Removed OptionsContract class dependency
-   - Direct QuantLib integration
-   - Pure functional approach
-3. Next step: Begin pre-integration tasks from plan
+Simulation Service Implementation:
+1. Core simulation functions development
+2. Position-level simulation accuracy
+3. Integration with calculation modules for pricing
 
 ## 🚀 Next Steps
 
-### Phase 1: CLI Integration Pre-work
-- [x] Implement pure functions for options calculations
-- [ ] Full audit of focli's portfolio data usage
-- [ ] Document breaking changes
-- [ ] Create test portfolio dataset
-- [ ] Standardize error handling across modules
-- [ ] Add interface documentation
+### Phase 2: Simulation Service Implementation
+- [ ] Implement core simulation functions
+  - [ ] simulate_portfolio
+  - [ ] generate_spy_changes
+  - [ ] position_level_simulation
+- [ ] Add test coverage for simulation
+- [ ] Integrate with calculation modules
+- [ ] Add performance benchmarks
 
-### Phase 2: Core Integration
-- [ ] Update state management
-- [ ] Integrate portfolio loading
-- [ ] Update basic commands
-
-### Phase 3: Command Updates
-- [ ] Migrate remaining commands
-- [ ] Add performance tests
-- [ ] Complete integration test suite
+### Phase 3: CLI Integration (Upcoming)
+- [ ] Update CLI to use folib services
+- [ ] Update data structures
+- [ ] Add new CLI commands
+- [ ] Integration testing
 
 ## 🎉 Recent Achievements
 
-1. ✅ Implemented complete portfolio loading functionality
-2. ✅ Fixed redundancy by removing duplicate portfolio_loader.py
-3. ✅ Created comprehensive integration plan
-4. ✅ Reimplemented options.py as pure functions with direct QuantLib integration
+1. ✅ Completed Phase 1: Portfolio Service Integration
+   - Integrated calculation modules into portfolio_service.py
+   - Updated exposure calculations
+   - Added comprehensive tests
+2. ✅ Improved calculation module integration
+3. ✅ Enhanced error handling and validation
 
 ## 🔄 Ongoing Tasks
 
-1. Interface Improvements:
-   - [ ] Consider wrapping DataFrame in domain model
-   - [ ] Document CSV format requirements
-   - [ ] Add usage examples to docstrings
+1. Simulation Service Development:
+   - [ ] Design core simulation interfaces
+   - [ ] Implement position pricing in scenarios
+   - [ ] Add simulation test suite
 
-2. Error Handling:
-   - [ ] Standardize error handling approach
-   - [ ] Implement consistent error messaging
-   - [ ] Add error documentation
-
-3. Testing:
-   - [ ] Create integration test suite
-   - [ ] Add performance benchmarks
-   - [ ] Create test data fixtures
+2. Testing Improvements:
+   - [ ] Add simulation benchmarks
+   - [ ] Create scenario test data
+   - [ ] Performance testing
 
 ## 🚧 Known Issues
 
-1. **Interface Consistency**:
-   - DataFrame exposure in loader.py
-   - Mixed error handling strategies
-   - Missing interface documentation
+1. **Simulation Accuracy**:
+   - Need to validate option pricing in extreme scenarios
+   - Beta calculation in edge cases
+   - Performance with large portfolios
 
 2. **Documentation Gaps**:
-   - Missing usage examples
-   - Incomplete CSV format documentation
-   - Limited debugging information
+   - Simulation interface documentation
+   - Performance characteristics
+   - Usage examples
 
 ## 📝 Notes
 
-- Keep error handling consistent with "fail fast" approach
-- Maintain backward compatibility during integration
-- Focus on validation and testing
-- Consider performance implications
-- Document all breaking changes
+- Focus on simulation accuracy and performance
+- Maintain pure functional approach
+- Add comprehensive test coverage
+- Document simulation assumptions and limitations

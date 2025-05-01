@@ -3,7 +3,6 @@ description: Implementation Status and Plan for folib
 date: "2025-05-01"
 status: "IN PROGRESS"
 ---
-
 # Folib Implementation Status and Plan
 
 This document captures the current implementation status of the folib library and outlines the plan for completing the remaining components. It serves as an extension and evolution of the original [master plan](master-plan-concise.md).

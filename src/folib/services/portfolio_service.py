@@ -43,6 +43,14 @@ from typing import Literal, cast
 
 import pandas as pd
 
+from ..calculations import (
+    calculate_beta_adjusted_exposure,
+    calculate_option_delta,
+    calculate_option_exposure,
+    calculate_portfolio_metrics,
+    calculate_stock_exposure,
+    create_value_breakdowns,
+)
 from ..data.stock import stockdata
 from ..domain import (
     CashPosition,
@@ -479,7 +487,7 @@ def create_portfolio_summary(portfolio: Portfolio) -> PortfolioSummary:
     - Stock value
     - Option value
     - Cash value
-    - Unknown position value
+    - Unknown value
     - Pending activity value
     - Net market exposure
     - Portfolio beta
@@ -492,76 +500,120 @@ def create_portfolio_summary(portfolio: Portfolio) -> PortfolioSummary:
     """
     logger.debug("Creating portfolio summary")
 
-    # Initialize values
-    total_value = 0.0
-    stock_value = 0.0
-    option_value = 0.0
+    # Initialize exposure breakdowns
+    long_stocks = {"value": 0.0, "beta_adjusted": 0.0}
+    short_stocks = {"value": 0.0, "beta_adjusted": 0.0}  # Will contain negative values
+    long_options = {"value": 0.0, "beta_adjusted": 0.0, "delta_exposure": 0.0}
+    short_options = {
+        "value": 0.0,
+        "beta_adjusted": 0.0,
+        "delta_exposure": 0.0,
+    }  # Will contain negative values
+
+    # Initialize other metrics
     cash_value = 0.0
     unknown_value = 0.0
-    net_market_exposure = 0.0
-    weighted_beta_sum = 0.0
-    total_stock_value = 0.0  # For beta calculation
 
-    # Process all positions by type
+    # Process positions by type
     for position in portfolio.positions:
         # Skip NaN values
         position_value = position.market_value
         if pd.isna(position_value):
-            logger.warning(f"Skipping NaN market value for {position.ticker}")
+            logger.warning(f"Skipping position {position.ticker} with NaN market value")
             continue
 
         # Process based on position type
         if position.position_type == "stock":
-            stock_position = cast(StockPosition, position)
-            stock_value += position_value
-            total_value += position_value
-
+            stock = cast(StockPosition, position)
             # Get beta for exposure calculation
             beta = 1.0
             try:
-                beta = stockdata.get_beta(stock_position.ticker)
+                beta = stockdata.get_beta(stock.ticker)
             except Exception as e:
-                logger.warning(
-                    f"Could not calculate beta for {stock_position.ticker}: {e}"
-                )
+                logger.warning(f"Could not get beta for {stock.ticker}: {e}")
 
-            weighted_beta_sum += beta * position_value
-            total_stock_value += position_value
-            net_market_exposure += position_value * beta
+            # Calculate exposures using the calculation module
+            market_exposure = calculate_stock_exposure(stock.quantity, stock.price)
+            beta_adjusted = calculate_beta_adjusted_exposure(market_exposure, beta)
+
+            if stock.quantity > 0:
+                long_stocks["value"] += market_exposure
+                long_stocks["beta_adjusted"] += beta_adjusted
+            else:
+                short_stocks["value"] += market_exposure  # Already negative
+                short_stocks["beta_adjusted"] += beta_adjusted  # Already negative
 
         elif position.position_type == "option":
-            # Cast to OptionPosition for future use (e.g., delta calculations)
-            # Currently unused but kept for type safety
-            _ = cast(OptionPosition, position)
-            option_value += position_value
-            total_value += position_value
+            option = cast(OptionPosition, position)
+            # Get underlying price and beta
+            beta = 1.0
+            try:
+                underlying_price = stockdata.get_price(option.ticker)
+                beta = stockdata.get_beta(option.ticker)
+            except Exception as e:
+                logger.warning(f"Could not get market data for {option.ticker}: {e}")
+                # Fallback to using a reasonable proxy for underlying price
+                underlying_price = option.strike  # Using strike as fallback
 
-            # Options exposure is more complex and would be calculated in a separate function
-            # For now, we're just adding the market value to the total
+            # Calculate option exposures using the calculation module
+            delta = calculate_option_delta(
+                option_type=option.option_type,
+                strike=option.strike,
+                expiry=option.expiry,
+                underlying_price=underlying_price,
+            )
+            market_exposure = calculate_option_exposure(
+                quantity=option.quantity, underlying_price=underlying_price, delta=delta
+            )
+            beta_adjusted = calculate_beta_adjusted_exposure(market_exposure, beta)
+
+            if market_exposure > 0:
+                long_options["value"] += position_value
+                long_options["beta_adjusted"] += beta_adjusted
+                long_options["delta_exposure"] += market_exposure
+            else:
+                short_options["value"] += position_value
+                short_options["beta_adjusted"] += beta_adjusted
+                short_options["delta_exposure"] += market_exposure
 
         elif position.position_type == "cash":
             cash_value += position_value
-            total_value += position_value
-            # Cash has zero beta, so no contribution to market exposure
 
-        elif position.position_type == "unknown":
+        else:  # unknown
             unknown_value += position_value
-            total_value += position_value
-            # Unknown positions don't contribute to beta or market exposure
+            logger.warning(f"Unknown position type for {position.ticker}")
 
-    # Add pending activity
-    total_value += portfolio.pending_activity_value
+    # Create exposure breakdowns using portfolio_value module
+    long_value, short_value, options_value = create_value_breakdowns(
+        long_stocks=long_stocks,
+        short_stocks=short_stocks,
+        long_options=long_options,
+        short_options=short_options,
+    )
 
-    # Calculate portfolio beta (weighted average of stock betas)
-    portfolio_beta = None
-    if total_stock_value > 0:
-        portfolio_beta = weighted_beta_sum / total_stock_value
+    # Calculate portfolio metrics
+    net_market_exposure, portfolio_beta, short_percentage = calculate_portfolio_metrics(
+        long_value=long_value, short_value=short_value
+    )
 
-    # Create and return summary
+    # Calculate total value
+    total_value = (
+        abs(long_stocks["value"])
+        + abs(short_stocks["value"])
+        + abs(long_options["value"])
+        + abs(short_options["value"])
+        + cash_value
+        + unknown_value
+        + portfolio.pending_activity_value
+    )
+
+    # Cash percentage calculation removed (not in PortfolioSummary yet)
+
+    # Create and return the portfolio summary
     summary = PortfolioSummary(
         total_value=total_value,
-        stock_value=stock_value,
-        option_value=option_value,
+        stock_value=abs(long_stocks["value"]) + abs(short_stocks["value"]),
+        option_value=abs(long_options["value"]) + abs(short_options["value"]),
         cash_value=cash_value,
         unknown_value=unknown_value,
         pending_activity_value=portfolio.pending_activity_value,
@@ -569,9 +621,7 @@ def create_portfolio_summary(portfolio: Portfolio) -> PortfolioSummary:
         portfolio_beta=portfolio_beta,
     )
 
-    logger.debug(
-        f"Portfolio summary: total value = {total_value:.2f}, beta = {portfolio_beta}"
-    )
+    logger.debug("Portfolio summary created successfully")
     return summary
 
 
@@ -607,29 +657,54 @@ def get_portfolio_exposures(portfolio: Portfolio) -> dict:
 
     # Process stock positions
     for position in portfolio.stock_positions:
-        if position.quantity > 0:
-            exposures["long_stock_exposure"] += position.market_value
-        else:
-            exposures["short_stock_exposure"] += abs(position.market_value)
+        # Calculate stock exposure using the calculation module
+        market_exposure = calculate_stock_exposure(position.quantity, position.price)
 
         # Get beta for exposure calculation
         try:
             beta = stockdata.get_beta(position.ticker)
-            exposures["beta_adjusted_exposure"] += position.market_value * beta
         except Exception as e:
             logger.warning(f"Could not calculate beta for {position.ticker}: {e}")
-            # Use beta of 1.0 as fallback
-            exposures["beta_adjusted_exposure"] += position.market_value * 1.0
+            beta = 1.0  # Use beta of 1.0 as fallback
+
+        # Calculate beta-adjusted exposure
+        beta_adjusted = calculate_beta_adjusted_exposure(market_exposure, beta)
+        exposures["beta_adjusted_exposure"] += beta_adjusted
+
+        if market_exposure > 0:
+            exposures["long_stock_exposure"] += market_exposure
+        else:
+            exposures["short_stock_exposure"] += abs(market_exposure)
 
     # Process option positions
     for position in portfolio.option_positions:
-        if position.quantity > 0:
-            exposures["long_option_exposure"] += position.market_value
-        else:
-            exposures["short_option_exposure"] += abs(position.market_value)
+        # Get underlying price and beta
+        try:
+            underlying_price = stockdata.get_price(position.ticker)
+            beta = stockdata.get_beta(position.ticker)
+        except Exception as e:
+            logger.warning(f"Could not get market data for {position.ticker}: {e}")
+            # Fallback to using strike as proxy for underlying price
+            underlying_price = position.strike
+            beta = 1.0  # Use beta of 1.0 as fallback
 
-        # Delta-adjusted exposure would be calculated here
-        # For now, we're just adding the market value
+        # Calculate option exposures using the calculation modules
+        delta = calculate_option_delta(
+            option_type=position.option_type,
+            strike=position.strike,
+            expiry=position.expiry,
+            underlying_price=underlying_price,
+        )
+        market_exposure = calculate_option_exposure(
+            quantity=position.quantity, underlying_price=underlying_price, delta=delta
+        )
+        beta_adjusted = calculate_beta_adjusted_exposure(market_exposure, beta)
+        exposures["beta_adjusted_exposure"] += beta_adjusted
+
+        if market_exposure > 0:
+            exposures["long_option_exposure"] += market_exposure
+        else:
+            exposures["short_option_exposure"] += abs(market_exposure)
 
     # Calculate net market exposure
     exposures["net_market_exposure"] = (
