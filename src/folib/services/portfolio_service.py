@@ -285,7 +285,7 @@ def process_portfolio(
                 raw_data=holding.__dict__,
             )
             positions.append(unknown_position)
-            logger.warning(f"Identified unknown position: {holding.symbol}")
+            logger.debug(f"Identified unknown position: {holding.symbol}")
 
     # For backward compatibility during migration
     # We don't use the groups directly, but we create them for logging purposes
@@ -559,7 +559,7 @@ def create_portfolio_summary(portfolio: Portfolio) -> PortfolioSummary:
 
         else:  # unknown
             unknown_value += position_value
-            logger.warning(f"Unknown position type for {position.ticker}")
+            logger.debug(f"Unknown position type for {position.ticker}")
 
     # Create exposure breakdowns using portfolio_value module
     long_value, short_value, options_value = create_value_breakdowns(

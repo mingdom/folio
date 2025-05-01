@@ -313,11 +313,15 @@ class StockOracle:
         if not is_valid_stock_symbol(ticker):
             raise ValueError(f"Invalid stock symbol format: {ticker}")
 
+        logger.debug(f"Getting price for {ticker} using {self.provider_name} provider")
+
         # Get historical data for the most recent day
         historical_data = self.get_historical_data(ticker, period="1d")
 
         # Extract the current price
-        return get_current_price(historical_data)
+        price = get_current_price(historical_data)
+        logger.debug(f"Current price for {ticker}: ${price:.2f}")
+        return price
 
     def get_beta(self, ticker: str) -> float | None:
         """
@@ -356,15 +360,25 @@ class StockOracle:
             cache_path = cache.get_beta_cache_path(ticker)
             beta = cache.read_value_from_cache(cache_path)
             if beta is not None:
+                logger.debug(f"Using cached beta value for {ticker}: {beta:.2f}")
                 return beta
+            else:
+                logger.debug(f"No valid cache found for beta value of {ticker}")
 
         # Try to get beta directly from the provider
+        logger.debug(f"Fetching beta for {ticker} from {self.provider_name} provider")
         beta = self.provider.try_get_beta_from_provider(ticker)
         if beta is not None:
+            logger.debug(f"Got beta value for {ticker} from provider: {beta:.2f}")
             # Cache the result if possible
             if cache and isinstance(cache, DataCache):
                 cache.write_value_to_cache(beta, cache_path)
+                logger.debug(f"Cached beta value for {ticker}")
             return beta
+        else:
+            logger.debug(
+                f"Provider {self.provider_name} could not provide beta for {ticker}, will calculate manually"
+            )
 
         # If provider beta retrieval failed, calculate it manually
         logger.debug(f"Calculating beta manually for {ticker}")

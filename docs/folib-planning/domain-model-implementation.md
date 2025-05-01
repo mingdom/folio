@@ -363,7 +363,7 @@ def process_portfolio(
                 cost_basis=holding.cost_basis_total,
             )
             positions.append(unknown_position)
-            logger.warning(f"Identified unknown position: {holding.symbol}")
+            logger.debug(f"Identified unknown position: {holding.symbol}")
 
     # Create and return the portfolio
     portfolio = Portfolio(

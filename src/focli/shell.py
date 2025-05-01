@@ -5,6 +5,7 @@ This module provides the main entry point for the Folio CLI interactive shell.
 """
 
 import argparse
+import logging
 import os
 import traceback
 
@@ -12,10 +13,29 @@ from prompt_toolkit import PromptSession
 from prompt_toolkit.completion import NestedCompleter
 from prompt_toolkit.history import FileHistory
 from rich.console import Console
+from rich.logging import RichHandler
 
 from src.focli.commands import execute_command, get_command_registry
 from src.focli.commands.simulate import simulate_command
 from src.focli.utils import load_portfolio
+
+# Configure logging
+# Set root logger to INFO level to capture all logs
+root_logger = logging.getLogger()
+root_logger.setLevel(logging.INFO)
+
+# Remove any existing handlers to avoid duplicates
+for handler in root_logger.handlers[:]:
+    root_logger.removeHandler(handler)
+
+# Add Rich handler to root logger
+rich_handler = RichHandler(rich_tracebacks=True, show_path=False)
+rich_handler.setFormatter(logging.Formatter("%(message)s"))
+root_logger.addHandler(rich_handler)
+
+# Get logger for this module
+logger = logging.getLogger("focli")
+logger.info("Logger initialized with level INFO for local environment")
 
 
 def create_completer():
@@ -100,6 +120,9 @@ def main():
 
     console = Console()
 
+    # Log application start
+    logger.info("Starting Folio CLI interactive shell...")
+
     # Initialize application state
     state = initialize_state()
 
@@ -127,7 +150,6 @@ def main():
             return
 
     # Regular interactive mode
-    console.print("[bold cyan]Folio Interactive Shell[/bold cyan]")
     console.print("Type 'help' for available commands.")
 
     # Create history file in user's home directory
