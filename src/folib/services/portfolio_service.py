@@ -3,184 +3,56 @@ Portfolio processing service.
 
 This module provides high-level functions for portfolio processing, including:
 - Processing raw portfolio holdings into a structured portfolio
-- Grouping and filtering positions by various criteria
+- Creating portfolio groups that combine related positions
 - Calculating portfolio summary metrics
 - Computing exposure metrics for risk analysis
 
-Key functions:
-- process_portfolio: Convert raw portfolio data into a structured portfolio
-- create_portfolio_summary: Generate summary metrics for a portfolio
-- group_positions_by_ticker: Group positions by underlying ticker
-- get_portfolio_exposures: Calculate exposures for a portfolio
+Migration Plan Notes:
+---------------------
+This module is part of Phase 1 of the folib migration plan, focusing on Portfolio Loading E2E.
+It replaces the portfolio processing functionality in src/folio/portfolio.py with a cleaner,
+more maintainable design that separates data processing from data loading.
+
+Key differences from the old implementation:
+- Uses immutable data structures for thread safety and predictability
+- Separates portfolio processing from CSV loading
+- Provides clear interfaces between components
+- Uses composition over inheritance
+- Follows functional programming principles where possible
+
+Old Codebase References:
+------------------------
+- src/folio/portfolio.py: Contains the original process_portfolio_data function
+- src/folio/portfolio_value.py: Contains functions for calculating portfolio values and metrics
+- src/folio/data_model.py: Contains the original Position, PortfolioGroup, and PortfolioSummary classes
+
+Potential Issues:
+----------------
+- The old codebase mixed data loading with business logic
+- The old implementation used mutable classes, while the new design uses immutable dataclasses
+- Some field types have changed (e.g., expiry is now a date object instead of a string)
+- The old implementation had many computed properties that are now moved to utility functions
 """
 
 import logging
 import re
 from datetime import date
-from typing import Literal, cast
+from typing import Literal
 
 import pandas as pd
 
-from ..calculations import (
-    calculate_beta_adjusted_exposure,
-    calculate_option_delta,
-    calculate_option_exposure,
-    calculate_portfolio_metrics,
-    calculate_stock_exposure,
-    create_value_breakdowns,
-)
 from ..data.stock import stockdata
 from ..domain import (
-    CashPosition,
     OptionPosition,
     Portfolio,
     PortfolioGroup,
     PortfolioHolding,
     PortfolioSummary,
-    Position,
     StockPosition,
-    UnknownPosition,
 )
 
 # Set up logging
 logger = logging.getLogger(__name__)
-
-
-# Helper functions for working with positions
-
-
-def group_positions_by_ticker(positions: list[Position]) -> dict[str, list[Position]]:
-    """
-    Group positions by ticker symbol.
-
-    Args:
-        positions: List of positions to group
-
-    Returns:
-        Dictionary mapping ticker symbols to lists of positions
-    """
-    grouped = {}
-    for position in positions:
-        if position.ticker not in grouped:
-            grouped[position.ticker] = []
-        grouped[position.ticker].append(position)
-    return grouped
-
-
-def get_positions_by_ticker(positions: list[Position], ticker: str) -> list[Position]:
-    """
-    Get all positions for a specific ticker.
-
-    Args:
-        positions: List of positions to search
-        ticker: Ticker symbol to match
-
-    Returns:
-        List of positions with the specified ticker
-    """
-    return [p for p in positions if p.ticker == ticker]
-
-
-def get_stock_position_by_ticker(
-    positions: list[Position], ticker: str
-) -> StockPosition | None:
-    """
-    Get the stock position for a specific ticker.
-
-    Args:
-        positions: List of positions to search
-        ticker: Ticker symbol to match
-
-    Returns:
-        StockPosition if found, None otherwise
-    """
-    for p in positions:
-        if p.position_type == "stock" and p.ticker == ticker:
-            return cast(StockPosition, p)
-    return None
-
-
-def get_option_positions_by_ticker(
-    positions: list[Position], ticker: str
-) -> list[OptionPosition]:
-    """
-    Get all option positions for a specific ticker.
-
-    Args:
-        positions: List of positions to search
-        ticker: Ticker symbol to match
-
-    Returns:
-        List of option positions with the specified ticker
-    """
-    return [
-        cast(OptionPosition, p)
-        for p in positions
-        if p.position_type == "option" and p.ticker == ticker
-    ]
-
-
-def get_positions_by_type(
-    positions: list[Position],
-    position_type: Literal["stock", "option", "cash", "unknown"],
-) -> list[Position]:
-    """
-    Get all positions of a specific type.
-
-    Args:
-        positions: List of positions to search
-        position_type: Type of positions to return
-
-    Returns:
-        List of positions with the specified type
-    """
-    return [p for p in positions if p.position_type == position_type]
-
-
-# For backward compatibility during migration
-def create_portfolio_groups_from_positions(
-    positions: list[Position],
-) -> list[PortfolioGroup]:
-    """
-    Create portfolio groups from a list of positions.
-
-    This function is provided for backward compatibility during migration.
-    New code should use the helper functions above instead.
-
-    Args:
-        positions: List of positions to group
-
-    Returns:
-        List of portfolio groups
-    """
-    # Group positions by ticker
-    grouped = group_positions_by_ticker(positions)
-    groups = []
-
-    for ticker, ticker_positions in grouped.items():
-        # Find stock position
-        stock_position = None
-        for p in ticker_positions:
-            if p.position_type == "stock":
-                stock_position = cast(StockPosition, p)
-                break
-
-        # Find option positions
-        option_positions = [
-            cast(OptionPosition, p)
-            for p in ticker_positions
-            if p.position_type == "option"
-        ]
-
-        # Create group
-        group = PortfolioGroup(
-            ticker=ticker,
-            stock_position=stock_position,
-            option_positions=option_positions,
-        )
-        groups.append(group)
-
-    return groups
 
 
 def process_portfolio(
@@ -194,16 +66,17 @@ def process_portfolio(
 
     This function transforms raw portfolio holdings into a structured portfolio by:
     1. Identifying cash-like positions
-    2. Identifying stock and option positions
-    3. Identifying unknown/invalid positions
-    4. Creating a portfolio object with all positions
+    2. Identifying unknown/invalid positions
+    3. Grouping related positions (stocks with their options)
+    4. Creating a portfolio object with groups, cash positions, and unknown positions
 
     Args:
         holdings: List of portfolio holdings from parse_portfolio_holdings()
+        market_oracle: Market data oracle for fetching prices and other market data
         update_prices: Whether to update prices from market data (default: True)
 
     Returns:
-        Processed portfolio with all positions
+        Processed portfolio with structured groups, cash positions, and unknown positions
     """
     logger.debug("Processing portfolio with %d holdings", len(holdings))
 
@@ -213,83 +86,50 @@ def process_portfolio(
     # Filter out pending activity from holdings
     filtered_holdings = [h for h in holdings if not _is_pending_activity(h.symbol)]
 
-    # Process holdings into positions
-    positions = []
+    # Separate cash-like positions and unknown positions
+    non_cash_holdings = []
+    cash_positions = []
+    unknown_positions = []
 
     for holding in filtered_holdings:
         # Check for cash-like positions
         if stockdata.is_cash_like(holding.symbol, holding.description):
-            # Convert to CashPosition
-            cash_position = CashPosition(
+            # Convert to StockPosition for cash-like holdings
+            cash_position = StockPosition(
                 ticker=holding.symbol,
                 quantity=holding.quantity,
                 price=holding.price,
                 cost_basis=holding.cost_basis_total,
-                raw_data=holding.__dict__,
             )
-            positions.append(cash_position)
+            cash_positions.append(cash_position)
             logger.debug(f"Identified cash-like position: {holding.symbol}")
-
         # Check for option positions
         elif _is_valid_option_symbol(holding.symbol, holding.description):
-            # Extract option data
-            try:
-                option_data = _extract_option_data(holding)
-                if option_data:
-                    ticker, strike, expiry, option_type, quantity = option_data
-                    option_position = OptionPosition(
-                        ticker=ticker,
-                        quantity=quantity,
-                        price=holding.price,
-                        strike=strike,
-                        expiry=expiry,
-                        option_type=option_type,
-                        cost_basis=holding.cost_basis_total,
-                        raw_data=holding.__dict__,
-                    )
-                    positions.append(option_position)
-                    logger.debug(f"Identified option position: {holding.symbol}")
-            except Exception as e:
-                # If we can't parse the option data, treat it as an unknown position
-                logger.warning(f"Could not parse option data for {holding.symbol}: {e}")
-                unknown_position = UnknownPosition(
-                    ticker=holding.symbol,
-                    quantity=holding.quantity,
-                    price=holding.price,
-                    description=holding.description,
-                    cost_basis=holding.cost_basis_total,
-                    raw_data=holding.__dict__,
-                )
-                positions.append(unknown_position)
-
-        # Check for stock positions
+            # Options will be processed in create_portfolio_groups
+            non_cash_holdings.append(holding)
+            logger.debug(f"Identified option position: {holding.symbol}")
         elif stockdata.is_valid_stock_symbol(holding.symbol):
-            stock_position = StockPosition(
-                ticker=holding.symbol,
-                quantity=holding.quantity,
-                price=holding.price,
-                cost_basis=holding.cost_basis_total,
-                raw_data=holding.__dict__,
-            )
-            positions.append(stock_position)
             logger.debug(f"Identified stock position: {holding.symbol}")
-
-        # Unknown positions
+            non_cash_holdings.append(holding)
+        # Check for unknown/invalid positions
         else:
-            unknown_position = UnknownPosition(
-                ticker=holding.symbol,
-                quantity=holding.quantity,
-                price=holding.price,
-                description=holding.description,
-                cost_basis=holding.cost_basis_total,
-                raw_data=holding.__dict__,
-            )
-            positions.append(unknown_position)
-            logger.debug(f"Identified unknown position: {holding.symbol}")
+            unknown_positions.append(holding)
+            logger.warning(f"Identified unknown/invalid position: {holding.symbol}")
 
-    # For backward compatibility during migration
-    # We don't use the groups directly, but we create them for logging purposes
-    _ = create_portfolio_groups_from_positions(positions)
+    # Create portfolio groups from non-cash, non-unknown holdings
+    groups = create_portfolio_groups(non_cash_holdings)
+    logger.debug(f"Created {len(groups)} portfolio groups")
+
+    # Create positions list from groups
+    positions = []
+    for group in groups:
+        if group.stock_position:
+            positions.append(group.stock_position)
+        positions.extend(group.option_positions)
+
+    # Add cash and unknown positions
+    positions.extend(cash_positions)
+    positions.extend(unknown_positions)
 
     # Create and return the portfolio
     portfolio = Portfolio(
@@ -297,16 +137,8 @@ def process_portfolio(
         pending_activity_value=pending_activity_value,
     )
 
-    # Log portfolio statistics
-    stock_positions = [p for p in positions if p.position_type == "stock"]
-    option_positions = [p for p in positions if p.position_type == "option"]
-    cash_positions = [p for p in positions if p.position_type == "cash"]
-    unknown_positions = [p for p in positions if p.position_type == "unknown"]
-
     logger.debug(
-        f"Portfolio processing complete: {len(positions)} positions "
-        f"({len(stock_positions)} stocks, {len(option_positions)} options, "
-        f"{len(cash_positions)} cash, {len(unknown_positions)} unknown)"
+        f"Portfolio processing complete: {len(groups)} groups, {len(cash_positions)} cash positions, {len(unknown_positions)} unknown positions"
     )
     return portfolio
 
@@ -441,15 +273,25 @@ def create_portfolio_groups(holdings: list[PortfolioHolding]) -> list[PortfolioG
             processed_option_indices.add(i)
 
         if option_positions:
-            # Create portfolio group with just the options
+            # In the old implementation, a placeholder stock position with quantity 0 is created
+            # for options without a matching stock position. This is important for matching
+            # the old implementation's behavior.
+            stock_position = StockPosition(
+                ticker=ticker,
+                quantity=0,
+                price=0.0,
+                cost_basis=0.0,
+            )
+
+            # Create portfolio group with the placeholder stock position and the options
             group = PortfolioGroup(
                 ticker=ticker,
-                stock_position=None,
+                stock_position=stock_position,
                 option_positions=option_positions,
             )
             groups.append(group)
             logger.debug(
-                f"Created orphaned option group for {ticker} with {len(option_positions)} options"
+                f"Created orphaned option group for {ticker} with placeholder stock position and {len(option_positions)} options"
             )
 
     logger.debug(f"Created {len(groups)} portfolio groups")
@@ -465,7 +307,7 @@ def create_portfolio_summary(portfolio: Portfolio) -> PortfolioSummary:
     - Stock value
     - Option value
     - Cash value
-    - Unknown value
+    - Unknown position value
     - Pending activity value
     - Net market exposure
     - Portfolio beta
@@ -477,6 +319,14 @@ def create_portfolio_summary(portfolio: Portfolio) -> PortfolioSummary:
         Portfolio summary with calculated metrics
     """
     logger.debug("Creating portfolio summary")
+
+    # Import calculation functions
+    from ..calculations.exposure import (
+        calculate_beta_adjusted_exposure,
+        calculate_option_exposure,
+        calculate_stock_exposure,
+    )
+    from ..calculations.options import calculate_option_delta
 
     # Initialize exposure breakdowns
     long_stocks = {"value": 0.0, "beta_adjusted": 0.0}
@@ -502,57 +352,73 @@ def create_portfolio_summary(portfolio: Portfolio) -> PortfolioSummary:
 
         # Process based on position type
         if position.position_type == "stock":
-            stock = cast(StockPosition, position)
             # Get beta for exposure calculation
             beta = 1.0
             try:
-                beta = stockdata.get_beta(stock.ticker)
+                beta = stockdata.get_beta(position.ticker)
             except Exception as e:
-                logger.warning(f"Could not get beta for {stock.ticker}: {e}")
+                logger.warning(f"Could not get beta for {position.ticker}: {e}")
 
-            # Calculate exposures using the calculation module
-            market_exposure = calculate_stock_exposure(stock.quantity, stock.price)
+            # In the old implementation, stock values are based on market_value, not calculated exposure
+            # This is a key difference that affects the total stock value calculation
+            position_value = position.market_value
+
+            # Calculate beta-adjusted exposure for reporting
+            market_exposure = calculate_stock_exposure(
+                position.quantity, position.price
+            )
             beta_adjusted = calculate_beta_adjusted_exposure(market_exposure, beta)
 
-            if stock.quantity > 0:
-                long_stocks["value"] += market_exposure
+            if position.quantity > 0:
+                # Use market_value for value calculation, not calculated exposure
+                long_stocks["value"] += position_value
                 long_stocks["beta_adjusted"] += beta_adjusted
             else:
-                short_stocks["value"] += market_exposure  # Already negative
+                # Use market_value for value calculation, not calculated exposure
+                short_stocks["value"] += position_value  # Already negative
                 short_stocks["beta_adjusted"] += beta_adjusted  # Already negative
 
         elif position.position_type == "option":
-            option = cast(OptionPosition, position)
             # Get underlying price and beta
             beta = 1.0
             try:
-                underlying_price = stockdata.get_price(option.ticker)
-                beta = stockdata.get_beta(option.ticker)
+                underlying_price = stockdata.get_price(position.ticker)
+                beta = stockdata.get_beta(position.ticker)
             except Exception as e:
-                logger.warning(f"Could not get market data for {option.ticker}: {e}")
+                logger.warning(f"Could not get market data for {position.ticker}: {e}")
                 # Fallback to using a reasonable proxy for underlying price
-                underlying_price = option.strike  # Using strike as fallback
+                underlying_price = position.strike  # Using strike as fallback
 
             # Calculate option exposures using the calculation module
             delta = calculate_option_delta(
-                option_type=option.option_type,
-                strike=option.strike,
-                expiry=option.expiry,
+                option_type=position.option_type,
+                strike=position.strike,
+                expiry=position.expiry,
                 underlying_price=underlying_price,
             )
             market_exposure = calculate_option_exposure(
-                quantity=option.quantity, underlying_price=underlying_price, delta=delta
+                quantity=position.quantity,
+                underlying_price=underlying_price,
+                delta=delta,
             )
             beta_adjusted = calculate_beta_adjusted_exposure(market_exposure, beta)
 
-            if market_exposure > 0:
+            # In the old implementation (src/folio/portfolio_value.py), options are categorized
+            # based on delta exposure, not quantity or market value:
+            # - Positive delta exposure (long calls, short puts) => Long position
+            # - Negative delta exposure (short calls, long puts) => Short position
+            if market_exposure >= 0:  # Positive delta exposure = Long position
                 long_options["value"] += position_value
                 long_options["beta_adjusted"] += beta_adjusted
                 long_options["delta_exposure"] += market_exposure
-            else:
-                short_options["value"] += position_value
-                short_options["beta_adjusted"] += beta_adjusted
-                short_options["delta_exposure"] += market_exposure
+            else:  # Negative delta exposure = Short position
+                # In the old implementation, short option values are stored as negative values
+                # This is critical for matching the old implementation's behavior
+                short_options["value"] -= position_value  # Store as negative value
+                short_options["beta_adjusted"] += (
+                    beta_adjusted  # Already negative from market_exposure
+                )
+                short_options["delta_exposure"] += market_exposure  # Already negative
 
         elif position.position_type == "cash":
             cash_value += position_value
@@ -560,6 +426,12 @@ def create_portfolio_summary(portfolio: Portfolio) -> PortfolioSummary:
         else:  # unknown
             unknown_value += position_value
             logger.debug(f"Unknown position type for {position.ticker}")
+
+    # Import portfolio calculation functions
+    from ..calculations.portfolio import (
+        calculate_portfolio_metrics,
+        create_value_breakdowns,
+    )
 
     # Create exposure breakdowns using portfolio_value module
     long_value, short_value, options_value = create_value_breakdowns(
@@ -574,7 +446,9 @@ def create_portfolio_summary(portfolio: Portfolio) -> PortfolioSummary:
         long_value=long_value, short_value=short_value
     )
 
-    # Calculate total value
+    # Calculate total value - in the old implementation, the total value includes
+    # the absolute values of stock positions but for options, it uses the raw values
+    # (with short options being negative)
     total_value = (
         abs(long_stocks["value"])
         + abs(short_stocks["value"])
@@ -585,13 +459,14 @@ def create_portfolio_summary(portfolio: Portfolio) -> PortfolioSummary:
         + portfolio.pending_activity_value
     )
 
-    # Cash percentage calculation removed (not in PortfolioSummary yet)
-
     # Create and return the portfolio summary
+    # In the old implementation, option_value is calculated as long_options["value"] + short_options["value"]
+    # Since short_options["value"] is negative, this effectively subtracts the short option value
     summary = PortfolioSummary(
         total_value=total_value,
         stock_value=abs(long_stocks["value"]) + abs(short_stocks["value"]),
-        option_value=abs(long_options["value"]) + abs(short_options["value"]),
+        option_value=long_options["value"]
+        + short_options["value"],  # Note: short_options["value"] is negative
         cash_value=cash_value,
         unknown_value=unknown_value,
         pending_activity_value=portfolio.pending_activity_value,
@@ -622,6 +497,14 @@ def get_portfolio_exposures(portfolio: Portfolio) -> dict:
         Dictionary with exposure metrics
     """
     logger.debug("Calculating portfolio exposures")
+
+    # Import calculation functions
+    from ..calculations.exposure import (
+        calculate_beta_adjusted_exposure,
+        calculate_option_exposure,
+        calculate_stock_exposure,
+    )
+    from ..calculations.options import calculate_option_delta
 
     # Initialize exposure metrics
     exposures = {
@@ -679,6 +562,9 @@ def get_portfolio_exposures(portfolio: Portfolio) -> dict:
         beta_adjusted = calculate_beta_adjusted_exposure(market_exposure, beta)
         exposures["beta_adjusted_exposure"] += beta_adjusted
 
+        # In the old implementation, options are categorized based on delta exposure, not quantity
+        # Long Call / Short Put => Positive Delta Exposure => Long position
+        # Short Call / Long Put => Negative Delta Exposure => Short position
         if market_exposure > 0:
             exposures["long_option_exposure"] += market_exposure
         else:

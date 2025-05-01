@@ -79,17 +79,21 @@ def aggregate_exposures(
     )
 
 
-def calculate_beta_adjusted_exposure(exposure: float, beta: float) -> float:
+def calculate_beta_adjusted_exposure(exposure: float, beta: float | None) -> float:
     """
     Calculate beta-adjusted exposure.
 
     Args:
         exposure: Market exposure
-        beta: Beta value
+        beta: Beta value (defaults to 1.0 if None)
 
     Returns:
         The beta-adjusted exposure
     """
+    # Use beta of 1.0 if None is provided
+    if beta is None:
+        beta = 1.0
+
     return exposure * beta
 
 
