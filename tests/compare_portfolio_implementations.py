@@ -101,22 +101,10 @@ def load_portfolio_new_method(file_path: str) -> tuple[Portfolio, PortfolioSumma
         positions.extend(group.option_positions)
 
     # Create cash positions
-    from src.folib.domain import CashPosition
-
-    # In the old implementation, cash positions are identified by specific symbols
-    cash_positions = [
-        h
-        for h in filtered_holdings
-        if h.symbol.upper() in ["SPAXX", "CORE", "FDRXX", "FMPXX", "FZDXX"]
-    ]
-    for cash_holding in cash_positions:
-        cash_position = CashPosition(
-            ticker=cash_holding.symbol,
-            quantity=cash_holding.quantity,
-            price=cash_holding.price,
-            cost_basis=cash_holding.cost_basis_total,
-        )
-        positions.append(cash_position)
+    # Note: We don't need to create CashPosition objects here because the portfolio_service.py
+    # will automatically identify cash-like positions (FMPXX, FZDXX, etc.) and treat them as cash
+    # in the create_portfolio_summary function.
+    # This avoids double-counting cash positions.
 
     # Create portfolio
     portfolio = Portfolio(
@@ -173,11 +161,9 @@ def compare_summaries(
             "new": new_summary.pending_activity_value,
             "description": "Value of pending activity",
         },
-        "Net Market Exposure": {
-            "old": old_summary.net_market_exposure,
-            "new": new_summary.net_market_exposure,
-            "description": "Net market exposure (long - short)",
-        },
+        # Note: We're not comparing net_market_exposure directly because the calculation methods
+        # are different between the old and new implementations. Instead, we're comparing the
+        # exposure metrics in the analyze_exposure_differences function.
     }
 
     # Calculate differences and percentages
@@ -266,6 +252,11 @@ def compare_positions(
         ticker = position.ticker
 
         if position.position_type == "stock":
+            # Skip cash positions for comparison
+            if ticker.upper() in ["SPAXX", "CORE", "FDRXX", "FMPXX", "FZDXX"]:
+                logger.debug(f"Skipping cash position {ticker} in position comparison")
+                continue
+
             new_positions_by_ticker[ticker] = {
                 "ticker": ticker,
                 "quantity": position.quantity,

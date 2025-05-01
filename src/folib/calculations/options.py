@@ -98,7 +98,9 @@ def calculate_option_price(
     volatility_handle = ql.BlackVolTermStructureHandle(
         ql.BlackConstantVol(
             calculation_date,
-            ql.TARGET(),  # Use TARGET calendar instead of NYSE
+            ql.UnitedStates(
+                ql.UnitedStates.NYSE
+            ),  # Use NYSE calendar to match old implementation
             volatility,
             ql.Actual365Fixed(),
         )
@@ -173,7 +175,9 @@ def calculate_option_delta(
     volatility_handle = ql.BlackVolTermStructureHandle(
         ql.BlackConstantVol(
             calculation_date,
-            ql.TARGET(),  # Use TARGET calendar
+            ql.UnitedStates(
+                ql.UnitedStates.NYSE
+            ),  # Use NYSE calendar to match old implementation
             volatility,
             ql.Actual365Fixed(),
         )

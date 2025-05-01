@@ -94,8 +94,10 @@ def process_portfolio(
     for holding in filtered_holdings:
         # Check for cash-like positions
         if stockdata.is_cash_like(holding.symbol, holding.description):
-            # Convert to StockPosition for cash-like holdings
-            cash_position = StockPosition(
+            # Convert to CashPosition for cash-like holdings
+            from ..domain import CashPosition
+
+            cash_position = CashPosition(
                 ticker=holding.symbol,
                 quantity=holding.quantity,
                 price=holding.price,
@@ -352,6 +354,17 @@ def create_portfolio_summary(portfolio: Portfolio) -> PortfolioSummary:
 
         # Process based on position type
         if position.position_type == "stock":
+            # Check if this is a cash-like position (e.g., money market fund)
+            # In the old implementation, positions like FMPXX and FZDXX are treated as cash
+            if stockdata.is_cash_like(
+                position.ticker, getattr(position, "description", "")
+            ):
+                logger.debug(
+                    f"Treating {position.ticker} as cash position in summary calculation"
+                )
+                cash_value += position_value
+                continue
+
             # Get beta for exposure calculation
             beta = 1.0
             try:
@@ -414,7 +427,9 @@ def create_portfolio_summary(portfolio: Portfolio) -> PortfolioSummary:
             else:  # Negative delta exposure = Short position
                 # In the old implementation, short option values are stored as negative values
                 # This is critical for matching the old implementation's behavior
-                short_options["value"] -= position_value  # Store as negative value
+                short_options["value"] += (
+                    position_value  # Store as is (already negative for short positions)
+                )
                 short_options["beta_adjusted"] += (
                     beta_adjusted  # Already negative from market_exposure
                 )
@@ -446,31 +461,43 @@ def create_portfolio_summary(portfolio: Portfolio) -> PortfolioSummary:
         long_value=long_value, short_value=short_value
     )
 
-    # Calculate total value - in the old implementation, the total value includes
-    # the absolute values of stock positions but for options, it uses the raw values
-    # (with short options being negative)
+    # Calculate total value - in the old implementation, the total value is calculated as:
+    # stock_value + option_value + cash_value + pending_activity_value
+    # where stock_value and option_value preserve the sign of the positions
     total_value = (
-        abs(long_stocks["value"])
-        + abs(short_stocks["value"])
-        + abs(long_options["value"])
-        + abs(short_options["value"])
+        long_stocks["value"]  # Positive value
+        + short_stocks["value"]  # Negative value
+        + long_options["value"]  # Positive value
+        + short_options["value"]  # Negative value
         + cash_value
         + unknown_value
         + portfolio.pending_activity_value
     )
 
     # Create and return the portfolio summary
-    # In the old implementation, option_value is calculated as long_options["value"] + short_options["value"]
-    # Since short_options["value"] is negative, this effectively subtracts the short option value
+    # In the old implementation, stock_value is calculated as the sum of all stock position market values
+    # (with short positions having negative market values)
+    # Option_value is calculated as long_options["value"] + short_options["value"]
+    # (with short_options["value"] being negative)
+
+    # In the old implementation, net_market_exposure is calculated from the exposure breakdowns
+    # which use delta exposure for options, not market value
+    # We need to use the same approach to match the old implementation
+
+    # Calculate exposures using the get_portfolio_exposures function
+    exposures = get_portfolio_exposures(portfolio)
+    old_style_net_exposure = exposures["net_market_exposure"]
+
     summary = PortfolioSummary(
         total_value=total_value,
-        stock_value=abs(long_stocks["value"]) + abs(short_stocks["value"]),
+        stock_value=long_stocks["value"]
+        + short_stocks["value"],  # Sum of all stock values, preserving sign
         option_value=long_options["value"]
         + short_options["value"],  # Note: short_options["value"] is negative
         cash_value=cash_value,
         unknown_value=unknown_value,
         pending_activity_value=portfolio.pending_activity_value,
-        net_market_exposure=net_market_exposure,
+        net_market_exposure=old_style_net_exposure,  # Use the exposure-based calculation
         portfolio_beta=portfolio_beta,
     )
 
@@ -518,6 +545,15 @@ def get_portfolio_exposures(portfolio: Portfolio) -> dict:
 
     # Process stock positions
     for position in portfolio.stock_positions:
+        # Skip cash-like positions (e.g., money market funds)
+        if stockdata.is_cash_like(
+            position.ticker, getattr(position, "description", "")
+        ):
+            logger.debug(
+                f"Skipping cash-like position {position.ticker} in exposure calculation"
+            )
+            continue
+
         # Calculate stock exposure using the calculation module
         market_exposure = calculate_stock_exposure(position.quantity, position.price)
 
