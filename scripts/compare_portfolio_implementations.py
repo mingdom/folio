@@ -623,78 +623,6 @@ def print_exposure_analysis(analysis: dict[str, Any]) -> None:
     console.print(detail_table)
 
 
-def generate_recommendations(
-    summary_metrics: dict[str, dict],
-    position_comparison: dict[str, dict],
-    exposure_analysis: dict[str, Any],
-) -> list[str]:
-    """
-    Generate recommendations based on comparison results.
-
-    Args:
-        summary_metrics: Summary comparison results
-        position_comparison: Position comparison results
-        exposure_analysis: Exposure analysis results
-
-    Returns:
-        List of recommendations
-    """
-    recommendations = []
-
-    # Check for significant summary differences
-    significant_summary_diffs = [
-        k for k, v in summary_metrics.items() if v["significant"]
-    ]
-    if significant_summary_diffs:
-        recommendations.append(
-            f"Investigate significant differences in summary metrics: {', '.join(significant_summary_diffs)}"
-        )
-
-    # Check for missing positions
-    old_only = [k for k, v in position_comparison.items() if v["status"] == "old_only"]
-    new_only = [k for k, v in position_comparison.items() if v["status"] == "new_only"]
-
-    if old_only:
-        recommendations.append(
-            f"Investigate positions present in old implementation but missing in new: {', '.join(old_only)}"
-        )
-
-    if new_only:
-        recommendations.append(
-            f"Investigate positions present in new implementation but missing in old: {', '.join(new_only)}"
-        )
-
-    # Check for exposure differences
-    for key, values in exposure_analysis.items():
-        if key != "Details" and abs(values.get("pct_diff", 0)) > 5.0:
-            recommendations.append(
-                f"Investigate large difference in {key}: {values['pct_diff']:.2f}%"
-            )
-
-    # Add specific recommendations based on patterns
-    if abs(exposure_analysis.get("Net Exposure", {}).get("pct_diff", 0)) > 5.0:
-        recommendations.append(
-            "Review option delta calculation in both implementations - this is likely the source of exposure differences"
-        )
-
-    if abs(summary_metrics.get("Stock Value", {}).get("pct_diff", 0)) > 1.0:
-        recommendations.append(
-            "Check stock position identification logic in both implementations"
-        )
-
-    if abs(summary_metrics.get("Option Value", {}).get("pct_diff", 0)) > 1.0:
-        recommendations.append(
-            "Check option position identification and valuation logic in both implementations"
-        )
-
-    if abs(summary_metrics.get("Cash Value", {}).get("pct_diff", 0)) > 1.0:
-        recommendations.append(
-            "Review cash position identification logic in both implementations"
-        )
-
-    return recommendations
-
-
 def save_old_implementation_cache(old_groups, old_summary, portfolio_path):
     """
     Save the old implementation results to a cache file.
@@ -707,16 +635,23 @@ def save_old_implementation_cache(old_groups, old_summary, portfolio_path):
 
     # Create a hash of the portfolio file path to use in the cache filename
     portfolio_hash = hashlib.md5(portfolio_path.encode()).hexdigest()
-    cache_dir = os.path.join(os.path.dirname(__file__), ".cache")
+
+    # Use a project-relative path for the cache directory
+    # This ensures it works regardless of where the script is located
+    project_root = Path(__file__).parent.parent
+    cache_dir = project_root / ".cache"
     os.makedirs(cache_dir, exist_ok=True)
 
-    cache_file = os.path.join(cache_dir, f"old_implementation_{portfolio_hash}.pkl")
+    cache_file = cache_dir / f"old_implementation_{portfolio_hash}.pkl"
 
     # Save the old implementation results
     with open(cache_file, "wb") as f:
         pickle.dump((old_groups, old_summary), f)
 
     logger.info(f"Saved old implementation results to cache: {cache_file}")
+    console.print(
+        f"[green]Saved old implementation results to cache: {cache_file}[/green]"
+    )
 
 
 def load_old_implementation_cache(portfolio_path):
@@ -732,8 +667,12 @@ def load_old_implementation_cache(portfolio_path):
 
     # Create a hash of the portfolio file path to use in the cache filename
     portfolio_hash = hashlib.md5(portfolio_path.encode()).hexdigest()
-    cache_dir = os.path.join(os.path.dirname(__file__), ".cache")
-    cache_file = os.path.join(cache_dir, f"old_implementation_{portfolio_hash}.pkl")
+
+    # Use a project-relative path for the cache directory
+    # This ensures it works regardless of where the script is located
+    project_root = Path(__file__).parent.parent
+    cache_dir = project_root / ".cache"
+    cache_file = cache_dir / f"old_implementation_{portfolio_hash}.pkl"
 
     # Check if cache file exists
     if not os.path.exists(cache_file):
@@ -779,12 +718,6 @@ def main():
         "-s",
         action="store_true",
         help="Save old implementation results to cache",
-    )
-    parser.add_argument(
-        "--sample-options",
-        type=int,
-        default=5,
-        help="Number of option positions to sample for detailed comparison",
     )
     args = parser.parse_args()
 
@@ -845,30 +778,6 @@ def main():
 
         console.print("\n[bold cyan]Exposure Analysis[/bold cyan]")
         print_exposure_analysis(exposure_analysis)
-
-        # Sample and compare specific option positions
-        if args.sample_options > 0:
-            console.print("\n[bold cyan]Sampling Option Positions[/bold cyan]")
-            detailed_comparisons = sample_option_positions(
-                old_groups, new_portfolio, num_samples=args.sample_options
-            )
-            print_option_samples(detailed_comparisons)
-
-        # Generate recommendations
-        recommendations = generate_recommendations(
-            summary_metrics, position_comparison, exposure_analysis
-        )
-
-        console.print("\n[bold cyan]Recommendations[/bold cyan]")
-        if recommendations:
-            for i, rec in enumerate(recommendations, 1):
-                console.print(f"{i}. {rec}")
-        else:
-            console.print(
-                "[green]No recommendations - implementations appear to be aligned[/green]"
-            )
-
-        return 0
 
     except Exception as e:
         console.print(f"[bold red]Error:[/bold red] {e}")
