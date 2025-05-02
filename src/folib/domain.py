@@ -33,6 +33,17 @@ class Position:
         """Calculate the market value of the position."""
         return self.quantity * self.price
 
+    def to_dict(self) -> dict:
+        """Convert the position to a dictionary for display purposes."""
+        return {
+            "ticker": self.ticker,
+            "quantity": self.quantity,
+            "price": self.price,
+            "position_type": self.position_type,
+            "market_value": self.market_value,
+            "cost_basis": self.cost_basis,
+        }
+
 
 @dataclass(frozen=True)
 class StockPosition(Position):
@@ -89,6 +100,18 @@ class OptionPosition(Position):
         """Calculate the market value of the position."""
         return self.quantity * self.price * 100  # 100 shares per contract
 
+    def to_dict(self) -> dict:
+        """Convert the option position to a dictionary for display purposes."""
+        base_dict = super().to_dict()
+        base_dict.update(
+            {
+                "strike": self.strike,
+                "expiry": self.expiry.isoformat(),
+                "option_type": self.option_type,
+            }
+        )
+        return base_dict
+
 
 @dataclass(frozen=True)
 class CashPosition(Position):
@@ -133,6 +156,16 @@ class UnknownPosition(Position):
         object.__setattr__(self, "description", description)
         object.__setattr__(self, "cost_basis", cost_basis)
         object.__setattr__(self, "raw_data", raw_data)
+
+    def to_dict(self) -> dict:
+        """Convert the unknown position to a dictionary for display purposes."""
+        base_dict = super().to_dict()
+        base_dict.update(
+            {
+                "description": self.description,
+            }
+        )
+        return base_dict
 
 
 @dataclass(frozen=True)
@@ -231,6 +264,19 @@ class PortfolioSummary:
     pending_activity_value: float
     net_market_exposure: float
     portfolio_beta: float | None = None
+
+    def to_dict(self) -> dict:
+        """Convert the portfolio summary to a dictionary for display purposes."""
+        return {
+            "total_value": self.total_value,
+            "stock_value": self.stock_value,
+            "option_value": self.option_value,
+            "cash_value": self.cash_value,
+            "unknown_value": self.unknown_value,
+            "pending_activity_value": self.pending_activity_value,
+            "net_market_exposure": self.net_market_exposure,
+            "portfolio_beta": self.portfolio_beta,
+        }
 
 
 @dataclass(frozen=True)

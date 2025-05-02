@@ -116,7 +116,17 @@ def process_portfolio(
             non_cash_holdings.append(holding)
         # Check for unknown/invalid positions
         else:
-            unknown_positions.append(holding)
+            # Convert to UnknownPosition
+            from ..domain import UnknownPosition
+
+            unknown_position = UnknownPosition(
+                ticker=holding.symbol,
+                quantity=holding.quantity,
+                price=holding.price,
+                description=holding.description,
+                cost_basis=holding.cost_basis_total,
+            )
+            unknown_positions.append(unknown_position)
             logger.warning(f"Identified unknown/invalid position: {holding.symbol}")
 
     # Create portfolio groups from non-cash, non-unknown holdings
@@ -875,6 +885,27 @@ def get_positions_by_type(
         List of positions of the specified type
     """
     return [p for p in positions if p.position_type == position_type]
+
+
+def group_positions_by_ticker(positions: list[Position]) -> dict[str, list[Position]]:
+    """
+    Group positions by ticker symbol.
+
+    This function organizes a list of positions into a dictionary where the keys are
+    ticker symbols and the values are lists of positions with that ticker.
+
+    Args:
+        positions: List of positions to group
+
+    Returns:
+        Dictionary mapping ticker symbols to lists of positions
+    """
+    grouped = {}
+    for position in positions:
+        if position.ticker not in grouped:
+            grouped[position.ticker] = []
+        grouped[position.ticker].append(position)
+    return grouped
 
 
 def create_portfolio_groups_from_positions(
