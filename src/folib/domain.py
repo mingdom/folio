@@ -268,7 +268,8 @@ class PortfolioSummary:
     unknown_value: float
     pending_activity_value: float
     net_market_exposure: float
-    portfolio_beta: float | None = None
+    net_exposure_pct: float
+    beta_adjusted_exposure: float
 
     def to_dict(self) -> dict:
         """Convert the portfolio summary to a dictionary for display purposes."""
@@ -280,7 +281,7 @@ class PortfolioSummary:
             "unknown_value": self.unknown_value,
             "pending_activity_value": self.pending_activity_value,
             "net_market_exposure": self.net_market_exposure,
-            "portfolio_beta": self.portfolio_beta,
+            "beta_adjusted_exposure": self.beta_adjusted_exposure,
         }
 
 

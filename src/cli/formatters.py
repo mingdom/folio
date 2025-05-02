@@ -35,15 +35,13 @@ def format_currency(value: float | Decimal | None, include_sign: bool = False) -
         value = float(value)
 
     # Format with commas and 2 decimal places
-    if abs(value) >= 1_000_000:
-        # Use millions format for large numbers
-        formatted = f"${abs(value) / 1_000_000:.2f}M"
-    else:
-        formatted = f"${abs(value):,.2f}"
+    # Always use full numbers with commas for financial display
+    formatted = f"${abs(value):,.2f}"
 
-    # Add sign
+    # Format according to financial reporting standards
+    # Negative values in brackets, positive values as is
     if value < 0:
-        return f"-{formatted}"
+        return f"({formatted})"  # Negative values in brackets
     elif include_sign and value > 0:
         return f"+{formatted}"
     else:
@@ -71,9 +69,10 @@ def format_percentage(value: float | Decimal | None, include_sign: bool = False)
     # Convert to percentage and format with 2 decimal places
     percentage = value * 100
 
-    # Format the percentage
+    # Format the percentage according to financial reporting standards
+    # Negative values in brackets, positive values as is
     if percentage < 0:
-        return f"-{abs(percentage):.2f}%"
+        return f"({abs(percentage):.2f}%)"  # Negative percentages in brackets
     elif include_sign and percentage > 0:
         return f"+{percentage:.2f}%"
     else:
@@ -98,7 +97,13 @@ def format_quantity(value: float | int | None) -> str:
         return "0"
 
     # Format with commas and no decimal places for whole numbers
-    if value == int(value):
+    # Use brackets for negative values according to financial reporting standards
+    if value < 0:
+        if value == int(value):
+            return f"({abs(int(value)):,})"
+        else:
+            return f"({abs(value):,.2f})"
+    elif value == int(value):
         return f"{int(value):,}"
     else:
         return f"{value:,.2f}"

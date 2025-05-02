@@ -531,6 +531,7 @@ def get_portfolio_exposures(portfolio: Portfolio) -> dict:
     - Short option exposure
     - Net market exposure
     - Beta-adjusted exposure
+    - Total value (for percentage calculations)
 
     Args:
         portfolio: The portfolio to analyze
@@ -548,6 +549,16 @@ def get_portfolio_exposures(portfolio: Portfolio) -> dict:
     )
     from ..calculations.options import calculate_option_delta
 
+    # Calculate total portfolio value for percentage calculations
+    # This is needed for the CLI to calculate percentages correctly
+    total_value = sum(p.market_value for p in portfolio.positions)
+
+    # Add pending activity value if available
+    if portfolio.pending_activity_value is not None and not pd.isna(
+        portfolio.pending_activity_value
+    ):
+        total_value += portfolio.pending_activity_value
+
     # Initialize exposure metrics
     exposures = {
         "long_stock_exposure": 0.0,
@@ -556,6 +567,7 @@ def get_portfolio_exposures(portfolio: Portfolio) -> dict:
         "short_option_exposure": 0.0,
         "net_market_exposure": 0.0,
         "beta_adjusted_exposure": 0.0,
+        "total_value": total_value,  # Add total value for percentage calculations
     }
 
     # Process stock positions

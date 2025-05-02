@@ -24,13 +24,13 @@ def create_value_breakdowns(
         Tuple of (long_value, short_value, options_value)
     """
     # Calculate long value (positive exposure)
-    long_value = abs(long_stocks["value"])
+    long_value = long_stocks["value"]
 
     # Calculate short value (negative exposure)
-    short_value = abs(short_stocks["value"])
+    short_value = short_stocks["value"]
 
     # Calculate options value (both long and short)
-    options_value = abs(long_options["value"]) + abs(short_options["value"])
+    options_value = long_options["value"] + short_options["value"]
 
     return long_value, short_value, options_value
 
