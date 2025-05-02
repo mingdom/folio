@@ -293,15 +293,5 @@ class ExposureMetrics:
     delta_exposure: float | None = None  # For options only
 
 
-# Keep PortfolioGroup for backward compatibility during migration
-@dataclass(frozen=True)
-class PortfolioGroup:
-    """Group of related positions (stock + options).
-
-    Note: This class is deprecated and will be removed in a future version.
-    Use the helper functions in portfolio_service.py instead.
-    """
-
-    ticker: str
-    stock_position: StockPosition | None = None
-    option_positions: list[OptionPosition] = field(default_factory=list)
+# PortfolioGroup class has been removed as part of the migration to the new data model.
+# Use group_positions_by_ticker() from portfolio_service.py instead.

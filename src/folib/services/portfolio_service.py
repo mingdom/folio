@@ -38,7 +38,6 @@ Old Codebase References:
 import logging
 import re
 from datetime import date
-from typing import Literal
 
 import pandas as pd
 
@@ -47,7 +46,6 @@ from ..data.stock import stockdata
 from ..domain import (
     OptionPosition,
     Portfolio,
-    PortfolioGroup,
     PortfolioHolding,
     PortfolioSummary,
     Position,
@@ -129,9 +127,15 @@ def process_portfolio(
             )
             cash_positions.append(cash_position)
             logger.debug(f"Identified cash-like position: {holding.symbol}")
-        # Check for option positions
-        elif _is_valid_option_symbol(holding.symbol, holding.description):
-            # Options will be processed in create_portfolio_groups
+        # Check for option positions - look for option-related terms in description
+        elif (
+            "CALL" in holding.description.upper()
+            or "PUT" in holding.description.upper()
+            or holding.symbol.strip().startswith(
+                "-"
+            )  # Fidelity option symbols start with hyphen
+        ):
+            # Options will be processed later
             non_cash_holdings.append(holding)
             logger.debug(f"Identified option position: {holding.symbol}")
         elif stockdata.is_valid_stock_symbol(holding.symbol):
@@ -152,16 +156,95 @@ def process_portfolio(
             unknown_positions.append(unknown_position)
             logger.info(f"Identified unknown position: {holding.symbol}")
 
-    # Create portfolio groups from non-cash, non-unknown holdings
-    groups = create_portfolio_groups(non_cash_holdings)
-    logger.debug(f"Created {len(groups)} portfolio groups")
-
-    # Create positions list from groups
+    # Process non-cash, non-unknown holdings directly
     positions = []
-    for group in groups:
-        if group.stock_position:
-            positions.append(group.stock_position)
-        positions.extend(group.option_positions)
+
+    # Process stock positions
+    for holding in non_cash_holdings:
+        # Check if this is a stock (not an option)
+        if (
+            "CALL" not in holding.description.upper()
+            and "PUT" not in holding.description.upper()
+            and not holding.symbol.strip().startswith("-")
+        ):
+            # Create stock position
+            stock_position = StockPosition(
+                ticker=holding.symbol,
+                quantity=holding.quantity,
+                price=holding.price,
+                cost_basis=holding.cost_basis_total,
+            )
+            positions.append(stock_position)
+            logger.debug(f"Created stock position for {holding.symbol}")
+
+    # Process option positions
+    for holding in non_cash_holdings:
+        # Check if this is an option
+        if (
+            "CALL" in holding.description.upper()
+            or "PUT" in holding.description.upper()
+            or holding.symbol.strip().startswith("-")
+        ):
+            try:
+                # Extract option data from description
+                description = holding.description
+
+                # Try to extract data from the description (e.g., "AMZN MAY 16 2025 $190 CALL")
+                match = re.search(
+                    r"([A-Z]+)\s+(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\s+(\d{1,2})\s+(\d{4})\s+\$(\d+(?:\.\d+)?)\s+(CALL|PUT)",
+                    description,
+                    re.IGNORECASE,
+                )
+
+                if match:
+                    ticker = match.group(1)
+                    month_str = match.group(2).upper()
+                    day = int(match.group(3))
+                    year = int(match.group(4))
+                    strike = float(match.group(5))
+                    option_type = match.group(6).upper()
+                    quantity = holding.quantity
+
+                    # Convert month string to month number
+                    month_map = {
+                        "JAN": 1,
+                        "FEB": 2,
+                        "MAR": 3,
+                        "APR": 4,
+                        "MAY": 5,
+                        "JUN": 6,
+                        "JUL": 7,
+                        "AUG": 8,
+                        "SEP": 9,
+                        "OCT": 10,
+                        "NOV": 11,
+                        "DEC": 12,
+                    }
+                    month = month_map[month_str]
+
+                    # Create expiry date
+                    expiry = date(year, month, day)
+
+                    # Create option position
+                    option_position = OptionPosition(
+                        ticker=ticker,
+                        quantity=quantity,
+                        strike=strike,
+                        expiry=expiry,
+                        option_type=option_type,
+                        price=holding.price,
+                        cost_basis=holding.cost_basis_total,
+                    )
+                    positions.append(option_position)
+                    logger.debug(f"Created option position for {holding.symbol}")
+                else:
+                    logger.warning(
+                        f"Could not parse option data from description: {description}"
+                    )
+            except Exception as e:
+                logger.warning(
+                    f"Could not create option position for {holding.symbol}: {e}"
+                )
 
     # Add cash and unknown positions
     positions.extend(cash_positions)
@@ -174,174 +257,13 @@ def process_portfolio(
     )
 
     logger.debug(
-        f"Portfolio processing complete: {len(groups)} groups, {len(cash_positions)} cash positions, {len(unknown_positions)} unknown positions"
+        f"Portfolio processing complete: {len(positions)} positions ({len(cash_positions)} cash, {len(unknown_positions)} unknown)"
     )
     return portfolio
 
 
-def create_portfolio_groups(holdings: list[PortfolioHolding]) -> list[PortfolioGroup]:
-    """
-    Create portfolio groups from holdings by matching stocks with related options.
-
-    Group Creation Process:
-    1. Separate stock and option holdings
-    2. Extract option data (strike, expiry, etc.)
-    3. Match options with their underlying stocks
-    4. Create groups with stocks and their related options
-    5. Handle orphaned options (without matching stocks)
-
-    CSV Format Support:
-    - Processes Fidelity-style option symbols (starting with hyphen)
-    - Handles option descriptions in various formats
-    - Creates placeholder stock positions for orphaned options
-
-    Args:
-        holdings: List of portfolio holdings (excluding cash-like positions)
-
-    Returns:
-        list[PortfolioGroup]: Portfolio groups, each containing a stock and its options
-
-    Note:
-        Orphaned options are grouped with a placeholder stock position (quantity=0)
-    """
-    logger.debug("Creating portfolio groups from %d holdings", len(holdings))
-
-    # Separate stock and option holdings
-    stock_holdings = {}
-    option_holdings = []
-
-    for holding in holdings:
-        # Check if this is an option using our option symbol validation
-        if _is_valid_option_symbol(holding.symbol, holding.description):
-            option_holdings.append(holding)
-            logger.debug(f"Identified option: {holding.symbol}")
-        else:
-            # This is a stock
-            stock_holdings[holding.symbol] = holding
-            logger.debug(f"Identified stock: {holding.symbol}")
-
-    # First, extract option data for all options
-    option_data_map = {}
-    for i, option_holding in enumerate(option_holdings):
-        option_data = _extract_option_data(option_holding)
-        if option_data:
-            ticker, strike, expiry, option_type, quantity = option_data
-            option_data_map[i] = {
-                "ticker": ticker,
-                "strike": strike,
-                "expiry": expiry,
-                "option_type": option_type,
-                "quantity": quantity,
-                "holding": option_holding,
-            }
-        else:
-            logger.warning(f"Could not parse option data for: {option_holding.symbol}")
-
-    # Create a map of ticker -> options
-    ticker_to_options = {}
-    for i, data in option_data_map.items():
-        ticker = data["ticker"]
-        if ticker not in ticker_to_options:
-            ticker_to_options[ticker] = []
-        ticker_to_options[ticker].append((i, data))
-
-    # Create groups
-    groups = []
-    processed_option_indices = set()
-
-    # First, process stocks and their related options
-    for symbol, stock_holding in stock_holdings.items():
-        # Create stock position
-        stock_position = StockPosition(
-            ticker=stock_holding.symbol,
-            quantity=stock_holding.quantity,
-            price=stock_holding.price,
-            cost_basis=stock_holding.cost_basis_total,
-        )
-
-        # Find related options
-        option_positions = []
-
-        # Check if we have options for this stock
-        if symbol in ticker_to_options:
-            for i, data in ticker_to_options[symbol]:
-                if i in processed_option_indices:
-                    continue
-
-                # Create option position
-                option_position = OptionPosition(
-                    ticker=data["ticker"],
-                    quantity=data["quantity"],
-                    strike=data["strike"],
-                    expiry=data["expiry"],
-                    option_type=data["option_type"],
-                    price=data["holding"].price,
-                    cost_basis=data["holding"].cost_basis_total,
-                )
-
-                option_positions.append(option_position)
-                processed_option_indices.add(i)
-                logger.debug(
-                    f"Added option for {symbol}: {data['option_type']} {data['strike']} {data['expiry']}"
-                )
-
-        # Create portfolio group
-        group = PortfolioGroup(
-            ticker=symbol,
-            stock_position=stock_position,
-            option_positions=option_positions,
-        )
-        groups.append(group)
-
-    # Process orphaned options (options without a matching stock position)
-    for ticker, options in ticker_to_options.items():
-        # Skip if we already have a stock for this ticker
-        if ticker in stock_holdings:
-            continue
-
-        option_positions = []
-        for i, data in options:
-            if i in processed_option_indices:
-                continue
-
-            # Create option position
-            option_position = OptionPosition(
-                ticker=data["ticker"],
-                quantity=data["quantity"],
-                strike=data["strike"],
-                expiry=data["expiry"],
-                option_type=data["option_type"],
-                price=data["holding"].price,
-                cost_basis=data["holding"].cost_basis_total,
-            )
-
-            option_positions.append(option_position)
-            processed_option_indices.add(i)
-
-        if option_positions:
-            # In the old implementation, a placeholder stock position with quantity 0 is created
-            # for options without a matching stock position. This is important for matching
-            # the old implementation's behavior.
-            stock_position = StockPosition(
-                ticker=ticker,
-                quantity=0,
-                price=0.0,
-                cost_basis=0.0,
-            )
-
-            # Create portfolio group with the placeholder stock position and the options
-            group = PortfolioGroup(
-                ticker=ticker,
-                stock_position=stock_position,
-                option_positions=option_positions,
-            )
-            groups.append(group)
-            logger.debug(
-                f"Created orphaned option group for {ticker} with placeholder stock position and {len(option_positions)} options"
-            )
-
-    logger.debug(f"Created {len(groups)} portfolio groups")
-    return groups
+# create_portfolio_groups function has been removed as part of the migration to the new data model.
+# Use group_positions_by_ticker() instead.
 
 
 def create_portfolio_summary(portfolio: Portfolio) -> PortfolioSummary:
@@ -797,116 +719,10 @@ def get_pending_activity(holding: PortfolioHolding) -> float:
     return pending_activity_value
 
 
-def _is_valid_option_symbol(symbol: str, description: str = "") -> bool:
-    """
-    Check if a symbol is a valid option symbol in Fidelity's format.
-
-    Fidelity option symbols typically:
-    - Start with a hyphen
-    - Are followed by the underlying ticker
-    - Have a date code (YYMMDD)
-    - Have option type (C/P)
-    - End with the strike price
-
-    Args:
-        symbol: The symbol to check
-        description: Optional description to check for option-related terms
-
-    Returns:
-        True if the symbol appears to be a valid option symbol
-    """
-    if not symbol:
-        return False
-
-    # Check if symbol starts with a hyphen (Fidelity format for options)
-    if symbol.strip().startswith("-"):
-        # Fidelity option symbols start with a hyphen
-        return True
-
-    # Also check description for option-related terms
-    if description:
-        return _is_option_description(description)
-
-    return False
-
-
-def _is_option_description(description: str) -> bool:
-    """
-    Determine if a description is for an option.
-
-    Args:
-        description: The description to check
-
-    Returns:
-        True if the description is for an option, False otherwise
-    """
-    option_patterns = [
-        r"\b(CALL|PUT)\b",
-        r"\b(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\s+\d{1,2}\s+\d{4}\b",
-        r"\$\d+(\.\d+)?\s+(CALL|PUT)\b",
-    ]
-
-    for pattern in option_patterns:
-        if re.search(pattern, description, re.IGNORECASE):
-            return True
-
-    return False
-
-
-def _extract_option_data(
-    option_holding: PortfolioHolding,
-) -> tuple[str, float, date, Literal["CALL", "PUT"], float] | None:
-    """
-    Extract option data from a holding.
-
-    Args:
-        option_holding: The option holding
-        underlying_ticker: The underlying ticker (if known)
-
-    Returns:
-        Tuple of (ticker, strike, expiry, option_type, quantity) or None if parsing fails
-    """
-    description = option_holding.description
-    symbol = option_holding.symbol.strip()
-    quantity = option_holding.quantity
-
-    # Try to extract data from the description (e.g., "AMZN MAY 16 2025 $190 CALL")
-    match = re.search(
-        r"([A-Z]+)\s+(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\s+(\d{1,2})\s+(\d{4})\s+\$(\d+(?:\.\d+)?)\s+(CALL|PUT)",
-        description,
-        re.IGNORECASE,
-    )
-
-    if not match:
-        raise ValueError(f"Could not parse option data for: {symbol} - {description}")
-
-    ticker = match.group(1)
-    month_str = match.group(2).upper()
-    day = int(match.group(3))
-    year = int(match.group(4))
-    strike = float(match.group(5))
-    option_type = match.group(6).upper()
-
-    # Convert month string to month number
-    month_map = {
-        "JAN": 1,
-        "FEB": 2,
-        "MAR": 3,
-        "APR": 4,
-        "MAY": 5,
-        "JUN": 6,
-        "JUL": 7,
-        "AUG": 8,
-        "SEP": 9,
-        "OCT": 10,
-        "NOV": 11,
-        "DEC": 12,
-    }
-    month = month_map[month_str]
-
-    # Create expiry date
-    expiry = date(year, month, day)
-    return ticker, strike, expiry, option_type, quantity
+# These functions have been removed as part of the migration to the new data model:
+# - _is_valid_option_symbol
+# - _is_option_description
+# - _extract_option_data
 
 
 def get_positions_by_type(
@@ -1029,83 +845,5 @@ def group_positions_by_ticker(positions: list[Position]) -> dict[str, list[Posit
     return grouped
 
 
-def create_portfolio_groups_from_positions(
-    positions: list[Position],
-) -> list[PortfolioGroup]:
-    """
-    Create portfolio groups from a list of positions.
-
-    This function groups related positions (stocks and their options) into PortfolioGroup objects.
-    It's similar to create_portfolio_groups but works with Position objects instead of PortfolioHolding objects.
-
-    Args:
-        positions: List of positions (StockPosition, OptionPosition, etc.)
-
-    Returns:
-        List of portfolio groups, each containing a stock position and its related option positions
-    """
-    logger.debug("Creating portfolio groups from %d positions", len(positions))
-
-    # Separate positions by type
-    stock_positions = get_positions_by_type(positions, "stock")
-    option_positions = get_positions_by_type(positions, "option")
-
-    # Create a map of ticker -> stock position
-    ticker_to_stock = {p.ticker: p for p in stock_positions}
-
-    # Create a map of ticker -> option positions
-    ticker_to_options = {}
-    for option in option_positions:
-        ticker = option.ticker
-        if ticker not in ticker_to_options:
-            ticker_to_options[ticker] = []
-        ticker_to_options[ticker].append(option)
-
-    # Create groups
-    groups = []
-
-    # First, process stocks and their related options
-    for ticker, stock_position in ticker_to_stock.items():
-        # Find related options
-        option_positions = ticker_to_options.get(ticker, [])
-
-        # Create portfolio group
-        group = PortfolioGroup(
-            ticker=ticker,
-            stock_position=stock_position,
-            option_positions=option_positions,
-        )
-        groups.append(group)
-        logger.debug(
-            f"Created portfolio group for {ticker} with {len(option_positions)} options"
-        )
-
-    # Process orphaned options (options without a matching stock position)
-    for ticker, options in ticker_to_options.items():
-        # Skip if we already have a stock for this ticker
-        if ticker in ticker_to_stock:
-            continue
-
-        # Create a placeholder stock position with quantity 0
-        from ..domain import StockPosition
-
-        stock_position = StockPosition(
-            ticker=ticker,
-            quantity=0,
-            price=0.0,
-            cost_basis=0.0,
-        )
-
-        # Create portfolio group with the placeholder stock position and the options
-        group = PortfolioGroup(
-            ticker=ticker,
-            stock_position=stock_position,
-            option_positions=options,
-        )
-        groups.append(group)
-        logger.debug(
-            f"Created orphaned option group for {ticker} with placeholder stock position and {len(options)} options"
-        )
-
-    logger.debug(f"Created {len(groups)} portfolio groups from positions")
-    return groups
+# create_portfolio_groups_from_positions function has been removed as part of the migration to the new data model.
+# Use group_positions_by_ticker() instead.
