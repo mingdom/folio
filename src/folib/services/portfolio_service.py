@@ -563,10 +563,7 @@ def get_portfolio_exposures(portfolio: Portfolio) -> dict:
         calculate_option_exposure,
         calculate_stock_exposure,
     )
-    from ..calculations.options import (
-        calculate_option_delta,
-        categorize_option_by_delta,
-    )
+    from ..calculations.options import calculate_option_delta
 
     # Initialize exposure metrics
     exposures = {
@@ -606,7 +603,8 @@ def get_portfolio_exposures(portfolio: Portfolio) -> dict:
         if market_exposure > 0:
             exposures["long_stock_exposure"] += market_exposure
         else:
-            exposures["short_stock_exposure"] += abs(market_exposure)
+            # Store short exposure with its negative sign
+            exposures["short_stock_exposure"] += market_exposure
 
     # Process option positions
     for position in portfolio.option_positions:
@@ -643,35 +641,28 @@ def get_portfolio_exposures(portfolio: Portfolio) -> dict:
         beta_adjusted = calculate_beta_adjusted_exposure(market_exposure, beta)
         exposures["beta_adjusted_exposure"] += beta_adjusted
 
-        # In the old implementation, options are categorized based on delta exposure, not quantity
-        # Long Call / Short Put => Positive Delta Exposure => Long position
-        # Short Call / Long Put => Negative Delta Exposure => Short position
-        option_category = categorize_option_by_delta(delta)
-
-        # In the old implementation, options are categorized based on delta sign, not quantity
-        # But the exposure value should always be positive for long_option_exposure and short_option_exposure
-        # This is because the sign is implied by the category (long vs short)
-        if (
-            option_category == "long"
-        ):  # Positive delta = Long position (regardless of quantity)
-            # For long exposure, we want a positive value
-            exposures["long_option_exposure"] += abs(market_exposure)
+        # Instead of categorizing options and using abs(), we'll directly use the sign of the exposure
+        # This is more aligned with the principle of storing values with their natural signs
+        if market_exposure > 0:
+            # Positive exposure contributes to long exposure
+            exposures["long_option_exposure"] += market_exposure
             logger.debug(
-                f"Categorized as LONG option exposure in get_portfolio_exposures: {position.ticker} {position.option_type} {position.strike} (delta: {delta}, exposure: {abs(market_exposure)})"
+                f"Added to LONG option exposure: {position.ticker} {position.option_type} {position.strike} (delta: {delta}, exposure: {market_exposure})"
             )
-        else:  # option_category == "short" - Negative delta = Short position (regardless of quantity)
-            # For short exposure, we also want a positive value (will be subtracted in net calculation)
-            exposures["short_option_exposure"] += abs(market_exposure)
+        else:
+            # Negative exposure contributes to short exposure (stored as negative)
+            exposures["short_option_exposure"] += market_exposure
             logger.debug(
-                f"Categorized as SHORT option exposure in get_portfolio_exposures: {position.ticker} {position.option_type} {position.strike} (delta: {delta}, exposure: {abs(market_exposure)})"
+                f"Added to SHORT option exposure: {position.ticker} {position.option_type} {position.strike} (delta: {delta}, exposure: {market_exposure})"
             )
 
-    # Calculate net market exposure
+    # Calculate net market exposure by simply adding all exposures
+    # Since short exposures are stored with negative signs, we can just add them
     exposures["net_market_exposure"] = (
         exposures["long_stock_exposure"]
-        - exposures["short_stock_exposure"]
+        + exposures["short_stock_exposure"]  # Already negative
         + exposures["long_option_exposure"]
-        - exposures["short_option_exposure"]
+        + exposures["short_option_exposure"]  # Already negative
     )
 
     logger.debug(f"Portfolio exposures calculated: {exposures}")

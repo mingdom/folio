@@ -368,7 +368,7 @@ def analyze_exposure_differences(
     # Get exposures from old implementation
     old_net_exposure = old_summary.net_market_exposure
     old_long_exposure = old_summary.long_exposure.total_exposure
-    old_short_exposure = abs(old_summary.short_exposure.total_exposure)
+    old_short_exposure = old_summary.short_exposure.total_exposure  # Keep negative sign
 
     # Log detailed old exposure components
     logger.debug("Old implementation exposure components:")
@@ -379,10 +379,10 @@ def analyze_exposure_differences(
         f"  Long option delta exposure: {old_summary.long_exposure.option_delta_exposure:.2f}"
     )
     logger.debug(
-        f"  Short stock exposure: {abs(old_summary.short_exposure.stock_exposure):.2f}"
+        f"  Short stock exposure: {old_summary.short_exposure.stock_exposure:.2f}"  # Keep negative sign
     )
     logger.debug(
-        f"  Short option delta exposure: {abs(old_summary.short_exposure.option_delta_exposure):.2f}"
+        f"  Short option delta exposure: {old_summary.short_exposure.option_delta_exposure:.2f}"  # Keep negative sign
     )
 
     # Calculate exposures for new implementation
@@ -404,6 +404,7 @@ def analyze_exposure_differences(
 
     # Calculate total long and short exposures
     new_long_exposure = new_long_stock_exposure + new_long_option_exposure
+    # Short exposures are now stored with negative signs, so we just add them
     new_short_exposure = new_short_stock_exposure + new_short_option_exposure
 
     # Compare exposures
@@ -445,14 +446,12 @@ def analyze_exposure_differences(
     analysis["Details"] = {
         "old_long_stock_exposure": old_summary.long_exposure.stock_exposure,
         "old_long_option_exposure": old_summary.long_exposure.option_delta_exposure,
-        "old_short_stock_exposure": abs(old_summary.short_exposure.stock_exposure),
-        "old_short_option_exposure": abs(
-            old_summary.short_exposure.option_delta_exposure
-        ),
+        "old_short_stock_exposure": old_summary.short_exposure.stock_exposure,  # Keep negative sign
+        "old_short_option_exposure": old_summary.short_exposure.option_delta_exposure,  # Keep negative sign
         "new_long_stock_exposure": new_long_stock_exposure,
         "new_long_option_exposure": new_long_option_exposure,
-        "new_short_stock_exposure": new_short_stock_exposure,
-        "new_short_option_exposure": new_short_option_exposure,
+        "new_short_stock_exposure": new_short_stock_exposure,  # Already negative
+        "new_short_option_exposure": new_short_option_exposure,  # Already negative
     }
 
     return analysis
