@@ -43,7 +43,7 @@ def portfolio_load_cmd(
 
     except Exception as e:
         console.print(f"[red]Error loading portfolio:[/red] {e!s}")
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
 
 
 @portfolio_app.command("summary")
@@ -84,7 +84,7 @@ def portfolio_summary_cmd(
 
     except Exception as e:
         console.print(f"[red]Error creating portfolio summary:[/red] {e!s}")
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
 
 
 @portfolio_app.command("list")
@@ -192,7 +192,7 @@ def portfolio_list_cmd(
 
     except Exception as e:
         console.print(f"[red]Error listing positions:[/red] {e!s}")
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
 
 
 # Interactive mode command functions
@@ -224,7 +224,7 @@ def portfolio_load(state, args):
         console.print(f"[red]Error loading portfolio:[/red] {e!s}")
 
 
-def portfolio_summary(state, args):
+def portfolio_summary(state, _args):
     """Display high-level portfolio metrics (interactive mode)."""
     # Check if portfolio is loaded
     if not state.has_portfolio():

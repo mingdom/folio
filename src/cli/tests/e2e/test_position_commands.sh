@@ -39,7 +39,7 @@ echo "PASS: 'position risk' command succeeded"
 
 # Test position risk command with show-greeks option
 echo "Testing 'position risk' command with --show-greeks option..."
-$CLI_CMD position $TEST_TICKER risk --file $DEFAULT_PORTFOLIO --show-greeks > /tmp/position_risk_greeks_output.txt
+$CLI_CMD position risk $TEST_TICKER --file $DEFAULT_PORTFOLIO --show-greeks > /tmp/position_risk_greeks_output.txt
 if [ $? -ne 0 ]; then
     echo "FAIL: 'position risk' command with --show-greeks option failed"
     exit 1

@@ -130,7 +130,7 @@ def position_details_cmd(
 
     except Exception as e:
         console.print(f"[red]Error analyzing position:[/red] {e!s}")
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
 
 
 @position_app.command("risk")
@@ -217,7 +217,7 @@ def position_risk_cmd(
 
     except Exception as e:
         console.print(f"[red]Error analyzing position risk:[/red] {e!s}")
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
 
 
 # Interactive mode command functions

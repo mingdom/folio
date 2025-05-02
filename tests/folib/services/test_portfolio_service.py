@@ -60,7 +60,7 @@ class TestCreatePortfolioSummary:
     """Tests for the create_portfolio_summary function."""
 
     @patch("src.folib.services.portfolio_service.stockdata")
-    @patch("src.folib.services.portfolio_service.calculate_option_delta")
+    @patch("src.folib.calculations.options.calculate_option_delta")
     def test_create_portfolio_summary_with_stock_and_option(
         self, mock_calculate_delta, mock_stockdata, sample_portfolio
     ):
@@ -68,6 +68,7 @@ class TestCreatePortfolioSummary:
         # Arrange
         mock_stockdata.get_price.return_value = 150.0
         mock_stockdata.get_beta.return_value = 1.2
+        mock_stockdata.is_cash_like.return_value = False
         mock_calculate_delta.return_value = 0.6
 
         # Act
@@ -82,14 +83,15 @@ class TestCreatePortfolioSummary:
 
         # Verify the exposure calculations were called correctly
         mock_stockdata.get_beta.assert_called_with("AAPL")
-        mock_calculate_delta.assert_called_once()
+        # The function is called twice, once for exposure calculation and once for categorization
+        assert mock_calculate_delta.call_count == 2
 
 
 class TestGetPortfolioExposures:
     """Tests for the get_portfolio_exposures function."""
 
     @patch("src.folib.services.portfolio_service.stockdata")
-    @patch("src.folib.services.portfolio_service.calculate_option_delta")
+    @patch("src.folib.calculations.options.calculate_option_delta")
     def test_get_portfolio_exposures(
         self, mock_calculate_delta, mock_stockdata, sample_portfolio
     ):

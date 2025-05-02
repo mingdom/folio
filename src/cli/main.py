@@ -41,6 +41,7 @@ def version_callback(value: bool):
     """Print version information and exit."""
     if value:
         from . import __version__
+
         console.print(f"Folio CLI version: {__version__}")
         raise typer.Exit()
 
@@ -48,7 +49,11 @@ def version_callback(value: bool):
 @app.callback()
 def main(
     version: bool = typer.Option(
-        False, "--version", "-v", callback=version_callback, help="Show version and exit"
+        False,
+        "--version",
+        "-v",
+        callback=version_callback,
+        help="Show version and exit",
     ),
 ):
     """

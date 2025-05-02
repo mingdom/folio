@@ -10,9 +10,6 @@ from pathlib import Path
 
 import pandas as pd
 
-# Set up logging
-logger = logging.getLogger(__name__)
-
 from src.folib.data.loader import parse_portfolio_holdings
 from src.folib.services.portfolio_service import (
     create_portfolio_groups_from_positions,
@@ -22,6 +19,9 @@ from src.folib.services.portfolio_service import (
 
 # Import both old and new portfolio processing functions for transition
 from src.folio.portfolio import process_portfolio_data
+
+# Set up logging
+logger = logging.getLogger(__name__)
 
 
 def load_portfolio(path, state, console=None):
