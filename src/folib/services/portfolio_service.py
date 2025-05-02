@@ -7,31 +7,32 @@ This module provides high-level functions for portfolio processing, including:
 - Calculating portfolio summary metrics
 - Computing exposure metrics for risk analysis
 
-Migration Plan Notes:
+Important Implementation Notes:
 ---------------------
-This module is part of Phase 1 of the folib migration plan, focusing on Portfolio Loading E2E.
-It replaces the portfolio processing functionality in src/folio/portfolio.py with a cleaner,
-more maintainable design that separates data processing from data loading.
+1. CSV Structure Handling:
+   - Supports varying CSV formats with different column structures
+   - Handles duplicate columns in CSV headers (e.g. 'Type' appearing twice)
+   - Processes 'Pending Activity' entries with flexible value location
+   - Supports both normal and quoted currency values
 
-Key differences from the old implementation:
-- Uses immutable data structures for thread safety and predictability
-- Separates portfolio processing from CSV loading
-- Provides clear interfaces between components
-- Uses composition over inheritance
-- Follows functional programming principles where possible
+2. Data Processing Flow:
+   - Holdings are first parsed from CSV by the loader module
+   - Holdings are then categorized into different position types
+   - Related positions are grouped (e.g. stocks with their options)
+   - Portfolio summary and exposure metrics are calculated
+   - Special handling for cash-like positions (e.g. SPAXX, FMPXX)
+
+3. Key Features:
+   - Uses immutable data structures for thread safety
+   - Separates data loading from business logic
+   - Provides clear interfaces between components
+   - Follows functional programming principles where possible
 
 Old Codebase References:
 ------------------------
-- src/folio/portfolio.py: Contains the original process_portfolio_data function
-- src/folio/portfolio_value.py: Contains functions for calculating portfolio values and metrics
-- src/folio/data_model.py: Contains the original Position, PortfolioGroup, and PortfolioSummary classes
-
-Potential Issues:
-----------------
-- The old codebase mixed data loading with business logic
-- The old implementation used mutable classes, while the new design uses immutable dataclasses
-- Some field types have changed (e.g., expiry is now a date object instead of a string)
-- The old implementation had many computed properties that are now moved to utility functions
+- src/folio/portfolio.py: Original process_portfolio_data function
+- src/folio/portfolio_value.py: Portfolio value and metric calculations
+- src/folio/data_model.py: Original Position, PortfolioGroup, and PortfolioSummary classes
 """
 
 import logging
@@ -66,20 +67,31 @@ def process_portfolio(
     """
     Process raw portfolio holdings into a structured portfolio.
 
-    This function transforms raw portfolio holdings into a structured portfolio by:
-    1. Identifying cash-like positions
-    2. Identifying unknown/invalid positions
-    3. Identifying pending activity
-    4. Grouping related positions (stocks with their options)
-    5. Creating a portfolio object with groups, cash positions, and unknown positions
+    Processing Steps:
+    1. Identify cash-like positions (SPAXX, FMPXX, etc.)
+    2. Identify unknown/invalid positions
+    3. Process pending activity entries
+       - Handles multiple CSV formats
+       - Checks various columns for pending activity value
+       - Validates only one pending activity entry exists
+    4. Group related positions (stocks with their options)
+    5. Create portfolio object with all positions
+
+    CSV Structure Handling:
+    - Supports varying column structures in input CSVs
+    - Handles pending activity values in different columns
+    - Processes cash positions with special symbols
 
     Args:
         holdings: List of portfolio holdings from parse_portfolio_holdings()
-        market_oracle: Market data oracle for fetching prices and other market data
         update_prices: Whether to update prices from market data (default: True)
+                      Reserved for future implementation.
 
     Returns:
-        Processed portfolio with structured groups, cash positions, and unknown positions
+        Portfolio: Structured portfolio with categorized positions and groups
+
+    Raises:
+        ValueError: If multiple pending activity entries are found
     """
     logger.debug("Processing portfolio with %d holdings", len(holdings))
 
@@ -169,18 +181,28 @@ def process_portfolio(
 
 def create_portfolio_groups(holdings: list[PortfolioHolding]) -> list[PortfolioGroup]:
     """
-    TODO: this logic is overly complicated. Maybe PortfolioGroup is a concept. Or we should be able to do everything in 1 pass.
-    Create portfolio groups from holdings.
+    Create portfolio groups from holdings by matching stocks with related options.
 
-    This function groups related positions (stocks and their options) into PortfolioGroup objects.
-    It identifies options based on their description patterns and matches them to their underlying stocks.
+    Group Creation Process:
+    1. Separate stock and option holdings
+    2. Extract option data (strike, expiry, etc.)
+    3. Match options with their underlying stocks
+    4. Create groups with stocks and their related options
+    5. Handle orphaned options (without matching stocks)
+
+    CSV Format Support:
+    - Processes Fidelity-style option symbols (starting with hyphen)
+    - Handles option descriptions in various formats
+    - Creates placeholder stock positions for orphaned options
 
     Args:
         holdings: List of portfolio holdings (excluding cash-like positions)
-        market_oracle: Market data oracle for fetching prices and other market data
 
     Returns:
-        List of portfolio groups, each containing a stock position and its related option positions
+        list[PortfolioGroup]: Portfolio groups, each containing a stock and its options
+
+    Note:
+        Orphaned options are grouped with a placeholder stock position (quantity=0)
     """
     logger.debug("Creating portfolio groups from %d holdings", len(holdings))
 
@@ -324,23 +346,25 @@ def create_portfolio_groups(holdings: list[PortfolioHolding]) -> list[PortfolioG
 
 def create_portfolio_summary(portfolio: Portfolio) -> PortfolioSummary:
     """
-    Create a summary of portfolio metrics.
+    Create summary metrics for the portfolio including values and exposures.
 
-    This function calculates summary metrics for the portfolio, including:
-    - Total value
-    - Stock value
-    - Option value
-    - Cash value
-    - Unknown position value
-    - Pending activity value
-    - Net market exposure
-    - Portfolio beta
+    Summary Calculation:
+    1. Calculate position values by type (stock, option, cash)
+    2. Process pending activity values
+    3. Calculate exposure metrics
+    4. Compute portfolio beta and market exposure
+
+    Special Handling:
+    - Treats certain symbols as cash (SPAXX, FMPXX, etc.)
+    - Handles NaN values in cash positions
+    - Processes both positive and negative pending activity
+    - Calculates beta-adjusted exposures
 
     Args:
-        portfolio: The portfolio to summarize
+        portfolio: Portfolio to summarize
 
     Returns:
-        Portfolio summary with calculated metrics
+        PortfolioSummary: Summary metrics including values and exposures
     """
     logger.debug("Creating portfolio summary")
 
@@ -737,20 +761,21 @@ def get_pending_activity(holding: PortfolioHolding) -> float:
     """
     Extract pending activity value from a portfolio holding.
 
-    This function extracts the value of pending activity from a holding
-    that has been identified as a pending activity entry.
-
-    It checks multiple columns in the raw data to handle different CSV formats:
-    1. First tries the value already parsed during CSV loading (Current Value column)
-    2. If that's zero, checks Last Price Change column
-    3. If that's not available, checks Today's Gain/Loss Dollar column
-    4. If that's not available, checks Last Price column
+    CSV Column Priority:
+    1. Current Value column (parsed during CSV loading)
+    2. Last Price Change column
+    3. Today's Gain/Loss Dollar column
+    4. Last Price column
 
     Args:
-        holding: A portfolio holding representing pending activity
+        holding: Portfolio holding representing pending activity
 
     Returns:
-        Value of pending activity (positive for incoming funds, negative for outgoing)
+        float: Pending activity value (positive=incoming, negative=outgoing)
+
+    Raises:
+        ValueError: If holding has no raw data
+        AssertionError: If holding is not pending activity
     """
     logger.warning(f"Extracting pending activity value from holding: {holding}")
 

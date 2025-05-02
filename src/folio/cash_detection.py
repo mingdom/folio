@@ -61,7 +61,12 @@ def _is_likely_money_market(
             return True
 
     # Pattern 4: Common short-term treasury ETFs
-    short_term_treasury_etfs = ["BIL", "SHY", "SGOV", "GBIL", "TLT"]
+    short_term_treasury_etfs = [
+        "BIL",
+        "SHY",
+        "SGOV",
+        "GBIL",
+    ]  # TLT is long-term (20+ years), not short-term
     if ticker in short_term_treasury_etfs:
         return True
 
