@@ -224,7 +224,7 @@ def portfolio_load(state, args):
         console.print(f"[red]Error loading portfolio:[/red] {e!s}")
 
 
-def portfolio_summary(state, _args):
+def portfolio_summary(state, args):  # noqa: ARG001
     """Display high-level portfolio metrics (interactive mode)."""
     # Check if portfolio is loaded
     if not state.has_portfolio():

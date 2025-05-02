@@ -20,7 +20,8 @@ help:
 	@echo "  folio       - Start the portfolio dashboard with debug mode enabled"
 	@echo "               Options: portfolio=path/to/file.csv (use custom portfolio file)"
 	@echo "                        log=LEVEL (set logging level: DEBUG, INFO, WARNING, ERROR)"
-	@echo "  focli       - Start the interactive Folio CLI shell for portfolio analysis"
+	@echo "  focli       - Start the legacy interactive Folio CLI shell for portfolio analysis"
+	@echo "  cli         - Start the new interactive Folio CLI shell for portfolio analysis"
 	@echo "  simulate    - Run portfolio simulation using the improved simulator_v2"
 	@echo "  sim         - Alias for simulate (shorter to type)"
 	@echo "               Options: ticker=SYMBOL (focus on a specific ticker)"
@@ -125,7 +126,7 @@ lint:
 --fix:
 
 # Portfolio and CLI Projects
-.PHONY: folio stop-folio port focli simulate
+.PHONY: folio stop-folio port focli cli simulate
 
 # Poetry is used under the hood for all targets
 
@@ -164,6 +165,14 @@ focli:
 		exit 1; \
 	fi
 	@$(POETRY) run python src/focli/focli.py
+
+cli:
+	@echo "Starting new Folio CLI interactive shell..."
+	@if ! command -v $(POETRY) &> /dev/null; then \
+		echo "Poetry not found. Please run 'make env' first."; \
+		exit 1; \
+	fi
+	@$(POETRY) run python -m src.cli
 
 simulate:
 	@echo "Running portfolio simulation with simulator_v2..."
