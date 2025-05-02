@@ -198,6 +198,10 @@ def start_interactive_shell():
             console.print(
                 f"[green]Loaded default portfolio:[/green] {default_portfolio_path}"
             )
+
+            # Display portfolio summary by default
+            console.print("\n[bold]Portfolio Summary:[/bold]")
+            portfolio_summary(state=state, args=[])
         except Exception as e:
             console.print(f"[yellow]Could not load default portfolio:[/yellow] {e!s}")
 
