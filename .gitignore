@@ -84,7 +84,7 @@ src/lab/portfolio.csv
 
 # Personal notes file
 .executive.md
-private-data/*
+private-data/**
 
 # Local documentation folder
 .refs/
