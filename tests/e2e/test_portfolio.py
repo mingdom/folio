@@ -327,10 +327,10 @@ class TestPriceUpdates:
 
     def test_update_portfolio_prices(self, mocker):
         """Test updating prices for portfolio positions."""
-        # Create mock data fetcher
-        mock_data_fetcher = mocker.MagicMock()
-        mock_df = pd.DataFrame({"Close": [150.0]})
-        mock_data_fetcher.fetch_data.return_value = mock_df
+        # Mock stockdata
+        mock_get_price = mocker.patch(
+            "src.folib.data.stock.stockdata.get_price", return_value=150.0
+        )
 
         # Create test portfolio groups
         stock_position = StockPosition(
@@ -373,6 +373,8 @@ class TestPriceUpdates:
         # Update prices
         from src.folio.portfolio import update_portfolio_prices
 
+        # Create a mock data_fetcher for backward compatibility
+        mock_data_fetcher = mocker.MagicMock()
         timestamp = update_portfolio_prices([portfolio_group], mock_data_fetcher)
 
         # Verify the timestamp is returned
@@ -387,8 +389,8 @@ class TestPriceUpdates:
         assert stock_position.market_exposure == 15000.0  # 100 shares * $150
         assert stock_position.beta_adjusted_exposure == 18000.0  # $15000 * 1.2
 
-        # Verify the data fetcher was called correctly
-        mock_data_fetcher.fetch_data.assert_called_with("AAPL", period="1d")
+        # Verify stockdata was called correctly
+        mock_get_price.assert_called_with("AAPL")
 
     def test_update_portfolio_summary_with_prices(self, mocker):
         """Test updating the portfolio summary with the latest prices."""
@@ -461,7 +463,7 @@ class TestPriceUpdates:
         # Verify the price_updated_at timestamp was set
         assert updated_summary.price_updated_at == "2025-04-08T12:34:56.789012"
 
-        # Verify the update_portfolio_prices function was called
+        # Verify the update_portfolio_prices function was called with the correct arguments
         mock_update_prices.assert_called_once_with(portfolio_groups, None)
 
     def test_process_orphaned_options(self):
