@@ -69,8 +69,9 @@ def process_portfolio(
     This function transforms raw portfolio holdings into a structured portfolio by:
     1. Identifying cash-like positions
     2. Identifying unknown/invalid positions
-    3. Grouping related positions (stocks with their options)
-    4. Creating a portfolio object with groups, cash positions, and unknown positions
+    3. Identifying pending activity
+    4. Grouping related positions (stocks with their options)
+    5. Creating a portfolio object with groups, cash positions, and unknown positions
 
     Args:
         holdings: List of portfolio holdings from parse_portfolio_holdings()
@@ -82,18 +83,27 @@ def process_portfolio(
     """
     logger.debug("Processing portfolio with %d holdings", len(holdings))
 
-    # Extract pending activity value using the enhanced public function
-    pending_activity_value = get_pending_activity(holdings)
-
-    # Filter out pending activity from holdings
-    filtered_holdings = [h for h in holdings if not _is_pending_activity(h.symbol)]
-
-    # Separate cash-like positions and unknown positions
+    # Separate different types of holdings
     non_cash_holdings = []
     cash_positions = []
     unknown_positions = []
+    pending_activity_value = 0.0
+    pending_activity_found = False
 
-    for holding in filtered_holdings:
+    for holding in holdings:
+        # Check for pending activity
+        if _is_pending_activity(holding.symbol):
+            if pending_activity_found:
+                raise ValueError(
+                    f"Multiple pending activity holdings found: {holding.symbol}"
+                )
+            pending_activity_value = get_pending_activity(holding)
+            pending_activity_found = True
+            logger.debug(
+                f"Identified pending activity: {holding.symbol} with value {pending_activity_value}"
+            )
+            continue
+
         # Check for cash-like positions
         if stockdata.is_cash_like(holding.symbol, holding.description):
             # Convert to CashPosition for cash-like holdings
@@ -723,12 +733,12 @@ def _is_pending_activity(symbol: str) -> bool:
     return any(pattern in symbol_upper for pattern in pending_patterns)
 
 
-def get_pending_activity(holdings: list[PortfolioHolding]) -> float:
+def get_pending_activity(holding: PortfolioHolding) -> float:
     """
-    Extract pending activity value from portfolio holdings.
+    Extract pending activity value from a portfolio holding.
 
-    This function identifies and calculates the total value of pending activity
-    in the portfolio by examining holdings with "Pending Activity" in their symbol.
+    This function extracts the value of pending activity from a holding
+    that has been identified as a pending activity entry.
 
     It checks multiple columns in the raw data to handle different CSV formats:
     1. First tries the value already parsed during CSV loading (Current Value column)
@@ -737,28 +747,16 @@ def get_pending_activity(holdings: list[PortfolioHolding]) -> float:
     4. If that's not available, checks Last Price column
 
     Args:
-        holdings: List of portfolio holdings from parse_portfolio_holdings()
+        holding: A portfolio holding representing pending activity
 
     Returns:
-        Total value of pending activity (positive for incoming funds, negative for outgoing)
+        Value of pending activity (positive for incoming funds, negative for outgoing)
     """
-    logger.debug("Extracting pending activity value")
+    logger.warning(f"Extracting pending activity value from holding: {holding}")
 
     pending_activity_value = 0.0
 
-    # Find holdings that represent pending activity
-    pending_holdings = [h for h in holdings if _is_pending_activity(h.symbol)]
-
-    if not pending_holdings:
-        raise ValueError("No pending activity found in portfolio holdings")
-
-    if len(pending_holdings) > 1:
-        raise ValueError(
-            f"Multiple pending activity holdings found: {[h.symbol for h in pending_holdings]}"
-        )
-
-    logger.warning(f"Found {pending_holdings} pending activity holdings")
-    holding = pending_holdings[0]
+    assert _is_pending_activity(holding.symbol), "How did we get here!?"
 
     if not holding.raw_data:
         raise ValueError(f"Pending activity holding has no raw data: {holding}")
@@ -770,7 +768,7 @@ def get_pending_activity(holdings: list[PortfolioHolding]) -> float:
                 logger.debug(f"Found pending activity value in {key} column: {value}")
                 pending_activity_value = clean_currency_value(value)
 
-    logger.warning(f"Found pending activity value: {pending_activity_value}")
+    logger.debug(f"Found pending activity value: {pending_activity_value}")
     return pending_activity_value
 
 
