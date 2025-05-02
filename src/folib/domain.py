@@ -26,7 +26,9 @@ class Position:
     price: float
     position_type: Literal["stock", "option", "cash", "unknown"]
     cost_basis: float | None = None
-    raw_data: dict | None = None  # Original CSV data for debugging and recalculation
+    raw_data: dict | None = (
+        None  # Original CSV row data for debugging and recalculation
+    )
 
     @property
     def market_value(self) -> float:
@@ -195,6 +197,9 @@ class PortfolioHolding:
     price: float  # Last Price in the CSV
     value: float  # Current Value in the CSV
     cost_basis_total: float | None = None  # Cost Basis Total in the CSV
+    raw_data: dict | None = (
+        None  # Original CSV row data for debugging and recalculation
+    )
 
     @property
     def market_value(self) -> float:

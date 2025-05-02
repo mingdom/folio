@@ -22,15 +22,18 @@ import pandas as pd
 from rich.console import Console
 from rich.table import Table
 
-# Add the project root to the Python path
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
 # Import old implementation
 # Import new implementation
 from src.folib.data.loader import load_portfolio_from_csv, parse_portfolio_holdings
 from src.folib.domain import Portfolio, PortfolioSummary
 from src.folib.services.portfolio_service import create_portfolio_summary
 from src.folio.portfolio import process_portfolio_data
+
+# Constants
+DEFAULT_PORTFOLIO_CSV = "private-data/portfolios/portfolio-default.csv"
+
+# Add the project root to the Python path
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Set up logging
 logging.basicConfig(
@@ -698,7 +701,7 @@ def main():
         "--portfolio",
         "-p",
         type=str,
-        default="private-data/portfolio-private.csv",
+        default=DEFAULT_PORTFOLIO_CSV,
         help="Path to portfolio CSV file",
     )
     parser.add_argument(
