@@ -87,4 +87,4 @@ src/lab/portfolio.csv
 private-data/*
 
 # Local documentation folder
-.docs/
+.refs/

@@ -92,7 +92,9 @@ class YFinanceDataFetcher(DataFetcherInterface):
 
             # Only use expired cache for expected data errors, not for programming errors
             if os.path.exists(cache_path):
-                logger.warning(f"Using expired cache for {ticker} as fallback")
+                logger.warning(
+                    f"Using expired cache for {ticker} as fallback in {cache_path}"
+                )
                 try:
                     return pd.read_csv(cache_path, index_col=0, parse_dates=True)
                 except (pd.errors.ParserError, pd.errors.EmptyDataError) as cache_e:
