@@ -780,6 +780,12 @@ def main():
         action="store_true",
         help="Save old implementation results to cache",
     )
+    parser.add_argument(
+        "--sample-options",
+        type=int,
+        default=5,
+        help="Number of option positions to sample for detailed comparison",
+    )
     args = parser.parse_args()
 
     # Set logging level
@@ -840,6 +846,14 @@ def main():
         console.print("\n[bold cyan]Exposure Analysis[/bold cyan]")
         print_exposure_analysis(exposure_analysis)
 
+        # Sample and compare specific option positions
+        if args.sample_options > 0:
+            console.print("\n[bold cyan]Sampling Option Positions[/bold cyan]")
+            detailed_comparisons = sample_option_positions(
+                old_groups, new_portfolio, num_samples=args.sample_options
+            )
+            print_option_samples(detailed_comparisons)
+
         # Generate recommendations
         recommendations = generate_recommendations(
             summary_metrics, position_comparison, exposure_analysis
@@ -860,6 +874,400 @@ def main():
         console.print(f"[bold red]Error:[/bold red] {e}")
         logger.exception("Error in comparison script")
         return 1
+
+
+def sample_option_positions(old_groups, new_portfolio, num_samples=5):
+    """
+    Sample specific option positions and compare their calculations in detail.
+
+    Args:
+        old_groups: Portfolio groups from old implementation
+        new_portfolio: Portfolio from new implementation
+        num_samples: Number of option positions to sample
+
+    Returns:
+        List of detailed comparison results for sampled options
+    """
+    logger.info(f"Sampling {num_samples} option positions for detailed comparison")
+
+    # Extract all option positions from old implementation
+    old_options = []
+    for group in old_groups:
+        for opt in group.option_positions:
+            old_options.append(
+                {
+                    "ticker": group.ticker,
+                    "option_type": opt.option_type,
+                    "strike": opt.strike,
+                    "expiry": opt.expiry,
+                    "quantity": opt.quantity,
+                    "delta": getattr(opt, "delta", None),
+                    "delta_exposure": getattr(opt, "delta_exposure", None),
+                    "market_value": opt.market_value,
+                    "position": opt,
+                }
+            )
+
+    # Extract all option positions from new implementation
+    new_options = []
+    for pos in new_portfolio.option_positions:
+        new_options.append(
+            {
+                "ticker": pos.ticker,
+                "option_type": pos.option_type,
+                "strike": pos.strike,
+                "expiry": pos.expiry,
+                "quantity": pos.quantity,
+                "market_value": pos.market_value,
+                "position": pos,
+            }
+        )
+
+    # Try to match options between implementations
+    matched_options = []
+    for old_opt in old_options:
+        for new_opt in new_options:
+            if (
+                old_opt["ticker"] == new_opt["ticker"]
+                and old_opt["option_type"] == new_opt["option_type"]
+                and abs(old_opt["strike"] - new_opt["strike"]) < 0.01
+                and old_opt["quantity"] == new_opt["quantity"]
+            ):
+                matched_options.append((old_opt, new_opt))
+                break
+
+    # If we don't have enough matches, add some unmatched options
+    if len(matched_options) < num_samples:
+        for old_opt in old_options:
+            if len(matched_options) >= num_samples:
+                break
+
+            # Check if this option is already matched
+            already_matched = False
+            for matched_old, _ in matched_options:
+                if (
+                    matched_old["ticker"] == old_opt["ticker"]
+                    and matched_old["option_type"] == old_opt["option_type"]
+                    and matched_old["strike"] == old_opt["strike"]
+                ):
+                    already_matched = True
+                    break
+
+            if not already_matched:
+                # Add with None for new implementation
+                matched_options.append((old_opt, None))
+
+    # If we still don't have enough, add some from new implementation
+    if len(matched_options) < num_samples:
+        for new_opt in new_options:
+            if len(matched_options) >= num_samples:
+                break
+
+            # Check if this option is already matched
+            already_matched = False
+            for _, matched_new in matched_options:
+                if matched_new and (
+                    matched_new["ticker"] == new_opt["ticker"]
+                    and matched_new["option_type"] == new_opt["option_type"]
+                    and matched_new["strike"] == new_opt["strike"]
+                ):
+                    already_matched = True
+                    break
+
+            if not already_matched:
+                # Add with None for old implementation
+                matched_options.append((None, new_opt))
+
+    # Limit to requested number of samples
+    matched_options = matched_options[:num_samples]
+
+    # Calculate detailed metrics for each matched option
+    detailed_comparisons = []
+
+    for old_opt, new_opt in matched_options:
+        comparison = {}
+
+        if old_opt and new_opt:
+            # Both implementations have this option
+            comparison["ticker"] = old_opt["ticker"]
+            comparison["option_type"] = old_opt["option_type"]
+            comparison["strike"] = old_opt["strike"]
+            comparison["expiry"] = old_opt["expiry"]
+            comparison["quantity"] = old_opt["quantity"]
+
+            # Get delta and exposure from old implementation
+            old_delta = old_opt["delta"]
+            old_delta_exposure = old_opt["delta_exposure"]
+
+            # Calculate delta and exposure for new implementation
+            from src.folib.calculations.exposure import calculate_option_exposure
+            from src.folib.calculations.options import calculate_option_delta
+            from src.folib.services.data import stockdata
+
+            try:
+                underlying_price = stockdata.get_price(new_opt["ticker"])
+            except:
+                # Fallback to using strike as proxy
+                underlying_price = new_opt["strike"]
+
+            new_delta = calculate_option_delta(
+                option_type=new_opt["option_type"],
+                strike=new_opt["strike"],
+                expiry=new_opt["expiry"].date()
+                if hasattr(new_opt["expiry"], "date")
+                else new_opt["expiry"],
+                underlying_price=underlying_price,
+                volatility=None,  # Use default
+            )
+
+            new_delta_exposure = calculate_option_exposure(
+                quantity=new_opt["quantity"],
+                underlying_price=underlying_price,
+                delta=new_delta,
+            )
+
+            # Calculate differences
+            delta_diff = (
+                new_delta - old_delta
+                if old_delta is not None and new_delta is not None
+                else None
+            )
+            delta_pct_diff = (
+                ((delta_diff / abs(old_delta)) * 100)
+                if old_delta is not None and old_delta != 0 and delta_diff is not None
+                else None
+            )
+
+            exposure_diff = (
+                new_delta_exposure - old_delta_exposure
+                if old_delta_exposure is not None and new_delta_exposure is not None
+                else None
+            )
+            exposure_pct_diff = (
+                ((exposure_diff / abs(old_delta_exposure)) * 100)
+                if old_delta_exposure is not None
+                and old_delta_exposure != 0
+                and exposure_diff is not None
+                else None
+            )
+
+            comparison["old_delta"] = old_delta
+            comparison["new_delta"] = new_delta
+            comparison["delta_diff"] = delta_diff
+            comparison["delta_pct_diff"] = delta_pct_diff
+
+            comparison["old_delta_exposure"] = old_delta_exposure
+            comparison["new_delta_exposure"] = new_delta_exposure
+            comparison["exposure_diff"] = exposure_diff
+            comparison["exposure_pct_diff"] = exposure_pct_diff
+
+            comparison["status"] = "both"
+
+        elif old_opt:
+            # Only in old implementation
+            comparison["ticker"] = old_opt["ticker"]
+            comparison["option_type"] = old_opt["option_type"]
+            comparison["strike"] = old_opt["strike"]
+            comparison["expiry"] = old_opt["expiry"]
+            comparison["quantity"] = old_opt["quantity"]
+
+            comparison["old_delta"] = old_opt["delta"]
+            comparison["new_delta"] = None
+            comparison["delta_diff"] = None
+            comparison["delta_pct_diff"] = None
+
+            comparison["old_delta_exposure"] = old_opt["delta_exposure"]
+            comparison["new_delta_exposure"] = None
+            comparison["exposure_diff"] = None
+            comparison["exposure_pct_diff"] = None
+
+            comparison["status"] = "old_only"
+
+        elif new_opt:
+            # Only in new implementation
+            comparison["ticker"] = new_opt["ticker"]
+            comparison["option_type"] = new_opt["option_type"]
+            comparison["strike"] = new_opt["strike"]
+            comparison["expiry"] = new_opt["expiry"]
+            comparison["quantity"] = new_opt["quantity"]
+
+            # Calculate delta and exposure for new implementation
+            from src.folib.calculations.exposure import calculate_option_exposure
+            from src.folib.calculations.options import calculate_option_delta
+            from src.folib.services.data import stockdata
+
+            try:
+                underlying_price = stockdata.get_price(new_opt["ticker"])
+            except:
+                # Fallback to using strike as proxy
+                underlying_price = new_opt["strike"]
+
+            new_delta = calculate_option_delta(
+                option_type=new_opt["option_type"],
+                strike=new_opt["strike"],
+                expiry=new_opt["expiry"].date()
+                if hasattr(new_opt["expiry"], "date")
+                else new_opt["expiry"],
+                underlying_price=underlying_price,
+                volatility=None,  # Use default
+            )
+
+            new_delta_exposure = calculate_option_exposure(
+                quantity=new_opt["quantity"],
+                underlying_price=underlying_price,
+                delta=new_delta,
+            )
+
+            comparison["old_delta"] = None
+            comparison["new_delta"] = new_delta
+            comparison["delta_diff"] = None
+            comparison["delta_pct_diff"] = None
+
+            comparison["old_delta_exposure"] = None
+            comparison["new_delta_exposure"] = new_delta_exposure
+            comparison["exposure_diff"] = None
+            comparison["exposure_pct_diff"] = None
+
+            comparison["status"] = "new_only"
+
+        detailed_comparisons.append(comparison)
+
+    return detailed_comparisons
+
+
+def print_option_samples(detailed_comparisons):
+    """
+    Print detailed comparison of sampled option positions.
+
+    Args:
+        detailed_comparisons: List of detailed comparison results
+    """
+    table = Table(title="Sampled Option Positions - Detailed Comparison")
+
+    table.add_column("Ticker", style="cyan")
+    table.add_column("Type", style="cyan")
+    table.add_column("Strike", justify="right")
+    table.add_column("Qty", justify="right")
+    table.add_column("Old Delta", justify="right")
+    table.add_column("New Delta", justify="right")
+    table.add_column("Delta Diff", justify="right")
+    table.add_column("Old Exposure", justify="right")
+    table.add_column("New Exposure", justify="right")
+    table.add_column("Exp Diff", justify="right")
+
+    for comp in detailed_comparisons:
+        # Format values
+        old_delta_str = (
+            f"{comp['old_delta']:.4f}" if comp["old_delta"] is not None else "N/A"
+        )
+        new_delta_str = (
+            f"{comp['new_delta']:.4f}" if comp["new_delta"] is not None else "N/A"
+        )
+        delta_diff_str = (
+            f"{comp['delta_diff']:.4f}" if comp["delta_diff"] is not None else "N/A"
+        )
+
+        old_exposure_str = (
+            f"${comp['old_delta_exposure']:,.2f}"
+            if comp["old_delta_exposure"] is not None
+            else "N/A"
+        )
+        new_exposure_str = (
+            f"${comp['new_delta_exposure']:,.2f}"
+            if comp["new_delta_exposure"] is not None
+            else "N/A"
+        )
+        exposure_diff_str = (
+            f"${comp['exposure_diff']:,.2f}"
+            if comp["exposure_diff"] is not None
+            else "N/A"
+        )
+
+        # Determine row style based on significance
+        significant = False
+        if comp["delta_pct_diff"] is not None and abs(comp["delta_pct_diff"]) > 1.0:
+            significant = True
+        if (
+            comp["exposure_pct_diff"] is not None
+            and abs(comp["exposure_pct_diff"]) > 1.0
+        ):
+            significant = True
+
+        row_style = "red" if significant else None
+
+        table.add_row(
+            comp["ticker"],
+            comp["option_type"],
+            f"{comp['strike']:.2f}",
+            f"{comp['quantity']}",
+            old_delta_str,
+            new_delta_str,
+            delta_diff_str,
+            old_exposure_str,
+            new_exposure_str,
+            exposure_diff_str,
+            style=row_style,
+        )
+
+    console.print(table)
+
+    # Print analysis of the samples
+    console.print("\n[bold cyan]Sample Analysis[/bold cyan]")
+
+    # Count significant differences
+    delta_diff_count = sum(
+        1
+        for c in detailed_comparisons
+        if c["delta_pct_diff"] is not None and abs(c["delta_pct_diff"]) > 1.0
+    )
+    exposure_diff_count = sum(
+        1
+        for c in detailed_comparisons
+        if c["exposure_pct_diff"] is not None and abs(c["exposure_pct_diff"]) > 1.0
+    )
+
+    console.print(
+        f"Options with significant delta differences: {delta_diff_count}/{len(detailed_comparisons)}"
+    )
+    console.print(
+        f"Options with significant exposure differences: {exposure_diff_count}/{len(detailed_comparisons)}"
+    )
+
+    # Analyze patterns in the differences
+    if exposure_diff_count > 0:
+        console.print("\nPatterns in exposure differences:")
+
+        # Check for sign issues
+        sign_issues = 0
+        for comp in detailed_comparisons:
+            if (
+                comp["old_delta_exposure"] is not None
+                and comp["new_delta_exposure"] is not None
+            ):
+                if (
+                    comp["old_delta_exposure"] * comp["new_delta_exposure"] < 0
+                ):  # Different signs
+                    sign_issues += 1
+
+        if sign_issues > 0:
+            console.print(
+                f"- {sign_issues} options have different signs between old and new implementations"
+            )
+
+        # Check for short position issues
+        short_issues = 0
+        for comp in detailed_comparisons:
+            if (
+                comp["quantity"] < 0
+                and comp["exposure_pct_diff"] is not None
+                and abs(comp["exposure_pct_diff"]) > 10.0
+            ):
+                short_issues += 1
+
+        if short_issues > 0:
+            console.print(
+                f"- {short_issues} short positions have large exposure differences (>10%)"
+            )
 
 
 if __name__ == "__main__":
