@@ -453,6 +453,68 @@ class StockOracle:
         """
         return is_valid_stock_symbol(ticker)
 
+    def get_volatility(self, ticker: str) -> float:
+        """
+        Get the historical volatility for a ticker.
+
+        This method calculates the historical volatility (standard deviation of returns)
+        for the given ticker using historical price data.
+
+        Args:
+            ticker: The ticker symbol
+
+        Returns:
+            The historical volatility as a decimal (e.g., 0.25 for 25% volatility)
+
+        Raises:
+            ValueError: If the ticker is invalid or no historical data is available
+        """
+        # Validate ticker
+        if not is_valid_stock_symbol(ticker):
+            raise ValueError(f"Invalid stock symbol format: {ticker}")
+
+        # Check cache first
+        from .cache import DataCache
+
+        cache = getattr(self.provider, "cache", None)
+        if cache and isinstance(cache, DataCache):
+            cache_path = cache.get_volatility_cache_path(ticker)
+            volatility = cache.read_value_from_cache(cache_path)
+            if volatility is not None:
+                logger.debug(
+                    f"Using cached volatility value for {ticker}: {volatility:.2f}"
+                )
+                return volatility
+            else:
+                logger.debug(f"No valid cache found for volatility value of {ticker}")
+
+        try:
+            # Get historical data for the last 30 days
+            df = self.provider.get_historical_data(ticker, period="30d")
+
+            if df.empty:
+                logger.warning(f"No historical data available for {ticker}")
+                # Return a default volatility value
+                return 0.3  # 30% volatility as a reasonable default
+
+            # Calculate daily returns
+            df["Returns"] = df["Close"].pct_change()
+
+            # Calculate volatility (standard deviation of returns)
+            volatility = df["Returns"].std() * (252**0.5)  # Annualized
+
+            # Cache the result
+            if cache and isinstance(cache, DataCache):
+                cache.write_value_to_cache(volatility, cache_path)
+                logger.debug(f"Cached volatility value for {ticker}: {volatility:.2f}")
+
+            return volatility
+
+        except Exception as e:
+            logger.warning(f"Error calculating volatility for {ticker}: {e}")
+            # Return a default volatility value
+            return 0.3  # 30% volatility as a reasonable default
+
     def is_cash_like(self, ticker: str, description: str = "") -> bool:
         """
         Determine if a position should be considered cash or cash-like.

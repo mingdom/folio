@@ -242,3 +242,61 @@ class TestParsePortfolioHoldings:
         # Check that the correct log messages were generated
         mock_logger.debug.assert_any_call("Row 0: Processing Pending Activity row")
         mock_logger.debug.assert_any_call("Found pending activity value: 529535.51")
+
+    def test_parse_portfolio_holdings_with_special_symbols(self):
+        """Test parsing portfolio holdings with special symbols like SPAXX**."""
+        # Create a test DataFrame with a special symbol
+        df = pd.DataFrame(
+            {
+                "Symbol": ["SPAXX**"],
+                "Description": ["FIDELITY GOVERNMENT MONEY MARKET"],
+                "Quantity": [""],
+                "Last Price": [""],
+                "Current Value": ["$51151.25"],
+                "Cost Basis Total": [""],
+            }
+        )
+
+        # Parse the holdings
+        holdings = parse_portfolio_holdings(df)
+        assert len(holdings) == 1
+        assert holdings[0].symbol == "SPAXX"  # ** should be removed
+        assert holdings[0].quantity == 1.0  # Should be set to 1.0 for cash positions
+        assert holdings[0].price == 51151.25  # Should be calculated from value/quantity
+        assert holdings[0].value == 51151.25
+
+    @patch("src.folib.data.loader.logger")
+    def test_parse_portfolio_holdings_with_special_symbols_logging(self, mock_logger):
+        """Test that special symbol cleaning is properly logged."""
+        # Create a test DataFrame with a special symbol
+        df = pd.DataFrame(
+            {
+                "Symbol": ["SPAXX**"],
+                "Description": ["FIDELITY GOVERNMENT MONEY MARKET"],
+                "Quantity": [""],
+                "Last Price": [""],
+                "Current Value": ["$51151.25"],
+                "Cost Basis Total": [""],
+            }
+        )
+
+        # Mock the is_cash_like method to return True
+        with patch("src.folib.data.stock.stockdata.is_cash_like", return_value=True):
+            # Parse the holdings
+            holdings = parse_portfolio_holdings(df)
+            assert len(holdings) == 1
+            assert holdings[0].symbol == "SPAXX"  # ** should be removed
+
+            # Check that the correct log messages were generated
+            mock_logger.debug.assert_any_call(
+                "Row 0: Cleaned up symbol from SPAXX** to SPAXX"
+            )
+            mock_logger.debug.assert_any_call(
+                "Row 0: Identified SPAXX as a cash-like position"
+            )
+            mock_logger.debug.assert_any_call(
+                "Row 0: Set quantity to 1.0 for cash position SPAXX"
+            )
+            mock_logger.debug.assert_any_call(
+                "Row 0: Calculated price for cash position SPAXX: 51151.25"
+            )

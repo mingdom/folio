@@ -127,7 +127,7 @@ def process_portfolio(
                 cost_basis=holding.cost_basis_total,
             )
             unknown_positions.append(unknown_position)
-            logger.warning(f"Identified unknown/invalid position: {holding.symbol}")
+            logger.info(f"Identified unknown position: {holding.symbol}")
 
     # Create portfolio groups from non-cash, non-unknown holdings
     groups = create_portfolio_groups(non_cash_holdings)
@@ -360,11 +360,21 @@ def create_portfolio_summary(portfolio: Portfolio) -> PortfolioSummary:
 
     # Process positions by type
     for position in portfolio.positions:
-        # Skip NaN values
+        # Handle NaN values for cash positions
         position_value = position.market_value
         if pd.isna(position_value):
-            logger.warning(f"Skipping position {position.ticker} with NaN market value")
-            continue
+            if position.position_type == "cash":
+                # For cash positions with NaN value, try to get the value from the CSV file
+                # This is a workaround for SPAXX** and similar cash positions
+                logger.warning(
+                    f"Cash position {position.ticker} has NaN market value, setting to 0"
+                )
+                position_value = 0.0
+            else:
+                logger.warning(
+                    f"Skipping position {position.ticker} with NaN market value"
+                )
+                continue
 
         # Process based on position type
         if position.position_type == "stock":
@@ -513,8 +523,14 @@ def create_portfolio_summary(portfolio: Portfolio) -> PortfolioSummary:
         + short_options["value"]  # Negative value
         + cash_value
         + unknown_value
-        + portfolio.pending_activity_value
     )
+
+    # Handle NaN or None values in pending_activity_value
+    pending_activity = portfolio.pending_activity_value
+    if pending_activity is None or pd.isna(pending_activity):
+        pending_activity = 0.0
+    else:
+        total_value += pending_activity
 
     # Create and return the portfolio summary
     # In the old implementation, stock_value is calculated as the sum of all stock position market values
@@ -538,7 +554,7 @@ def create_portfolio_summary(portfolio: Portfolio) -> PortfolioSummary:
         + short_options["value"],  # Note: short_options["value"] is negative
         cash_value=cash_value,
         unknown_value=unknown_value,
-        pending_activity_value=portfolio.pending_activity_value,
+        pending_activity_value=pending_activity,  # Use the fixed pending_activity value
         net_market_exposure=old_style_net_exposure,  # Use the exposure-based calculation
         portfolio_beta=portfolio_beta,
     )
@@ -885,6 +901,89 @@ def get_positions_by_type(
         List of positions of the specified type
     """
     return [p for p in positions if p.position_type == position_type]
+
+
+def filter_positions_by_criteria(
+    positions: list[Position], criteria: dict[str, str]
+) -> list[Position]:
+    """
+    Filter positions based on criteria.
+
+    Args:
+        positions: List of positions to filter
+        criteria: Dictionary of filter criteria
+            - type: Position type (stock, option, cash, unknown)
+            - symbol: Ticker symbol (exact match)
+            - min_value: Minimum position value
+            - max_value: Maximum position value
+
+    Returns:
+        Filtered list of positions
+    """
+    filtered_positions = positions
+
+    # Apply filters
+    for key, value in criteria.items():
+        if key == "type":
+            filtered_positions = [
+                p for p in filtered_positions if p.position_type == value.lower()
+            ]
+        elif key == "symbol":
+            filtered_positions = [
+                p for p in filtered_positions if p.ticker.upper() == value.upper()
+            ]
+        elif key == "min_value":
+            try:
+                min_value = float(value)
+                filtered_positions = [
+                    p for p in filtered_positions if abs(p.market_value) >= min_value
+                ]
+            except ValueError:
+                logger.warning(f"Invalid min_value: {value}. Skipping filter.")
+        elif key == "max_value":
+            try:
+                max_value = float(value)
+                filtered_positions = [
+                    p for p in filtered_positions if abs(p.market_value) <= max_value
+                ]
+            except ValueError:
+                logger.warning(f"Invalid max_value: {value}. Skipping filter.")
+
+    return filtered_positions
+
+
+def sort_positions(
+    positions: list[Position], sort_by: str = "value", sort_direction: str = "desc"
+) -> list[Position]:
+    """
+    Sort positions by the specified criteria.
+
+    Args:
+        positions: List of positions to sort
+        sort_by: Attribute to sort by (value, symbol, type)
+        sort_direction: Sort direction (asc or desc)
+
+    Returns:
+        Sorted list of positions
+    """
+    # Define sorting key functions
+    sort_keys = {
+        "value": lambda p: abs(p.market_value),
+        "symbol": lambda p: p.ticker.upper(),
+        "type": lambda p: p.position_type,
+    }
+
+    # Get the sorting key function
+    sort_key = sort_keys.get(sort_by.lower(), sort_keys["value"])
+
+    # Sort the positions
+    sorted_positions = sorted(positions, key=sort_key)
+
+    # Reverse if descending
+    if sort_direction.lower() == "desc":
+        sorted_positions.reverse()
+
+    return sorted_positions
 
 
 def group_positions_by_ticker(positions: list[Position]) -> dict[str, list[Position]]:

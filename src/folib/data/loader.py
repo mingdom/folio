@@ -180,6 +180,14 @@ def parse_portfolio_holdings(df: pd.DataFrame) -> list[PortfolioHolding]:
                 logger.debug(f"Row {index}: Skipping row with empty symbol")
                 continue
 
+            # Clean up the symbol - remove ** suffix (common in money market funds like SPAXX**)
+            if "**" in symbol:
+                original_symbol = symbol
+                symbol = symbol.replace("**", "")
+                logger.debug(
+                    f"Row {index}: Cleaned up symbol from {original_symbol} to {symbol}"
+                )
+
             # Special handling for pending activity rows
             is_pending_activity = (
                 symbol.upper() == "PENDING ACTIVITY" or "PENDING" in symbol.upper()
@@ -231,8 +239,38 @@ def parse_portfolio_holdings(df: pd.DataFrame) -> list[PortfolioHolding]:
                 )
                 value = 0.0
 
-            # For cash-like positions with no price but a value, calculate the price
-            if price == 0.0 and value != 0.0 and quantity != 0.0:
+            # Special handling for cash-like positions
+            is_cash_like = stockdata.is_cash_like(symbol, description)
+
+            # For cash-like positions, ensure we have valid quantity and price
+            if is_cash_like:
+                logger.debug(
+                    f"Row {index}: Identified {symbol} as a cash-like position"
+                )
+
+                # For cash positions, set quantity to 1 if it's 0 or NaN
+                if quantity == 0.0 or pd.isna(quantity):
+                    quantity = 1.0
+                    logger.debug(
+                        f"Row {index}: Set quantity to 1.0 for cash position {symbol}"
+                    )
+
+                # If we have a value but no price, calculate price from value and quantity
+                if value != 0.0 and (price == 0.0 or pd.isna(price)):
+                    price = value / quantity
+                    logger.debug(
+                        f"Row {index}: Calculated price for cash position {symbol}: {price}"
+                    )
+
+                # If we have a price but no value, calculate value from price and quantity
+                elif price != 0.0 and (value == 0.0 or pd.isna(value)):
+                    value = price * quantity
+                    logger.debug(
+                        f"Row {index}: Calculated value for cash position {symbol}: {value}"
+                    )
+
+            # For non-cash positions with a value but no price, calculate price from value and quantity
+            elif price == 0.0 and value != 0.0 and quantity != 0.0:
                 price = value / quantity
                 logger.debug(f"Row {index}: Calculated price for {symbol}: {price}")
 

@@ -87,28 +87,29 @@ def portfolio_summary_cmd(
         raise typer.Exit(code=1) from e
 
 
+# Define argument outside the function to avoid B008 lint error
+filter_args_arg = typer.Argument(
+    None,
+    help="Filter criteria in key=value format (e.g., type=stock symbol=AAPL sort=value:desc)",
+)
+
+
 @portfolio_app.command("list")
 def portfolio_list_cmd(
     file_path: str | None = typer.Option(
         None, "--file", "-f", help="Path to the portfolio CSV file"
     ),
-    focus: str | None = typer.Option(
-        None, "--focus", help="Focus on specific tickers (comma-separated)"
-    ),
-    position_type: str | None = typer.Option(
-        None, "--type", help="Filter by position type (stock, option, cash)"
-    ),
-    min_value: float | None = typer.Option(
-        None, "--min-value", help="Minimum position value"
-    ),
-    max_value: float | None = typer.Option(
-        None, "--max-value", help="Maximum position value"
-    ),
-    sort_by: str = typer.Option(
-        "value:desc", "--sort", help="Sort by field (ticker, value, beta, exposure)"
-    ),
+    filter_args: list[str] = filter_args_arg,
 ):
-    """List positions with filtering and sorting."""
+    """
+    List positions with filtering and sorting.
+
+    Examples:
+        portfolio list type=stock
+        portfolio list symbol=AAPL
+        portfolio list type=option sort=symbol:asc
+        portfolio list min_value=10000 max_value=50000
+    """
     try:
         # Load the portfolio
         result = load_portfolio(file_path)
@@ -117,64 +118,35 @@ def portfolio_list_cmd(
         # Get all positions
         positions = portfolio.positions
 
-        # Apply filters
-        filtered_positions = positions
+        # Parse filter arguments
+        filter_criteria = {}
+        sort_by = "value"
+        sort_direction = "desc"
 
-        # Filter by position type
-        if position_type:
-            position_type = position_type.lower()
-            if position_type == "stock":
-                filtered_positions = portfolio.stock_positions
-            elif position_type == "option":
-                filtered_positions = portfolio.option_positions
-            elif position_type == "cash":
-                filtered_positions = portfolio.cash_positions
-            elif position_type == "unknown":
-                filtered_positions = portfolio.unknown_positions
+        if filter_args:
+            for arg in filter_args:
+                if "=" in arg:
+                    key, value = arg.split("=", 1)
+                    if key.lower() == "sort":
+                        # Handle sort separately
+                        if ":" in value:
+                            sort_by, sort_direction = value.split(":", 1)
+                        else:
+                            sort_by = value
+                    else:
+                        # Add to filter criteria
+                        filter_criteria[key.lower()] = value
 
-        # Filter by ticker
-        if focus:
-            tickers = [t.strip().upper() for t in focus.split(",")]
-            filtered_positions = [p for p in filtered_positions if p.ticker in tickers]
-
-        # Filter by value
-        if min_value is not None:
-            filtered_positions = [
-                p for p in filtered_positions if abs(p.market_value) >= min_value
-            ]
-        if max_value is not None:
-            filtered_positions = [
-                p for p in filtered_positions if abs(p.market_value) <= max_value
-            ]
-
-        # Sort positions
-        sort_field, sort_direction = (
-            sort_by.split(":") if ":" in sort_by else (sort_by, "asc")
+        # Apply filters using the new filter_positions_by_criteria function
+        from src.folib.services.portfolio_service import (
+            filter_positions_by_criteria,
+            sort_positions,
         )
 
-        if sort_field == "ticker":
-            filtered_positions.sort(key=lambda p: p.ticker)
-        elif sort_field == "value":
-            filtered_positions.sort(key=lambda p: abs(p.market_value))
-        elif sort_field == "beta":
-            # Beta sorting requires additional data, not implemented yet
-            console.print(
-                "[yellow]Warning:[/yellow] Sorting by beta not implemented yet, using value instead"
-            )
-            filtered_positions.sort(key=lambda p: abs(p.market_value))
-        elif sort_field == "exposure":
-            # Exposure sorting requires additional data, not implemented yet
-            console.print(
-                "[yellow]Warning:[/yellow] Sorting by exposure not implemented yet, using value instead"
-            )
-            filtered_positions.sort(key=lambda p: abs(p.market_value))
-        else:
-            # Default to sorting by value
-            filtered_positions.sort(key=lambda p: abs(p.market_value))
+        filtered_positions = filter_positions_by_criteria(positions, filter_criteria)
 
-        # Reverse if descending
-        if sort_direction.lower() == "desc":
-            filtered_positions.reverse()
+        # Sort positions using the new sort_positions function
+        filtered_positions = sort_positions(filtered_positions, sort_by, sort_direction)
 
         # Display positions
         if filtered_positions:
@@ -187,6 +159,14 @@ def portfolio_list_cmd(
                 title=f"Portfolio Positions ({len(filtered_positions)} of {len(positions)})",
             )
             console.print(table)
+
+            # Display filter criteria if any
+            if filter_criteria:
+                filter_desc = [f"{k}={v}" for k, v in filter_criteria.items()]
+                console.print(f"[italic]Filtered by: {', '.join(filter_desc)}[/italic]")
+
+            # Display sort criteria
+            console.print(f"[italic]Sorted by: {sort_by} ({sort_direction})[/italic]")
         else:
             console.print("[yellow]No positions match the specified filters[/yellow]")
 
@@ -261,111 +241,53 @@ def portfolio_summary(state, args):  # noqa: ARG001
 
 
 def portfolio_list(state, args):
-    """List positions with filtering and sorting (interactive mode)."""
+    """
+    List positions with filtering and sorting (interactive mode).
+
+    Examples:
+        portfolio list type=stock
+        portfolio list symbol=AAPL
+        portfolio list type=option sort=symbol:asc
+        portfolio list min_value=10000 max_value=50000
+    """
     # Check if portfolio is loaded
     if not state.has_portfolio():
         console.print("[red]Error:[/red] No portfolio loaded")
         console.print("Use 'portfolio load <FILE_PATH>' to load a portfolio")
         return
 
-    # Parse arguments
-    focus = None
-    position_type = None
-    min_value = None
-    max_value = None
-    sort_by = "value:desc"
-
-    i = 0
-    while i < len(args):
-        arg = args[i]
-        if arg == "--focus" and i + 1 < len(args):
-            focus = args[i + 1]
-            i += 2
-        elif arg == "--type" and i + 1 < len(args):
-            position_type = args[i + 1]
-            i += 2
-        elif arg == "--min-value" and i + 1 < len(args):
-            try:
-                min_value = float(args[i + 1])
-                i += 2
-            except ValueError:
-                console.print(f"[red]Error:[/red] Invalid min-value: {args[i + 1]}")
-                return
-        elif arg == "--max-value" and i + 1 < len(args):
-            try:
-                max_value = float(args[i + 1])
-                i += 2
-            except ValueError:
-                console.print(f"[red]Error:[/red] Invalid max-value: {args[i + 1]}")
-                return
-        elif arg == "--sort" and i + 1 < len(args):
-            sort_by = args[i + 1]
-            i += 2
-        else:
-            i += 1
-
     try:
         # Get all positions
         positions = state.portfolio.positions
 
-        # Apply filters
-        filtered_positions = positions
+        # Parse filter arguments
+        filter_criteria = {}
+        sort_by = "value"
+        sort_direction = "desc"
 
-        # Filter by position type
-        if position_type:
-            position_type = position_type.lower()
-            if position_type == "stock":
-                filtered_positions = state.portfolio.stock_positions
-            elif position_type == "option":
-                filtered_positions = state.portfolio.option_positions
-            elif position_type == "cash":
-                filtered_positions = state.portfolio.cash_positions
-            elif position_type == "unknown":
-                filtered_positions = state.portfolio.unknown_positions
+        for arg in args:
+            if "=" in arg:
+                key, value = arg.split("=", 1)
+                if key.lower() == "sort":
+                    # Handle sort separately
+                    if ":" in value:
+                        sort_by, sort_direction = value.split(":", 1)
+                    else:
+                        sort_by = value
+                else:
+                    # Add to filter criteria
+                    filter_criteria[key.lower()] = value
 
-        # Filter by ticker
-        if focus:
-            tickers = [t.strip().upper() for t in focus.split(",")]
-            filtered_positions = [p for p in filtered_positions if p.ticker in tickers]
-
-        # Filter by value
-        if min_value is not None:
-            filtered_positions = [
-                p for p in filtered_positions if abs(p.market_value) >= min_value
-            ]
-        if max_value is not None:
-            filtered_positions = [
-                p for p in filtered_positions if abs(p.market_value) <= max_value
-            ]
-
-        # Sort positions
-        sort_field, sort_direction = (
-            sort_by.split(":") if ":" in sort_by else (sort_by, "asc")
+        # Apply filters using the new filter_positions_by_criteria function
+        from src.folib.services.portfolio_service import (
+            filter_positions_by_criteria,
+            sort_positions,
         )
 
-        if sort_field == "ticker":
-            filtered_positions.sort(key=lambda p: p.ticker)
-        elif sort_field == "value":
-            filtered_positions.sort(key=lambda p: abs(p.market_value))
-        elif sort_field == "beta":
-            # Beta sorting requires additional data, not implemented yet
-            console.print(
-                "[yellow]Warning:[/yellow] Sorting by beta not implemented yet, using value instead"
-            )
-            filtered_positions.sort(key=lambda p: abs(p.market_value))
-        elif sort_field == "exposure":
-            # Exposure sorting requires additional data, not implemented yet
-            console.print(
-                "[yellow]Warning:[/yellow] Sorting by exposure not implemented yet, using value instead"
-            )
-            filtered_positions.sort(key=lambda p: abs(p.market_value))
-        else:
-            # Default to sorting by value
-            filtered_positions.sort(key=lambda p: abs(p.market_value))
+        filtered_positions = filter_positions_by_criteria(positions, filter_criteria)
 
-        # Reverse if descending
-        if sort_direction.lower() == "desc":
-            filtered_positions.reverse()
+        # Sort positions using the new sort_positions function
+        filtered_positions = sort_positions(filtered_positions, sort_by, sort_direction)
 
         # Display positions
         if filtered_positions:
@@ -378,6 +300,14 @@ def portfolio_list(state, args):
                 title=f"Portfolio Positions ({len(filtered_positions)} of {len(positions)})",
             )
             console.print(table)
+
+            # Display filter criteria if any
+            if filter_criteria:
+                filter_desc = [f"{k}={v}" for k, v in filter_criteria.items()]
+                console.print(f"[italic]Filtered by: {', '.join(filter_desc)}[/italic]")
+
+            # Display sort criteria
+            console.print(f"[italic]Sorted by: {sort_by} ({sort_direction})[/italic]")
         else:
             console.print("[yellow]No positions match the specified filters[/yellow]")
 

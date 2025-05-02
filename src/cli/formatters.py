@@ -5,6 +5,7 @@ This module provides utilities for formatting output in the Folio CLI,
 including functions for formatting currency, percentages, and tables.
 """
 
+import math
 from decimal import Decimal
 from typing import Any
 
@@ -24,6 +25,10 @@ def format_currency(value: float | Decimal | None, include_sign: bool = False) -
     """
     if value is None:
         return "N/A"
+
+    # Check for NaN values
+    if isinstance(value, float) and math.isnan(value):  # NaN check
+        return "$0.00"
 
     # Convert to float if Decimal
     if isinstance(value, Decimal):
@@ -87,6 +92,10 @@ def format_quantity(value: float | int | None) -> str:
     """
     if value is None:
         return "N/A"
+
+    # Check for NaN values
+    if isinstance(value, float) and math.isnan(value):  # NaN check
+        return "0"
 
     # Format with commas and no decimal places for whole numbers
     if value == int(value):

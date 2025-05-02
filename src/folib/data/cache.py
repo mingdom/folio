@@ -68,6 +68,18 @@ class DataCache:
         """
         return os.path.join(self.cache_dir, f"{ticker}_beta.txt")
 
+    def get_volatility_cache_path(self, ticker: str) -> str:
+        """
+        Get the path to the volatility cache file for a ticker.
+
+        Args:
+            ticker: Stock ticker symbol
+
+        Returns:
+            Path to volatility cache file
+        """
+        return os.path.join(self.cache_dir, f"{ticker}_volatility.txt")
+
     def is_cache_expired(self, cache_timestamp: float) -> bool:
         """
         Determine if cache should be considered expired based on TTL.
