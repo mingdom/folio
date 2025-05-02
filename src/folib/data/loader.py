@@ -5,49 +5,21 @@ This module provides functions for loading and parsing portfolio CSV files.
 It handles the transformation of raw CSV data into structured PortfolioHolding objects
 that can be further processed by the portfolio service.
 
-Migration Plan Notes:
----------------------
-This module is part of Phase 1 of the folib migration plan, focusing on Portfolio Loading E2E.
-It replaces the CSV loading functionality in src/folio/portfolio.py with a cleaner,
-more maintainable design that separates data loading from business logic.
+Key functions:
+- load_portfolio_from_csv: Load portfolio data from a CSV file
+- parse_portfolio_holdings: Parse raw CSV data into portfolio holdings
+- detect_cash_positions: Identify cash and cash-like positions
+- detect_pending_activity: Calculate pending activity value
 
 CSV Format:
 ----------
-The primary source format is portfolio-private.csv, which contains the following columns:
-- Account Number (private, not used)
-- Account Name (private, not used)
-- Symbol (used: ticker symbol)
-- Description (used: text description of the security)
-- Quantity (used: number of shares/contracts)
-- Last Price (used: current price per share/contract)
-- Last Price Change (not used)
-- Current Value (used: total value of the position)
-- Today's Gain/Loss Dollar (not used)
-- Today's Gain/Loss Percent (not used)
-- Total Gain/Loss Dollar (not used)
-- Total Gain/Loss Percent (not used)
-- Percent Of Account (not used)
-- Cost Basis Total (used: total cost basis)
-- Average Cost Basis (not used)
-- Type (not used)
-
-Only the essential columns (Symbol, Description, Quantity, Last Price, Current Value,
-Cost Basis Total) are extracted and stored in PortfolioHolding objects to maintain
-privacy and focus on the core position data.
-
-Old Codebase References:
-------------------------
-- src/folio/portfolio.py: Contains the original CSV loading and processing logic
-- src/folio/cash_detection.py: Contains logic for detecting cash-like positions
-- src/folio/utils.py: Contains utility functions for cleaning currency values
-
-Potential Issues:
-----------------
-- The old codebase mixed CSV loading with data processing and calculations
-- Different brokers may use different CSV formats requiring adaptation
-- Some securities may have missing or invalid data in the CSV
-- Cash-like positions and pending activity need special detection logic
-- Currency values in the CSV may need cleaning (removing '$', ',', etc.)
+The module expects a CSV with these essential columns:
+- Symbol: Ticker symbol
+- Description: Text description of the security
+- Quantity: Number of shares/contracts
+- Last Price: Current price per share/contract
+- Current Value: Total value of the position
+- Cost Basis Total: Total cost basis (optional)
 """
 
 import logging
@@ -208,6 +180,14 @@ def parse_portfolio_holdings(df: pd.DataFrame) -> list[PortfolioHolding]:
                 logger.debug(f"Row {index}: Skipping row with empty symbol")
                 continue
 
+            # Clean up the symbol - remove ** suffix (common in money market funds like SPAXX**)
+            if "**" in symbol:
+                original_symbol = symbol
+                symbol = symbol.replace("**", "")
+                logger.debug(
+                    f"Row {index}: Cleaned up symbol from {original_symbol} to {symbol}"
+                )
+
             # Special handling for pending activity rows
             is_pending_activity = (
                 symbol.upper() == "PENDING ACTIVITY" or "PENDING" in symbol.upper()
@@ -259,8 +239,38 @@ def parse_portfolio_holdings(df: pd.DataFrame) -> list[PortfolioHolding]:
                 )
                 value = 0.0
 
-            # For cash-like positions with no price but a value, calculate the price
-            if price == 0.0 and value != 0.0 and quantity != 0.0:
+            # Special handling for cash-like positions
+            is_cash_like = stockdata.is_cash_like(symbol, description)
+
+            # For cash-like positions, ensure we have valid quantity and price
+            if is_cash_like:
+                logger.debug(
+                    f"Row {index}: Identified {symbol} as a cash-like position"
+                )
+
+                # For cash positions, set quantity to 1 if it's 0 or NaN
+                if quantity == 0.0 or pd.isna(quantity):
+                    quantity = 1.0
+                    logger.debug(
+                        f"Row {index}: Set quantity to 1.0 for cash position {symbol}"
+                    )
+
+                # If we have a value but no price, calculate price from value and quantity
+                if value != 0.0 and (price == 0.0 or pd.isna(price)):
+                    price = value / quantity
+                    logger.debug(
+                        f"Row {index}: Calculated price for cash position {symbol}: {price}"
+                    )
+
+                # If we have a price but no value, calculate value from price and quantity
+                elif price != 0.0 and (value == 0.0 or pd.isna(value)):
+                    value = price * quantity
+                    logger.debug(
+                        f"Row {index}: Calculated value for cash position {symbol}: {value}"
+                    )
+
+            # For non-cash positions with a value but no price, calculate price from value and quantity
+            elif price == 0.0 and value != 0.0 and quantity != 0.0:
                 price = value / quantity
                 logger.debug(f"Row {index}: Calculated price for {symbol}: {price}")
 

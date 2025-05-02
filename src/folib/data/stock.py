@@ -12,33 +12,11 @@ Example usage:
     price = oracle.get_price("AAPL")
     beta = oracle.get_beta("MSFT")
 
-Migration Plan Notes:
----------------------
-This module is part of Phase 1 of the folib migration plan, focusing on Portfolio Loading E2E.
-It consolidates market data functionality from src/stockdata.py and src/yfinance.py into a
-cleaner, more maintainable design with a single entry point for all market data needs.
-
-Key differences from the old implementation:
-- Uses a Singleton StockOracle class instead of separate DataFetcherInterface and YFinanceDataFetcher
-- Provides direct methods for common operations (get_price, get_beta) instead of generic fetch_data
-- Simplifies the API by hiding implementation details
-- Implements the Singleton pattern for consistent access throughout the application
-- Supports multiple data providers (Yahoo Finance, Financial Modeling Prep) through a provider interface
-
-Old Codebase References:
-------------------------
-- src/stockdata.py: Contains the DataFetcherInterface
-- src/yfinance.py: Contains the YFinanceDataFetcher implementation
-- src/folio/utils.py: Contains the get_beta function
-- src/folio/marketdata.py: Contains the get_stock_price function
-
-Potential Issues:
-----------------
-- Yahoo Finance API may have rate limits or change its interface
-- FMP API requires an API key and has its own rate limits
-- Beta calculation requires sufficient historical data
-- Some tickers may not have data available
-- Market data fetching can be slow
+Features:
+- Supports multiple data providers (Yahoo Finance, Financial Modeling Prep)
+- Implements caching to improve performance and reduce API calls
+- Provides validation for stock symbols
+- Calculates beta values when not available directly from providers
 """
 
 import logging
@@ -335,11 +313,15 @@ class StockOracle:
         if not is_valid_stock_symbol(ticker):
             raise ValueError(f"Invalid stock symbol format: {ticker}")
 
+        logger.debug(f"Getting price for {ticker} using {self.provider_name} provider")
+
         # Get historical data for the most recent day
         historical_data = self.get_historical_data(ticker, period="1d")
 
         # Extract the current price
-        return get_current_price(historical_data)
+        price = get_current_price(historical_data)
+        logger.debug(f"Current price for {ticker}: ${price:.2f}")
+        return price
 
     def get_beta(self, ticker: str) -> float | None:
         """
@@ -378,15 +360,25 @@ class StockOracle:
             cache_path = cache.get_beta_cache_path(ticker)
             beta = cache.read_value_from_cache(cache_path)
             if beta is not None:
+                logger.debug(f"Using cached beta value for {ticker}: {beta:.2f}")
                 return beta
+            else:
+                logger.debug(f"No valid cache found for beta value of {ticker}")
 
         # Try to get beta directly from the provider
+        logger.debug(f"Fetching beta for {ticker} from {self.provider_name} provider")
         beta = self.provider.try_get_beta_from_provider(ticker)
         if beta is not None:
+            logger.debug(f"Got beta value for {ticker} from provider: {beta:.2f}")
             # Cache the result if possible
             if cache and isinstance(cache, DataCache):
                 cache.write_value_to_cache(beta, cache_path)
+                logger.debug(f"Cached beta value for {ticker}")
             return beta
+        else:
+            logger.debug(
+                f"Provider {self.provider_name} could not provide beta for {ticker}, will calculate manually"
+            )
 
         # If provider beta retrieval failed, calculate it manually
         logger.debug(f"Calculating beta manually for {ticker}")
@@ -460,6 +452,68 @@ class StockOracle:
             True if the ticker appears to be a valid stock symbol, False otherwise
         """
         return is_valid_stock_symbol(ticker)
+
+    def get_volatility(self, ticker: str) -> float:
+        """
+        Get the historical volatility for a ticker.
+
+        This method calculates the historical volatility (standard deviation of returns)
+        for the given ticker using historical price data.
+
+        Args:
+            ticker: The ticker symbol
+
+        Returns:
+            The historical volatility as a decimal (e.g., 0.25 for 25% volatility)
+
+        Raises:
+            ValueError: If the ticker is invalid or no historical data is available
+        """
+        # Validate ticker
+        if not is_valid_stock_symbol(ticker):
+            raise ValueError(f"Invalid stock symbol format: {ticker}")
+
+        # Check cache first
+        from .cache import DataCache
+
+        cache = getattr(self.provider, "cache", None)
+        if cache and isinstance(cache, DataCache):
+            cache_path = cache.get_volatility_cache_path(ticker)
+            volatility = cache.read_value_from_cache(cache_path)
+            if volatility is not None:
+                logger.debug(
+                    f"Using cached volatility value for {ticker}: {volatility:.2f}"
+                )
+                return volatility
+            else:
+                logger.debug(f"No valid cache found for volatility value of {ticker}")
+
+        try:
+            # Get historical data for the last 30 days
+            df = self.provider.get_historical_data(ticker, period="30d")
+
+            if df.empty:
+                logger.warning(f"No historical data available for {ticker}")
+                # Return a default volatility value
+                return 0.3  # 30% volatility as a reasonable default
+
+            # Calculate daily returns
+            df["Returns"] = df["Close"].pct_change()
+
+            # Calculate volatility (standard deviation of returns)
+            volatility = df["Returns"].std() * (252**0.5)  # Annualized
+
+            # Cache the result
+            if cache and isinstance(cache, DataCache):
+                cache.write_value_to_cache(volatility, cache_path)
+                logger.debug(f"Cached volatility value for {ticker}: {volatility:.2f}")
+
+            return volatility
+
+        except Exception as e:
+            logger.warning(f"Error calculating volatility for {ticker}: {e}")
+            # Return a default volatility value
+            return 0.3  # 30% volatility as a reasonable default
 
     def is_cash_like(self, ticker: str, description: str = "") -> bool:
         """

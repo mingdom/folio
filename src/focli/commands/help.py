@@ -118,13 +118,16 @@ def help_command(args: list[str], state: dict[str, Any], console):  # noqa: ARG0
                 "  [green]portfolio list[/green] - List all positions in the portfolio"
             )
             console.print(
-                "  [green]portfolio list --focus SPY,AAPL[/green] - List specific positions"
+                "  [green]portfolio list type=stock[/green] - List only stock positions"
             )
             console.print(
-                "  [green]portfolio list --options[/green] - List only positions with options"
+                "  [green]portfolio list symbol=AAPL[/green] - List positions for a specific symbol"
             )
             console.print(
-                "  [green]portfolio list --sort value[/green] - Sort positions by value"
+                "  [green]portfolio list type=option sort=symbol:asc[/green] - List option positions sorted by symbol"
+            )
+            console.print(
+                "  [green]portfolio list min_value=10000 max_value=50000[/green] - List positions within a value range"
             )
 
         elif command == "help":

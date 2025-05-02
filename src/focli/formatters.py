@@ -194,11 +194,25 @@ def display_position_details(group, detailed=True, console=None):
     summary_table.add_column("Value", style="green")
 
     # Add basic position details
-    summary_table.add_row("Beta", f"{group.beta:.2f}")
-    summary_table.add_row("Net Exposure", format_currency(group.net_exposure))
-    summary_table.add_row(
-        "Beta-Adjusted Exposure", format_currency(group.beta_adjusted_exposure)
-    )
+    # Handle missing beta attribute
+    beta_str = "N/A"
+    if hasattr(group, "beta") and group.beta is not None:
+        beta_str = f"{group.beta:.2f}"
+    summary_table.add_row("Beta", beta_str)
+
+    # Handle missing net_exposure attribute
+    if hasattr(group, "net_exposure"):
+        summary_table.add_row("Net Exposure", format_currency(group.net_exposure))
+    else:
+        summary_table.add_row("Net Exposure", "$0.00")
+
+    # Handle missing beta_adjusted_exposure attribute
+    if hasattr(group, "beta_adjusted_exposure"):
+        summary_table.add_row(
+            "Beta-Adjusted Exposure", format_currency(group.beta_adjusted_exposure)
+        )
+    else:
+        summary_table.add_row("Beta-Adjusted Exposure", "$0.00")
 
     # Add stock details if available
     if group.stock_position:
@@ -210,11 +224,47 @@ def display_position_details(group, detailed=True, console=None):
     # Add option summary if available
     if group.option_positions:
         summary_table.add_row("Option Count", f"{len(group.option_positions)}")
-        summary_table.add_row("Call Options", f"{group.call_count}")
-        summary_table.add_row("Put Options", f"{group.put_count}")
-        summary_table.add_row(
-            "Total Delta Exposure", format_currency(group.total_delta_exposure)
-        )
+
+        # Handle missing call_count attribute
+        call_count = 0
+        if hasattr(group, "call_count"):
+            call_count = group.call_count
+        else:
+            # Calculate call_count manually
+            for op in group.option_positions:
+                if hasattr(op, "option_type") and op.option_type.upper() == "CALL":
+                    call_count += 1
+        summary_table.add_row("Call Options", f"{call_count}")
+
+        # Handle missing put_count attribute
+        put_count = 0
+        if hasattr(group, "put_count"):
+            put_count = group.put_count
+        else:
+            # Calculate put_count manually
+            for op in group.option_positions:
+                if hasattr(op, "option_type") and op.option_type.upper() == "PUT":
+                    put_count += 1
+        summary_table.add_row("Put Options", f"{put_count}")
+
+        # Handle missing total_delta_exposure attribute
+        delta_exposure = 0
+        if hasattr(group, "total_delta_exposure"):
+            delta_exposure = group.total_delta_exposure
+        else:
+            # Try to calculate delta exposure manually
+            try:
+                for op in group.option_positions:
+                    if hasattr(op, "delta_exposure"):
+                        delta_exposure += op.delta_exposure
+                    elif hasattr(op, "market_value"):
+                        # Fallback to market value if delta_exposure is not available
+                        delta_exposure += op.market_value
+            except Exception:
+                # If calculation fails, just use 0
+                delta_exposure = 0
+
+        summary_table.add_row("Total Delta Exposure", format_currency(delta_exposure))
 
     console.print(summary_table)
 
@@ -229,13 +279,43 @@ def display_position_details(group, detailed=True, console=None):
         options_table.add_column("Value", style="green", justify="right")
 
         for option in group.option_positions:
+            # Handle missing delta attribute
+            delta_str = "N/A"
+            if hasattr(option, "delta") and option.delta is not None:
+                delta_str = f"{option.delta:.2f}"
+
+            # Handle missing option_type attribute
+            option_type = "UNKNOWN"
+            if hasattr(option, "option_type") and option.option_type is not None:
+                option_type = option.option_type
+
+            # Handle missing strike attribute
+            strike_str = "$0.00"
+            if hasattr(option, "strike") and option.strike is not None:
+                strike_str = format_currency(option.strike)
+
+            # Handle missing expiry attribute
+            expiry_str = "UNKNOWN"
+            if hasattr(option, "expiry") and option.expiry is not None:
+                expiry_str = str(option.expiry)
+
+            # Handle missing quantity attribute
+            quantity_str = "0"
+            if hasattr(option, "quantity") and option.quantity is not None:
+                quantity_str = f"{option.quantity}"
+
+            # Handle missing market_value attribute
+            market_value_str = "$0.00"
+            if hasattr(option, "market_value") and option.market_value is not None:
+                market_value_str = format_currency(option.market_value)
+
             options_table.add_row(
-                option.option_type,
-                format_currency(option.strike),
-                option.expiry,
-                f"{option.quantity}",
-                f"{option.delta:.2f}",
-                format_currency(option.market_value),
+                option_type,
+                strike_str,
+                expiry_str,
+                quantity_str,
+                delta_str,
+                market_value_str,
             )
 
         console.print(options_table)
@@ -245,7 +325,7 @@ def display_portfolio_summary(summary, console=None):
     """Display a summary of the portfolio.
 
     Args:
-        summary: PortfolioSummary object
+        summary: PortfolioSummary object (either old or new folib version)
         console: Rich console for output
     """
     if console is None:
@@ -258,51 +338,155 @@ def display_portfolio_summary(summary, console=None):
     summary_table.add_column("Metric", style="cyan")
     summary_table.add_column("Value", style="green")
 
-    # Add portfolio metrics
-    summary_table.add_row(
-        "Total Value", format_currency(summary.portfolio_estimate_value)
-    )
-    summary_table.add_row("Stock Value", format_currency(summary.stock_value))
-    summary_table.add_row("Option Value", format_currency(summary.option_value))
-    summary_table.add_row("Cash Value", format_currency(summary.cash_like_value))
-    summary_table.add_row("Portfolio Beta", f"{summary.portfolio_beta:.2f}")
-    summary_table.add_row(
-        "Net Market Exposure", format_currency(summary.net_market_exposure)
-    )
+    # Check if this is a folib PortfolioSummary or the old summary
+    # The folib version has total_value, the old version has portfolio_estimate_value
+    is_folib = hasattr(summary, "total_value")
 
-    console.print(summary_table)
+    try:
+        # Add portfolio metrics
+        if is_folib:
+            # New folib PortfolioSummary
+            total_value = summary.total_value
+            summary_table.add_row("Total Value", format_currency(total_value))
+            summary_table.add_row("Stock Value", format_currency(summary.stock_value))
+            summary_table.add_row("Option Value", format_currency(summary.option_value))
 
-    # Create an exposure table
-    exposure_table = Table(title="Exposure Breakdown", box=ROUNDED)
-    exposure_table.add_column("Category", style="cyan")
-    exposure_table.add_column("Value", style="green")
-    exposure_table.add_column("% of Portfolio", style="magenta")
+            # Check if cash_value exists (it should in the new version)
+            if hasattr(summary, "cash_value"):
+                summary_table.add_row("Cash Value", format_currency(summary.cash_value))
 
-    # Add exposure metrics
-    total_value = summary.portfolio_estimate_value
-    if total_value > 0:
-        exposure_table.add_row(
-            "Long Exposure",
-            format_currency(summary.long_exposure.total_value),
-            f"{summary.long_exposure.total_value / total_value * 100:.1f}%",
-        )
-        exposure_table.add_row(
-            "Short Exposure",
-            format_currency(summary.short_exposure.total_value),
-            f"{summary.short_exposure.total_value / total_value * 100:.1f}%",
-        )
-        exposure_table.add_row(
-            "Options Exposure",
-            format_currency(summary.options_exposure.total_value),
-            f"{summary.options_exposure.total_value / total_value * 100:.1f}%",
-        )
-        exposure_table.add_row(
-            "Cash",
-            format_currency(summary.cash_like_value),
-            f"{summary.cash_percentage * 100:.1f}%",
-        )
+            # Check if unknown_value exists (it should in the new version)
+            if hasattr(summary, "unknown_value"):
+                summary_table.add_row(
+                    "Unknown Value", format_currency(summary.unknown_value)
+                )
 
-    console.print(exposure_table)
+            # Portfolio beta might be None in folib
+            beta_value = 0.0
+            if (
+                hasattr(summary, "portfolio_beta")
+                and summary.portfolio_beta is not None
+            ):
+                beta_value = summary.portfolio_beta
+            summary_table.add_row("Portfolio Beta", f"{beta_value:.2f}")
+
+            # Check if net_market_exposure exists
+            if hasattr(summary, "net_market_exposure"):
+                summary_table.add_row(
+                    "Net Market Exposure", format_currency(summary.net_market_exposure)
+                )
+        else:
+            # Old PortfolioSummary
+            total_value = summary.portfolio_estimate_value
+            summary_table.add_row("Total Value", format_currency(total_value))
+            summary_table.add_row("Stock Value", format_currency(summary.stock_value))
+            summary_table.add_row("Option Value", format_currency(summary.option_value))
+
+            # Check if cash_like_value exists
+            if hasattr(summary, "cash_like_value"):
+                summary_table.add_row(
+                    "Cash Value", format_currency(summary.cash_like_value)
+                )
+
+            # Check if portfolio_beta exists
+            if hasattr(summary, "portfolio_beta"):
+                summary_table.add_row("Portfolio Beta", f"{summary.portfolio_beta:.2f}")
+
+            # Check if net_market_exposure exists
+            if hasattr(summary, "net_market_exposure"):
+                summary_table.add_row(
+                    "Net Market Exposure", format_currency(summary.net_market_exposure)
+                )
+
+        console.print(summary_table)
+
+        # Create an exposure table
+        exposure_table = Table(title="Exposure Breakdown", box=ROUNDED)
+        exposure_table.add_column("Category", style="cyan")
+        exposure_table.add_column("Value", style="green")
+        exposure_table.add_column("% of Portfolio", style="magenta")
+
+        # Add exposure metrics
+        if is_folib and total_value > 0:
+            # For folib, we don't have exposure breakdowns yet
+            # Just show the basic values as percentages of total
+            exposure_table.add_row(
+                "Stock Value",
+                format_currency(summary.stock_value),
+                f"{summary.stock_value / total_value * 100:.1f}%",
+            )
+            exposure_table.add_row(
+                "Option Value",
+                format_currency(summary.option_value),
+                f"{summary.option_value / total_value * 100:.1f}%",
+            )
+
+            # Check if cash_value exists
+            if hasattr(summary, "cash_value"):
+                exposure_table.add_row(
+                    "Cash Value",
+                    format_currency(summary.cash_value),
+                    f"{summary.cash_value / total_value * 100:.1f}%",
+                )
+
+            # Check if unknown_value exists
+            if hasattr(summary, "unknown_value"):
+                exposure_table.add_row(
+                    "Unknown Value",
+                    format_currency(summary.unknown_value),
+                    f"{summary.unknown_value / total_value * 100:.1f}%",
+                )
+        # Old exposure breakdown
+        elif not is_folib and total_value > 0:
+            # Check if long_exposure exists
+            if hasattr(summary, "long_exposure") and hasattr(
+                summary.long_exposure, "total_value"
+            ):
+                exposure_table.add_row(
+                    "Long Exposure",
+                    format_currency(summary.long_exposure.total_value),
+                    f"{summary.long_exposure.total_value / total_value * 100:.1f}%",
+                )
+
+            # Check if short_exposure exists
+            if hasattr(summary, "short_exposure") and hasattr(
+                summary.short_exposure, "total_value"
+            ):
+                exposure_table.add_row(
+                    "Short Exposure",
+                    format_currency(summary.short_exposure.total_value),
+                    f"{summary.short_exposure.total_value / total_value * 100:.1f}%",
+                )
+
+            # Check if options_exposure exists
+            if hasattr(summary, "options_exposure") and hasattr(
+                summary.options_exposure, "total_value"
+            ):
+                exposure_table.add_row(
+                    "Options Exposure",
+                    format_currency(summary.options_exposure.total_value),
+                    f"{summary.options_exposure.total_value / total_value * 100:.1f}%",
+                )
+
+            # Check if cash_like_value and cash_percentage exist
+            if hasattr(summary, "cash_like_value") and hasattr(
+                summary, "cash_percentage"
+            ):
+                exposure_table.add_row(
+                    "Cash",
+                    format_currency(summary.cash_like_value),
+                    f"{summary.cash_percentage * 100:.1f}%",
+                )
+
+        console.print(exposure_table)
+    except Exception as e:
+        console.print(
+            f"[bold yellow]Warning:[/bold yellow] Error displaying portfolio summary: {e}"
+        )
+        console.print(
+            "This may be due to differences between the old and new data structures."
+        )
+        console.print("Please report this issue to the developers.")
 
 
 def display_position_risk_analysis(group, detailed=False, console=None):
@@ -326,22 +510,44 @@ def display_position_risk_analysis(group, detailed=False, console=None):
     risk_table.add_column("Description", style="yellow")
 
     # Add risk metrics
-    risk_table.add_row("Beta", f"{group.beta:.2f}", "Sensitivity to market movements")
+    # Handle missing beta attribute
+    beta_str = "N/A"
+    if hasattr(group, "beta") and group.beta is not None:
+        beta_str = f"{group.beta:.2f}"
+    risk_table.add_row("Beta", beta_str, "Sensitivity to market movements")
 
     # Calculate beta-adjusted exposure
-    beta_adjusted = group.beta_adjusted_exposure
-    risk_table.add_row(
-        "Beta-Adjusted Exposure",
-        format_currency(beta_adjusted),
-        "Exposure adjusted for market sensitivity",
-    )
+    # Handle missing beta_adjusted_exposure attribute
+    if hasattr(group, "beta_adjusted_exposure"):
+        beta_adjusted = group.beta_adjusted_exposure
+        risk_table.add_row(
+            "Beta-Adjusted Exposure",
+            format_currency(beta_adjusted),
+            "Exposure adjusted for market sensitivity",
+        )
+    else:
+        risk_table.add_row(
+            "Beta-Adjusted Exposure",
+            "$0.00",
+            "Exposure adjusted for market sensitivity",
+        )
 
     # Calculate option exposure
-    option_exposure = (
-        sum(op.delta_exposure for op in group.option_positions)
-        if group.option_positions
-        else 0
-    )
+    try:
+        option_exposure = (
+            sum(op.delta_exposure for op in group.option_positions)
+            if group.option_positions
+            else 0
+        )
+    except AttributeError:
+        # Handle missing delta_exposure attribute
+        option_exposure = 0
+        if group.option_positions:
+            # Try to calculate a simple delta exposure
+            for op in group.option_positions:
+                if hasattr(op, "market_value"):
+                    option_exposure += op.market_value
+
     risk_table.add_row(
         "Option Delta Exposure",
         format_currency(option_exposure),
@@ -349,7 +555,11 @@ def display_position_risk_analysis(group, detailed=False, console=None):
     )
 
     # Calculate stock exposure
-    stock_exposure = group.stock_position.market_value if group.stock_position else 0
+    stock_exposure = 0
+    if group.stock_position:
+        if hasattr(group.stock_position, "market_value"):
+            stock_exposure = group.stock_position.market_value
+
     risk_table.add_row(
         "Stock Exposure",
         format_currency(stock_exposure),

@@ -1,20 +1,17 @@
 #!/usr/bin/env python3
 # ruff: noqa: T201
 """
-Portfolio Demo Script
+Portfolio Demo Script (Version 2)
 
-This script demonstrates how to use the folib library for portfolio analysis:
+This script demonstrates how to use the folib library for portfolio analysis with the new domain model:
 1. Load a portfolio from a CSV file
 2. Parse the portfolio holdings
-3. Process the portfolio into groups
+3. Process the portfolio into a flat list of positions
 4. Calculate portfolio summary metrics
 5. Display detailed portfolio information
 
 Usage:
-    python src/folib/scripts/portfolio_demo.py [csv_file]
-
-Alternative usage (as a module):
-    python -m folib.scripts.portfolio_demo [csv_file]
+    python src/folib/examples/load_portfolio_example_v2.py [csv_file]
 
 If no CSV file is specified, the script uses the default portfolio file
 at 'private-data/portfolio-private.csv'.
@@ -35,12 +32,14 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../.
 from src.folib.data.loader import load_portfolio_from_csv, parse_portfolio_holdings
 from src.folib.services.portfolio_service import (
     create_portfolio_summary,
+    get_portfolio_exposures,
+    group_positions_by_ticker,
     process_portfolio,
 )
 
 # Set up logging
 logging.basicConfig(
-    level=logging.INFO,  # Changed from INFO to DEBUG
+    level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[logging.StreamHandler()],
 )
@@ -65,7 +64,7 @@ def format_percentage(value: float) -> str:
 def main():
     """Run the portfolio demo."""
     # Parse command line arguments
-    parser = argparse.ArgumentParser(description="Folib Portfolio Demo")
+    parser = argparse.ArgumentParser(description="Folib Portfolio Demo (V2)")
     parser.add_argument(
         "csv_file",
         nargs="?",
@@ -94,13 +93,17 @@ def main():
         # Step 3: Process the portfolio
         logger.info("Processing portfolio")
         portfolio = process_portfolio(holdings)
-        logger.info(f"Processed portfolio with {len(portfolio.groups)} groups")
+        logger.info(f"Processed portfolio with {len(portfolio.positions)} positions")
 
         # Step 4: Create portfolio summary
         logger.info("Creating portfolio summary")
         summary = create_portfolio_summary(portfolio)
 
-        # Step 5: Display portfolio information
+        # Step 5: Calculate portfolio exposures
+        logger.info("Calculating portfolio exposures")
+        exposures = get_portfolio_exposures(portfolio)
+
+        # Step 6: Display portfolio information
         print("\n" + "=" * 80)
         print("PORTFOLIO SUMMARY".center(80))
         print("=" * 80)
@@ -146,6 +149,29 @@ def main():
                 f"Pending Activity: {format_percentage(pending_pct)} ({format_currency(summary.pending_activity_value)})"
             )
 
+        # Display portfolio exposures
+        print("\n" + "=" * 80)
+        print("PORTFOLIO EXPOSURES".center(80))
+        print("=" * 80)
+        print(
+            f"\nLong Stock Exposure:    {format_currency(exposures['long_stock_exposure'])}"
+        )
+        print(
+            f"Short Stock Exposure:   {format_currency(exposures['short_stock_exposure'])}"
+        )
+        print(
+            f"Long Option Exposure:   {format_currency(exposures['long_option_exposure'])}"
+        )
+        print(
+            f"Short Option Exposure:  {format_currency(exposures['short_option_exposure'])}"
+        )
+        print(
+            f"Net Market Exposure:    {format_currency(exposures['net_market_exposure'])}"
+        )
+        print(
+            f"Beta-Adjusted Exposure: {format_currency(exposures['beta_adjusted_exposure'])}"
+        )
+
         # Display cash positions
         if portfolio.cash_positions:
             print("\n" + "=" * 80)
@@ -187,33 +213,36 @@ def main():
             print("-" * 70)
 
             for i, position in enumerate(portfolio.unknown_positions, 1):
-                # Truncate description if too long
-                description = (
-                    position.description[:27] + "..."
-                    if len(position.description) > 30
-                    else position.description
-                )
+                # Get description if available (UnknownPosition has it)
+                description = ""
+                if hasattr(position, "description"):
+                    # Truncate description if too long
+                    description = (
+                        position.description[:27] + "..."
+                        if len(position.description) > 30
+                        else position.description
+                    )
 
                 print(
-                    f"{i:<6} {position.symbol:<15} {description:<30} {format_currency(position.value):<15}"
+                    f"{i:<6} {position.ticker:<15} {description:<30} {format_currency(position.market_value):<15}"
                 )
 
             print(
-                f"\nTotal Unknown Value: {format_currency(sum(p.value for p in portfolio.unknown_positions))}"
+                f"\nTotal Unknown Value: {format_currency(sum(p.market_value for p in portfolio.unknown_positions))}"
             )
 
-        # Display group information
+        # Display position information
         print("\n" + "=" * 80)
-        print("PORTFOLIO GROUPS".center(80))
+        print("PORTFOLIO POSITIONS".center(80))
         print("=" * 80)
 
         # Count positions by type
-        stock_count = sum(1 for g in portfolio.groups if g.stock_position is not None)
-        option_count = sum(len(g.option_positions) for g in portfolio.groups)
+        stock_count = len(portfolio.stock_positions)
+        option_count = len(portfolio.option_positions)
         cash_count = len(portfolio.cash_positions)
         unknown_count = len(portfolio.unknown_positions)
 
-        print(f"\nTotal Groups: {len(portfolio.groups)}")
+        print(f"\nTotal Positions: {len(portfolio.positions)}")
         print(f"Stock Positions: {stock_count}")
         print(f"Option Positions: {option_count}")
         print(f"Cash Positions: {cash_count}")
@@ -229,10 +258,7 @@ def main():
         print("=" * 80)
 
         # Get stock positions and sort by value
-        stock_positions = []
-        for group in portfolio.groups:
-            if group.stock_position:
-                stock_positions.append(group.stock_position)
+        stock_positions = portfolio.stock_positions
 
         # Sort by absolute value (to handle short positions)
         stock_positions.sort(key=lambda x: abs(x.market_value), reverse=True)
@@ -262,15 +288,10 @@ def main():
         print("=" * 80)
 
         # Collect all option positions
-        call_options = []
-        put_options = []
-
-        for group in portfolio.groups:
-            for option in group.option_positions:
-                if option.option_type == "CALL":
-                    call_options.append(option)
-                else:
-                    put_options.append(option)
+        call_options = [
+            p for p in portfolio.option_positions if p.option_type == "CALL"
+        ]
+        put_options = [p for p in portfolio.option_positions if p.option_type == "PUT"]
 
         # Display call options summary
         call_value = sum(option.market_value for option in call_options)
@@ -282,6 +303,85 @@ def main():
         print(
             f"Put Options: {len(put_options)} positions, {format_currency(put_value)}"
         )
+
+        # Demonstrate group_positions_by_ticker functionality
+        print("\n" + "=" * 80)
+        print("POSITIONS GROUPED BY TICKER (TOP 5)".center(80))
+        print("=" * 80)
+
+        # Group all positions by ticker
+        grouped_positions = group_positions_by_ticker(portfolio.positions)
+
+        # Get the top 5 tickers by total absolute market value
+        ticker_values = {}
+        for ticker, positions in grouped_positions.items():
+            ticker_values[ticker] = sum(abs(p.market_value) for p in positions)
+
+        top_tickers = sorted(ticker_values.items(), key=lambda x: x[1], reverse=True)[
+            :5
+        ]
+
+        # Display positions for each top ticker
+        for i, (ticker, _) in enumerate(top_tickers, 1):
+            positions = grouped_positions[ticker]
+
+            # Calculate total market value for this ticker
+            total_value = sum(p.market_value for p in positions)
+
+            # Get stock and option positions
+            stock_positions = [p for p in positions if p.position_type == "stock"]
+            option_positions = [p for p in positions if p.position_type == "option"]
+
+            print(f"\n{i}. {ticker} - Total Value: {format_currency(total_value)}")
+            print(
+                f"   Total Positions: {len(positions)} ({len(stock_positions)} stocks, {len(option_positions)} options)"
+            )
+
+            # Display stock positions
+            if stock_positions:
+                print("\n   Stock Positions:")
+                print("   " + "-" * 60)
+                print(
+                    "   {:<6} {:<10} {:<15} {:<15}".format(
+                        "Type", "Quantity", "Price", "Value"
+                    )
+                )
+                print("   " + "-" * 60)
+
+                for position in stock_positions:
+                    print(
+                        "   {:<6} {:<10} {:<15} {:<15}".format(
+                            "Stock",
+                            f"{position.quantity:,.0f}",
+                            format_currency(position.price),
+                            format_currency(position.market_value),
+                        )
+                    )
+
+            # Display option positions
+            if option_positions:
+                print("\n   Option Positions:")
+                print("   " + "-" * 75)
+                print(
+                    "   {:<6} {:<10} {:<10} {:<15} {:<15} {:<15}".format(
+                        "Type", "Quantity", "Strike", "Expiry", "Price", "Value"
+                    )
+                )
+                print("   " + "-" * 75)
+
+                for position in option_positions:
+                    print(
+                        "   {:<6} {:<10} {:<10} {:<15} {:<15} {:<15}".format(
+                            position.option_type,
+                            f"{position.quantity:,.0f}",
+                            f"${position.strike:,.2f}",
+                            position.expiry.strftime("%Y-%m-%d"),
+                            format_currency(position.price),
+                            format_currency(position.market_value),
+                        )
+                    )
+
+            print("\n" + "-" * 80)
 
         print("\nDemo completed successfully")
 

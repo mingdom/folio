@@ -11,7 +11,7 @@ from src.focli.formatters import (
     display_position_risk_analysis,
     display_position_simulation,
 )
-from src.focli.utils import find_position_group, parse_args
+from src.focli.utils import find_position_group, find_positions_by_ticker, parse_args
 from src.folio.simulator import generate_spy_changes, simulate_position_with_spy_changes
 
 
@@ -24,7 +24,7 @@ def position_command(args: list[str], state: dict[str, Any], console):
         console: Rich console for output
     """
     # Check if a portfolio is loaded
-    if not state.get("portfolio_groups"):
+    if not state.get("portfolio_groups") and not state.get("portfolio"):
         console.print("[bold red]Error:[/bold red] No portfolio loaded.")
         console.print("Use 'portfolio load <path>' to load a portfolio.")
         return
@@ -79,18 +79,118 @@ def position_details(ticker: str, args: list[str], state: dict[str, Any], consol
         parsed_args = parse_args(args, arg_specs)
         detailed = parsed_args["detailed"]
 
-        # Find the position group
-        group = find_position_group(ticker, state["portfolio_groups"])
+        # Check if we have the new folib Portfolio object
+        if state.get("portfolio"):
+            # Find positions using the new folib function
+            positions = find_positions_by_ticker(ticker, state["portfolio"])
 
-        if not group:
-            console.print(f"[bold red]Position not found:[/bold red] {ticker}")
-            return
+            if not positions["stock_position"] and not positions["option_positions"]:
+                # Try the old method as fallback
+                group = find_position_group(ticker, state["portfolio_groups"])
+                if not group:
+                    console.print(f"[bold red]Position not found:[/bold red] {ticker}")
+                    return
 
-        # Display detailed position information
-        display_position_details(group, detailed, console)
+                # Display using the old method
+                display_position_details(group, detailed, console)
 
-        # Store the last viewed position in state
-        state["last_position"] = group
+                # Store the last viewed position in state
+                state["last_position"] = group
+            else:
+                # Use the position service to analyze the positions
+                from src.folib.data.stock import stockdata
+                from src.folib.services.position_service import analyze_position
+
+                position_analyses = []
+
+                try:
+                    if positions["stock_position"]:
+                        stock_analysis = analyze_position(
+                            positions["stock_position"], stockdata
+                        )
+                        position_analyses.append(stock_analysis)
+
+                    for option_position in positions["option_positions"]:
+                        try:
+                            option_analysis = analyze_position(
+                                option_position, stockdata
+                            )
+                            position_analyses.append(option_analysis)
+                        except AttributeError as e:
+                            # Handle missing get_volatility method
+                            if "get_volatility" in str(e):
+                                # Create a simplified analysis without volatility
+                                option_analysis = {
+                                    "type": "option",
+                                    "ticker": option_position.ticker,
+                                    "market_value": option_position.market_value,
+                                    "beta": stockdata.get_beta(option_position.ticker),
+                                    "exposure": option_position.market_value,
+                                    "beta_adjusted_exposure": option_position.market_value
+                                    * stockdata.get_beta(option_position.ticker),
+                                    "delta": 0.5,  # Default delta as a placeholder
+                                    "option_type": option_position.option_type,
+                                    "strike": option_position.strike,
+                                    "expiry": option_position.expiry,
+                                    "quantity": option_position.quantity,
+                                }
+                                position_analyses.append(option_analysis)
+                            else:
+                                raise
+                except Exception as e:
+                    console.print(
+                        f"[bold yellow]Warning:[/bold yellow] Error analyzing positions: {e}"
+                    )
+                    console.print("Falling back to legacy display method.")
+
+                # For now, use the old display function
+                # In the future, we'll create a new display function for folib data
+
+                # Find the position group using the old method for backward compatibility
+                group = find_position_group(ticker, state["portfolio_groups"])
+                if group:
+                    display_position_details(group, detailed, console)
+                    state["last_position"] = group
+                else:
+                    console.print(
+                        f"[bold yellow]Warning:[/bold yellow] Using legacy display for {ticker}"
+                    )
+                    # Create a simple display for the position
+                    console.print(
+                        f"\n[bold cyan]Position Details: {ticker}[/bold cyan]"
+                    )
+
+                    for analysis in position_analyses:
+                        console.print(f"Type: {analysis['type']}")
+                        console.print(f"Market Value: ${analysis['market_value']:,.2f}")
+                        console.print(f"Beta: {analysis['beta']:.2f}")
+                        console.print(f"Exposure: ${analysis['exposure']:,.2f}")
+                        console.print(
+                            f"Beta-Adjusted Exposure: ${analysis['beta_adjusted_exposure']:,.2f}"
+                        )
+
+                        if analysis["type"] == "option":
+                            console.print(f"Delta: {analysis['delta']:.4f}")
+
+                        if analysis.get("unrealized_pnl") is not None:
+                            console.print(
+                                f"Unrealized P&L: ${analysis['unrealized_pnl']:,.2f}"
+                            )
+
+                        console.print("")
+        else:
+            # Use the old method
+            group = find_position_group(ticker, state["portfolio_groups"])
+
+            if not group:
+                console.print(f"[bold red]Position not found:[/bold red] {ticker}")
+                return
+
+            # Display detailed position information
+            display_position_details(group, detailed, console)
+
+            # Store the last viewed position in state
+            state["last_position"] = group
 
     except ValueError as e:
         console.print(f"[bold red]Error:[/bold red] {e!s}")
@@ -125,18 +225,114 @@ def position_risk(ticker: str, args: list[str], state: dict[str, Any], console):
         parsed_args = parse_args(args, arg_specs)
         detailed = parsed_args["detailed"]
 
-        # Find the position group
-        group = find_position_group(ticker, state["portfolio_groups"])
+        # Check if we have the new folib Portfolio object
+        if state.get("portfolio"):
+            # Find positions using the new folib function
+            positions = find_positions_by_ticker(ticker, state["portfolio"])
 
-        if not group:
-            console.print(f"[bold red]Position not found:[/bold red] {ticker}")
-            return
+            if not positions["stock_position"] and not positions["option_positions"]:
+                # Try the old method as fallback
+                group = find_position_group(ticker, state["portfolio_groups"])
+                if not group:
+                    console.print(f"[bold red]Position not found:[/bold red] {ticker}")
+                    return
 
-        # Display risk analysis
-        display_position_risk_analysis(group, detailed, console)
+                # Display using the old method
+                display_position_risk_analysis(group, detailed, console)
 
-        # Store the last viewed position in state
-        state["last_position"] = group
+                # Store the last viewed position in state
+                state["last_position"] = group
+            else:
+                # For now, use the old display function
+                # In the future, we'll create a new display function for folib data
+
+                # Find the position group using the old method for backward compatibility
+                group = find_position_group(ticker, state["portfolio_groups"])
+                if group:
+                    display_position_risk_analysis(group, detailed, console)
+                    state["last_position"] = group
+                else:
+                    console.print(
+                        f"[bold yellow]Warning:[/bold yellow] Using legacy risk display for {ticker}"
+                    )
+                    # Use the position service to analyze the positions
+                    from src.folib.data.stock import stockdata
+                    from src.folib.services.position_service import analyze_position
+
+                    position_analyses = []
+
+                    try:
+                        if positions["stock_position"]:
+                            stock_analysis = analyze_position(
+                                positions["stock_position"], stockdata
+                            )
+                            position_analyses.append(stock_analysis)
+
+                        for option_position in positions["option_positions"]:
+                            try:
+                                option_analysis = analyze_position(
+                                    option_position, stockdata
+                                )
+                                position_analyses.append(option_analysis)
+                            except AttributeError as e:
+                                # Handle missing get_volatility method
+                                if "get_volatility" in str(e):
+                                    # Create a simplified analysis without volatility
+                                    option_analysis = {
+                                        "type": "option",
+                                        "ticker": option_position.ticker,
+                                        "market_value": option_position.market_value,
+                                        "beta": stockdata.get_beta(
+                                            option_position.ticker
+                                        ),
+                                        "exposure": option_position.market_value,
+                                        "beta_adjusted_exposure": option_position.market_value
+                                        * stockdata.get_beta(option_position.ticker),
+                                        "delta": 0.5,  # Default delta as a placeholder
+                                        "option_type": option_position.option_type,
+                                        "strike": option_position.strike,
+                                        "expiry": option_position.expiry,
+                                        "quantity": option_position.quantity,
+                                    }
+                                    position_analyses.append(option_analysis)
+                                else:
+                                    raise
+                    except Exception as e:
+                        console.print(
+                            f"[bold yellow]Warning:[/bold yellow] Error analyzing positions: {e}"
+                        )
+                        console.print("Falling back to legacy display method.")
+
+                    # Create a simple display for the position risk
+                    console.print(
+                        f"\n[bold cyan]Position Risk Analysis: {ticker}[/bold cyan]"
+                    )
+
+                    for analysis in position_analyses:
+                        console.print(f"Type: {analysis['type']}")
+                        console.print(f"Beta: {analysis['beta']:.2f}")
+                        console.print(f"Exposure: ${analysis['exposure']:,.2f}")
+                        console.print(
+                            f"Beta-Adjusted Exposure: ${analysis['beta_adjusted_exposure']:,.2f}"
+                        )
+
+                        if analysis["type"] == "option":
+                            console.print(f"Delta: {analysis['delta']:.4f}")
+
+                        console.print("")
+        else:
+            # Use the old method
+            group = find_position_group(ticker, state["portfolio_groups"])
+
+            if not group:
+                console.print(f"[bold red]Position not found:[/bold red] {ticker}")
+                return
+
+            # Display risk analysis
+            display_position_risk_analysis(group, detailed, console)
+
+            # Store the last viewed position in state
+            state["last_position"] = group
 
     except ValueError as e:
         console.print(f"[bold red]Error:[/bold red] {e!s}")
@@ -178,10 +374,31 @@ def position_simulate(ticker: str, args: list[str], state: dict[str, Any], conso
         range_pct = parsed_args["range"]
         steps = parsed_args["steps"]
 
+        # For simulation, we'll continue to use the old method for now
+        # The simulation service will be implemented in a future phase
+
         # Find the position group
         group = find_position_group(ticker, state["portfolio_groups"])
 
         if not group:
+            # If not found in portfolio_groups, check if we have a folib Portfolio
+            if state.get("portfolio"):
+                console.print(
+                    "[bold yellow]Warning:[/bold yellow] Simulation using folib is not yet implemented."
+                )
+                console.print("Using legacy portfolio groups for simulation.")
+
+                # Try to find the position in the folib Portfolio
+                positions = find_positions_by_ticker(ticker, state["portfolio"])
+                if positions["stock_position"] or positions["option_positions"]:
+                    console.print(
+                        f"[bold yellow]Position {ticker} found in folib Portfolio but cannot be simulated yet.[/bold yellow]"
+                    )
+                    console.print(
+                        "Simulation service will be implemented in a future phase."
+                    )
+                    return
+
             console.print(f"[bold red]Position not found:[/bold red] {ticker}")
             return
 

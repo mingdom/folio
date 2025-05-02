@@ -1,8 +1,8 @@
 """
 Cache utilities for market data providers.
 
-This module provides caching functionality for market data providers,
-including cache path generation, expiration checking, and data reading/writing.
+This module provides file-based caching functionality for market data providers,
+with support for TTL-based expiration and methods for caching DataFrames and values.
 """
 
 import logging
@@ -68,6 +68,18 @@ class DataCache:
         """
         return os.path.join(self.cache_dir, f"{ticker}_beta.txt")
 
+    def get_volatility_cache_path(self, ticker: str) -> str:
+        """
+        Get the path to the volatility cache file for a ticker.
+
+        Args:
+            ticker: Stock ticker symbol
+
+        Returns:
+            Path to volatility cache file
+        """
+        return os.path.join(self.cache_dir, f"{ticker}_volatility.txt")
+
     def is_cache_expired(self, cache_timestamp: float) -> bool:
         """
         Determine if cache should be considered expired based on TTL.
@@ -92,15 +104,28 @@ class DataCache:
             DataFrame from cache, or None if cache doesn't exist, is expired, or can't be read
         """
         if not os.path.exists(cache_path):
+            logger.debug(f"Cache file does not exist: {cache_path}")
             return None
+
+        # Get cache age in seconds
+        cache_age = time.time() - os.path.getmtime(cache_path)
+        cache_age_hours = cache_age / 3600  # Convert to hours for more readable logging
 
         if self.is_cache_expired(os.path.getmtime(cache_path)):
-            logger.debug(f"Cache expired: {cache_path}")
+            logger.debug(
+                f"Cache expired: {cache_path} (age: {cache_age_hours:.1f} hours)"
+            )
             return None
+        else:
+            logger.debug(
+                f"Cache valid: {cache_path} (age: {cache_age_hours:.1f} hours)"
+            )
 
         try:
-            logger.info(f"Loading data from cache: {cache_path}")
-            return pd.read_csv(cache_path, index_col=0, parse_dates=True)
+            logger.debug(f"Loading data from cache: {cache_path}")
+            df = pd.read_csv(cache_path, index_col=0, parse_dates=True)
+            logger.debug(f"Loaded {len(df)} rows from cache")
+            return df
         except Exception as e:
             logger.warning(f"Error reading cache: {e}")
             return None
@@ -118,7 +143,7 @@ class DataCache:
         """
         try:
             df.to_csv(cache_path)
-            logger.debug(f"Cached data to: {cache_path}")
+            logger.debug(f"Cached {len(df)} rows of data to: {cache_path}")
             return True
         except Exception as e:
             logger.warning(f"Error writing cache: {e}")
@@ -135,11 +160,22 @@ class DataCache:
             Value from cache, or None if cache doesn't exist, is expired, or can't be read
         """
         if not os.path.exists(cache_path):
+            logger.debug(f"Cache file does not exist: {cache_path}")
             return None
 
+        # Get cache age in seconds
+        cache_age = time.time() - os.path.getmtime(cache_path)
+        cache_age_hours = cache_age / 3600  # Convert to hours for more readable logging
+
         if self.is_cache_expired(os.path.getmtime(cache_path)):
-            logger.debug(f"Cache expired: {cache_path}")
+            logger.debug(
+                f"Cache expired: {cache_path} (age: {cache_age_hours:.1f} hours)"
+            )
             return None
+        else:
+            logger.debug(
+                f"Cache valid: {cache_path} (age: {cache_age_hours:.1f} hours)"
+            )
 
         try:
             with open(cache_path) as f:
@@ -164,7 +200,7 @@ class DataCache:
         try:
             with open(cache_path, "w") as f:
                 f.write(f"{value:.6f}")
-            logger.debug(f"Cached value: {value:.3f}")
+            logger.debug(f"Cached value: {value:.3f} to {cache_path}")
             return True
         except Exception as e:
             logger.warning(f"Error writing cache: {e}")

@@ -1,8 +1,8 @@
 """
 Yahoo Finance market data provider.
 
-This module implements the MarketDataProvider interface using the Yahoo Finance API
-via the yfinance package.
+This module implements the MarketDataProvider interface using the yfinance package,
+providing access to stock prices, historical data, and beta values from Yahoo Finance.
 """
 
 import logging
@@ -128,10 +128,15 @@ class YFinanceProvider(MarketDataProvider):
         cache_path = self.cache.get_cache_path(ticker, period, interval)
         df = self.cache.read_dataframe_from_cache(cache_path)
         if df is not None:
+            logger.debug(
+                f"Using cached historical data for {ticker} ({period}, {interval})"
+            )
             return df
+        else:
+            logger.debug(f"No valid cache found for {ticker} historical data")
 
         # Fetch from yfinance
-        logger.info(f"Fetching data for {ticker} from yfinance: {period}, {interval}")
+        logger.debug(f"Fetching data for {ticker} from yfinance: {period}, {interval}")
         ticker_data = yf.Ticker(ticker)
         df = ticker_data.history(period=period, interval=interval)
 
@@ -140,5 +145,6 @@ class YFinanceProvider(MarketDataProvider):
 
         # Save to cache
         self.cache.write_dataframe_to_cache(df, cache_path)
+        logger.debug(f"Cached historical data for {ticker} ({period}, {interval})")
 
         return df

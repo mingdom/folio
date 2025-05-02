@@ -20,7 +20,8 @@ help:
 	@echo "  folio       - Start the portfolio dashboard with debug mode enabled"
 	@echo "               Options: portfolio=path/to/file.csv (use custom portfolio file)"
 	@echo "                        log=LEVEL (set logging level: DEBUG, INFO, WARNING, ERROR)"
-	@echo "  focli       - Start the interactive Folio CLI shell for portfolio analysis"
+	@echo "  focli       - Start the legacy interactive Folio CLI shell for portfolio analysis"
+	@echo "  cli         - Start the new interactive Folio CLI shell for portfolio analysis"
 	@echo "  simulate    - Run portfolio simulation using the improved simulator_v2"
 	@echo "  sim         - Alias for simulate (shorter to type)"
 	@echo "               Options: ticker=SYMBOL (focus on a specific ticker)"
@@ -37,6 +38,7 @@ help:
 	@echo "               Options: --fix (auto-fix linting issues)"
 	@echo "  test        - Run all unit tests in the tests directory"
 	@echo "  test-e2e    - Run end-to-end tests against real portfolio data"
+	@echo "  test-cli    - Run CLI tests to check for errors and issues"
 	@echo ""
 	@echo "Note: All targets now use Poetry under the hood for dependency management"
 	@echo ""
@@ -125,7 +127,7 @@ lint:
 --fix:
 
 # Portfolio and CLI Projects
-.PHONY: folio stop-folio port focli simulate
+.PHONY: folio stop-folio port focli cli simulate
 
 # Poetry is used under the hood for all targets
 
@@ -164,6 +166,14 @@ focli:
 		exit 1; \
 	fi
 	@$(POETRY) run python src/focli/focli.py
+
+cli:
+	@echo "Starting new Folio CLI interactive shell..."
+	@if ! command -v $(POETRY) &> /dev/null; then \
+		echo "Poetry not found. Please run 'make env' first."; \
+		exit 1; \
+	fi
+	@$(POETRY) run python -m src.cli
 
 simulate:
 	@echo "Running portfolio simulation with simulator_v2..."
@@ -205,7 +215,7 @@ analyze:
 sim: simulate
 
 # Test targets
-.PHONY: test test-e2e simulate analyze sim
+.PHONY: test test-e2e test-cli simulate analyze sim
 test:
 	@echo "Running unit tests (excluding e2e tests)..."
 	@if ! command -v $(POETRY) &> /dev/null; then \
@@ -233,6 +243,20 @@ test-e2e:
 	echo "Starting E2E tests at: $$(date)" && \
 	$(POETRY) run pytest tests/e2e/ -v 2>&1) | tee $(LOGS_DIR)/test_e2e_latest.log
 	@echo "E2E test log saved to: $(LOGS_DIR)/test_e2e_latest.log"
+
+test-cli:
+	@echo "Running CLI tests..."
+	@if ! command -v $(POETRY) &> /dev/null; then \
+		echo "Poetry not found. Please run 'make env' first."; \
+		exit 1; \
+	fi
+	@mkdir -p $(LOGS_DIR)
+	@mkdir -p tests/cli/reports
+	@(echo "=== CLI Test Run Log $(TIMESTAMP) ===" && \
+	echo "Starting CLI tests at: $$(date)" && \
+	$(POETRY) run bash tests/cli/e2e/test_cli_errors.sh 2>&1) | tee $(LOGS_DIR)/test_cli_latest.log
+	@echo "CLI test log saved to: $(LOGS_DIR)/test_cli_latest.log"
+	@echo "CLI test report saved to: tests/cli/reports/cli-error-report.md"
 
 # Docker commands
 docker-build:

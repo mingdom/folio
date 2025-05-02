@@ -1,42 +1,131 @@
 """
 Tests for the portfolio service module.
-
-This module contains tests for the portfolio service functionality,
-focusing on portfolio processing, position classification, and summary calculation.
 """
 
-from unittest.mock import patch
+import datetime
+from unittest.mock import MagicMock, patch
 
-from src.folib.domain import PortfolioHolding
+import pytest
+
+from src.folib.domain import (
+    OptionPosition,
+    Portfolio,
+    PortfolioHolding,
+    PortfolioSummary,
+    StockPosition,
+)
 from src.folib.services.portfolio_service import (
-    _get_pending_activity,
-    _is_pending_activity,
     create_portfolio_summary,
+    get_portfolio_exposures,
     process_portfolio,
 )
 
 
-class TestPendingActivity:
-    """Tests for pending activity detection and processing."""
+@pytest.fixture
+def mock_stockdata():
+    """Create a mock stockdata object."""
+    mock = MagicMock()
+    mock.get_price.return_value = 150.0
+    mock.get_beta.return_value = 1.2
+    mock.is_valid_stock_symbol.return_value = True
+    mock.is_cash_like.return_value = False
+    return mock
 
-    def test_is_pending_activity(self):
-        """Test the _is_pending_activity function."""
-        # Test with various pending activity patterns
-        assert _is_pending_activity("PENDING ACTIVITY") is True
-        assert _is_pending_activity("pending activity") is True
-        assert _is_pending_activity("Pending Activity") is True
-        assert _is_pending_activity("PENDING") is True
-        assert _is_pending_activity("UNSETTLED") is True
 
-        # Test with non-pending activity strings
-        assert _is_pending_activity("AAPL") is False
-        assert _is_pending_activity("CASH") is False
-        assert _is_pending_activity("") is False
-        assert _is_pending_activity(None) is False
+@pytest.fixture
+def sample_portfolio():
+    """Create a sample portfolio for testing."""
+    stock_position = StockPosition(
+        ticker="AAPL",
+        quantity=10,
+        price=150.0,
+        cost_basis=1400.0,
+    )
+    option_position = OptionPosition(
+        ticker="AAPL",
+        quantity=2,
+        price=5.0,
+        strike=160.0,
+        expiry=datetime.date.today() + datetime.timedelta(days=30),
+        option_type="CALL",
+        cost_basis=900.0,
+    )
+    return Portfolio(
+        positions=[stock_position, option_position],
+        pending_activity_value=100.0,
+    )
 
-    def test_get_pending_activity(self):
-        """Test the _get_pending_activity function."""
-        # Create test holdings
+
+class TestCreatePortfolioSummary:
+    """Tests for the create_portfolio_summary function."""
+
+    @patch("src.folib.services.portfolio_service.stockdata")
+    @patch("src.folib.calculations.options.calculate_option_delta")
+    def test_create_portfolio_summary_with_stock_and_option(
+        self, mock_calculate_delta, mock_stockdata, sample_portfolio
+    ):
+        """Test creating a portfolio summary with stock and option positions."""
+        # Arrange
+        mock_stockdata.get_price.return_value = 150.0
+        mock_stockdata.get_beta.return_value = 1.2
+        mock_stockdata.is_cash_like.return_value = False
+        mock_calculate_delta.return_value = 0.6
+
+        # Act
+        summary = create_portfolio_summary(sample_portfolio)
+
+        # Assert
+        assert isinstance(summary, PortfolioSummary)
+        assert summary.total_value > 0
+        assert summary.stock_value == 1500.0  # 10 * 150.0
+        assert summary.option_value == 1000.0  # 2 contracts * 100 shares * 5.0
+        assert summary.pending_activity_value == 100.0
+
+        # Verify the exposure calculations were called correctly
+        mock_stockdata.get_beta.assert_called_with("AAPL")
+        # The function is called twice, once for exposure calculation and once for categorization
+        assert mock_calculate_delta.call_count == 2
+
+
+class TestGetPortfolioExposures:
+    """Tests for the get_portfolio_exposures function."""
+
+    @patch("src.folib.services.portfolio_service.stockdata")
+    @patch("src.folib.calculations.options.calculate_option_delta")
+    def test_get_portfolio_exposures(
+        self, mock_calculate_delta, mock_stockdata, sample_portfolio
+    ):
+        """Test calculating portfolio exposures."""
+        # Arrange
+        mock_stockdata.get_price.return_value = 150.0
+        mock_stockdata.get_beta.return_value = 1.2
+        mock_calculate_delta.return_value = 0.6
+
+        # Act
+        exposures = get_portfolio_exposures(sample_portfolio)
+
+        # Assert
+        assert isinstance(exposures, dict)
+        assert "long_stock_exposure" in exposures
+        assert "long_option_exposure" in exposures
+        assert "net_market_exposure" in exposures
+        assert "beta_adjusted_exposure" in exposures
+
+        # Verify the exposure calculations were called correctly
+        mock_stockdata.get_beta.assert_called_with("AAPL")
+        mock_calculate_delta.assert_called_once()
+
+
+class TestProcessPortfolio:
+    """Tests for the process_portfolio function."""
+
+    @patch("src.folib.services.portfolio_service.stockdata")
+    def test_process_portfolio_with_stock_and_option(self, mock_stockdata):
+        """Test processing portfolio holdings into a structured portfolio."""
+        # Arrange
+        mock_stockdata.is_valid_stock_symbol.return_value = True
+        mock_stockdata.is_cash_like.return_value = False
+
         holdings = [
             PortfolioHolding(
                 symbol="AAPL",
@@ -44,142 +133,27 @@ class TestPendingActivity:
                 quantity=10,
                 price=150.0,
                 value=1500.0,
+                cost_basis_total=1400.0,
             ),
             PortfolioHolding(
-                symbol="PENDING ACTIVITY",
-                description="Pending Activity",
-                quantity=1,
-                price=0.0,
-                value=500.0,
-            ),
-            PortfolioHolding(
-                symbol="MSFT",
-                description="MICROSOFT CORP",
-                quantity=5,
-                price=300.0,
-                value=1500.0,
+                symbol="-AAPL",
+                description="AAPL MAY 20 2025 $160 CALL",
+                quantity=2,
+                price=5.0,
+                value=1000.0,
+                cost_basis_total=900.0,
             ),
         ]
 
-        # Test that pending activity is correctly identified and summed
-        assert _get_pending_activity(holdings) == 500.0
+        # Act
+        portfolio = process_portfolio(holdings)
 
-        # Test with multiple pending activities
-        holdings.append(
-            PortfolioHolding(
-                symbol="PENDING",
-                description="Pending Deposit",
-                quantity=1,
-                price=0.0,
-                value=200.0,
-            )
-        )
-        assert _get_pending_activity(holdings) == 700.0
-
-        # Test with no pending activity
-        no_pending_holdings = [
-            PortfolioHolding(
-                symbol="AAPL",
-                description="APPLE INC",
-                quantity=10,
-                price=150.0,
-                value=1500.0,
-            ),
-            PortfolioHolding(
-                symbol="MSFT",
-                description="MICROSOFT CORP",
-                quantity=5,
-                price=300.0,
-                value=1500.0,
-            ),
-        ]
-        assert _get_pending_activity(no_pending_holdings) == 0.0
-
-        # Test with pending activity that has zero value
-        zero_value_holdings = [
-            PortfolioHolding(
-                symbol="PENDING ACTIVITY",
-                description="Pending Activity",
-                quantity=1,
-                price=0.0,
-                value=0.0,
-            ),
-        ]
-        assert _get_pending_activity(zero_value_holdings) == 0.0
-
-    def test_process_portfolio_with_pending_activity(self):
-        """Test that process_portfolio correctly handles pending activity."""
-        # Create test holdings with pending activity
-        holdings = [
-            PortfolioHolding(
-                symbol="AAPL",
-                description="APPLE INC",
-                quantity=10,
-                price=150.0,
-                value=1500.0,
-            ),
-            PortfolioHolding(
-                symbol="PENDING ACTIVITY",
-                description="Pending Activity",
-                quantity=1,
-                price=0.0,
-                value=500.0,
-            ),
-        ]
-
-        # Mock the stock oracle to avoid external API calls
-        with patch("src.folib.services.portfolio_service.stockdata") as mock_oracle:
-            # Configure the mock to return False for is_cash_like
-            mock_oracle.is_cash_like.return_value = False
-            mock_oracle.get_beta.return_value = 1.0
-
-            # Process the portfolio
-            portfolio = process_portfolio(holdings)
-            summary = create_portfolio_summary(portfolio)
-
-            # Check that pending activity is correctly extracted
-            assert portfolio.pending_activity_value == 500.0
-            assert summary.pending_activity_value == 500.0
-
-            # Check that pending activity is not included in the portfolio holdings
-            assert len(portfolio.groups) == 1
-            assert portfolio.groups[0].ticker == "AAPL"
-
-    def test_process_portfolio_with_fidelity_pending_activity(self):
-        """Test that process_portfolio correctly handles Fidelity-style pending activity."""
-        # Create test holdings with Fidelity-style pending activity
-        # Format: Z26522634,GMX,Pending Activity,,,,,$529535.51,,,,,,,,
-        holdings = [
-            PortfolioHolding(
-                symbol="AAPL",
-                description="APPLE INC",
-                quantity=10,
-                price=150.0,
-                value=1500.0,
-            ),
-            PortfolioHolding(
-                symbol="Pending Activity",
-                description="",
-                quantity=0,
-                price=0.0,
-                value=529535.51,
-            ),
-        ]
-
-        # Mock the stock oracle to avoid external API calls
-        with patch("src.folib.services.portfolio_service.stockdata") as mock_oracle:
-            # Configure the mock to return False for is_cash_like
-            mock_oracle.is_cash_like.return_value = False
-            mock_oracle.get_beta.return_value = 1.0
-
-            # Process the portfolio
-            portfolio = process_portfolio(holdings)
-            summary = create_portfolio_summary(portfolio)
-
-            # Check that pending activity is correctly extracted
-            assert portfolio.pending_activity_value == 529535.51
-            assert summary.pending_activity_value == 529535.51
-
-            # Check that pending activity is not included in the portfolio holdings
-            assert len(portfolio.groups) == 1
-            assert portfolio.groups[0].ticker == "AAPL"
+        # Assert
+        assert isinstance(portfolio, Portfolio)
+        assert len(portfolio.positions) == 2
+        assert len(portfolio.stock_positions) == 1
+        assert len(portfolio.option_positions) == 1
+        assert portfolio.stock_positions[0].ticker == "AAPL"
+        assert portfolio.option_positions[0].ticker == "AAPL"
+        assert portfolio.option_positions[0].strike == 160.0
+        assert portfolio.option_positions[0].option_type == "CALL"
