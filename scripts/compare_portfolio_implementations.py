@@ -84,11 +84,11 @@ def load_portfolio_new_method(file_path: str) -> tuple[Portfolio, PortfolioSumma
     # Create portfolio groups for comparison with old implementation
     # Extract pending activity value
     from src.folib.services.portfolio_service import (
-        _get_pending_activity,
         create_portfolio_groups,
+        get_pending_activity,
     )
 
-    pending_activity_value = _get_pending_activity(holdings)
+    pending_activity_value = get_pending_activity(holdings)
 
     # Filter out pending activity from holdings
     filtered_holdings = [

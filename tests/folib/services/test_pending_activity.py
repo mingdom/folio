@@ -3,9 +3,7 @@
 import pandas as pd
 
 from src.folib.data.loader import parse_portfolio_holdings
-from src.folib.services.portfolio_service import (
-    _get_pending_activity,  # This will be renamed to get_pending_activity
-)
+from src.folib.services.portfolio_service import get_pending_activity
 
 
 def test_pending_activity_in_current_value_column():
@@ -31,7 +29,7 @@ def test_pending_activity_in_current_value_column():
     holdings = parse_portfolio_holdings(df)
 
     # Detect pending activity
-    pending_activity_value = _get_pending_activity(holdings)
+    pending_activity_value = get_pending_activity(holdings)
 
     # Verify the pending activity value is correctly detected
     assert pending_activity_value == 5000.00
@@ -60,7 +58,7 @@ def test_pending_activity_in_last_price_change_column():
     holdings = parse_portfolio_holdings(df)
 
     # Detect pending activity
-    pending_activity_value = _get_pending_activity(holdings)
+    pending_activity_value = get_pending_activity(holdings)
 
     # Verify the pending activity value is correctly detected
     assert pending_activity_value == 6000.00
@@ -89,7 +87,7 @@ def test_pending_activity_in_todays_gain_loss_column():
     holdings = parse_portfolio_holdings(df)
 
     # Detect pending activity
-    pending_activity_value = _get_pending_activity(holdings)
+    pending_activity_value = get_pending_activity(holdings)
 
     # Verify the pending activity value is correctly detected
     assert pending_activity_value == 7000.00
@@ -119,7 +117,7 @@ def test_pending_activity_with_multiple_rows():
     holdings = parse_portfolio_holdings(df)
 
     # Detect pending activity
-    pending_activity_value = _get_pending_activity(holdings)
+    pending_activity_value = get_pending_activity(holdings)
 
     # Verify the pending activity value is correctly detected (sum of both rows)
     assert pending_activity_value == 5000.00
@@ -145,7 +143,7 @@ def test_pending_activity_with_no_value():
     holdings = parse_portfolio_holdings(df)
 
     # Detect pending activity
-    pending_activity_value = _get_pending_activity(holdings)
+    pending_activity_value = get_pending_activity(holdings)
 
     # Verify the pending activity value is 0 when no value is found
     assert pending_activity_value == 0.0
@@ -179,7 +177,7 @@ def test_pending_activity_with_real_world_csv_format1():
     holdings = parse_portfolio_holdings(df)
 
     # Detect pending activity
-    pending_activity_value = _get_pending_activity(holdings)
+    pending_activity_value = get_pending_activity(holdings)
 
     # Verify the pending activity value is correctly detected
     assert pending_activity_value == 551528.45
@@ -213,7 +211,7 @@ def test_pending_activity_with_real_world_csv_format2():
     holdings = parse_portfolio_holdings(df)
 
     # Detect pending activity
-    pending_activity_value = _get_pending_activity(holdings)
+    pending_activity_value = get_pending_activity(holdings)
 
     # Verify the pending activity value is correctly detected
     assert pending_activity_value == 524609.67

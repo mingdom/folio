@@ -41,6 +41,7 @@ from typing import Literal
 
 import pandas as pd
 
+from ..data.loader import clean_currency_value
 from ..data.stock import stockdata
 from ..domain import (
     OptionPosition,
@@ -81,8 +82,8 @@ def process_portfolio(
     """
     logger.debug("Processing portfolio with %d holdings", len(holdings))
 
-    # Extract pending activity value
-    pending_activity_value = _get_pending_activity(holdings)
+    # Extract pending activity value using the enhanced public function
+    pending_activity_value = get_pending_activity(holdings)
 
     # Filter out pending activity from holdings
     filtered_holdings = [h for h in holdings if not _is_pending_activity(h.symbol)]
@@ -717,34 +718,29 @@ def _is_pending_activity(symbol: str) -> bool:
     # Check for common pending activity patterns
     pending_patterns = [
         "PENDING ACTIVITY",
-        "PENDING",
-        "UNSETTLED",
     ]
 
     return any(pattern in symbol_upper for pattern in pending_patterns)
 
 
-def _get_pending_activity(holdings: list[PortfolioHolding]) -> float:
+def get_pending_activity(holdings: list[PortfolioHolding]) -> float:
     """
     Extract pending activity value from portfolio holdings.
 
     This function identifies and calculates the total value of pending activity
-    in the portfolio (e.g., unsettled trades, dividends, etc.).
+    in the portfolio by examining holdings with "Pending Activity" in their symbol.
 
-    The function checks for pending activity by:
-    1. Looking for holdings with "PENDING ACTIVITY" or similar in the symbol
-    2. Checking the value in the holding
-
-    In the old implementation, multiple columns were checked for the pending activity value
-    because the column containing the value could vary between CSV files. In the new
-    implementation, this is handled during CSV parsing, and the value is already
-    stored in the holding.value field.
+    It checks multiple columns in the raw data to handle different CSV formats:
+    1. First tries the value already parsed during CSV loading (Current Value column)
+    2. If that's zero, checks Last Price Change column
+    3. If that's not available, checks Today's Gain/Loss Dollar column
+    4. If that's not available, checks Last Price column
 
     Args:
-        holdings: List of portfolio holdings
+        holdings: List of portfolio holdings from parse_portfolio_holdings()
 
     Returns:
-        Total value of pending activity
+        Total value of pending activity (positive for incoming funds, negative for outgoing)
     """
     logger.debug("Extracting pending activity value")
 
@@ -754,24 +750,27 @@ def _get_pending_activity(holdings: list[PortfolioHolding]) -> float:
     pending_holdings = [h for h in holdings if _is_pending_activity(h.symbol)]
 
     if not pending_holdings:
-        logger.debug("No pending activity found")
-        return 0.0
+        raise ValueError("No pending activity found in portfolio holdings")
 
-    # Sum up the values of all pending activity holdings
-    for holding in pending_holdings:
-        if holding.value != 0:
-            pending_activity_value += holding.value
-            logger.debug(
-                f"Found pending activity: {holding.symbol} with value {holding.value}"
-            )
-
-    # If we found pending activity holdings but all had zero value, log a warning
-    if pending_holdings and pending_activity_value == 0:
-        logger.warning(
-            f"Found {len(pending_holdings)} pending activity holdings, but all had zero value"
+    if len(pending_holdings) > 1:
+        raise ValueError(
+            f"Multiple pending activity holdings found: {[h.symbol for h in pending_holdings]}"
         )
 
-    logger.debug(f"Total pending activity value: {pending_activity_value}")
+    logger.warning(f"Found {pending_holdings} pending activity holdings")
+    holding = pending_holdings[0]
+
+    if not holding.raw_data:
+        raise ValueError(f"Pending activity holding has no raw data: {holding}")
+
+    # If value is 0, try to extract from raw_data if available
+    if holding.raw_data:
+        for key, value in holding.raw_data.items():
+            if pd.notna(value) and isinstance(value, str) and "$" in value:
+                logger.debug(f"Found pending activity value in {key} column: {value}")
+                pending_activity_value = clean_currency_value(value)
+
+    logger.warning(f"Found pending activity value: {pending_activity_value}")
     return pending_activity_value
 
 

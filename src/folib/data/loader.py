@@ -8,8 +8,6 @@ that can be further processed by the portfolio service.
 Key functions:
 - load_portfolio_from_csv: Load portfolio data from a CSV file
 - parse_portfolio_holdings: Parse raw CSV data into portfolio holdings
-- detect_cash_positions: Identify cash and cash-like positions
-- detect_pending_activity: Calculate pending activity value
 
 CSV Format:
 ----------
@@ -188,25 +186,28 @@ def parse_portfolio_holdings(df: pd.DataFrame) -> list[PortfolioHolding]:
                     f"Row {index}: Cleaned up symbol from {original_symbol} to {symbol}"
                 )
 
-            # Special handling for pending activity rows
+            # Identify pending activity rows but don't do special value extraction
             is_pending_activity = (
                 symbol.upper() == "PENDING ACTIVITY" or "PENDING" in symbol.upper()
             )
 
             if is_pending_activity:
-                logger.debug(f"Row {index}: Processing Pending Activity row")
-                # For pending activity, we care about the value, not quantity or price
-                # Set quantity to 0 or 1 (doesn't matter) and price to 0
+                logger.debug(f"Row {index}: Identified pending activity row")
+                # For pending activity, we just create a basic holding with the raw data
+                # Set quantity to 0 and price to 0
                 quantity = 0
                 price = 0
 
-                # Make sure we get the value from the Current Value column
+                # Try to get the value from the Current Value column for backward compatibility
+                # But the comprehensive detection will happen in portfolio_service.py
                 try:
                     value = clean_currency_value(row["Current Value"])
-                    logger.debug(f"Found pending activity value: {value}")
+                    logger.debug(
+                        f"Found pending activity value in Current Value column: {value}"
+                    )
                 except (ValueError, TypeError):
                     logger.debug(
-                        f"Row {index}: Pending activity has invalid value: '{row['Current Value']}'. Using 0.0."
+                        f"Row {index}: Pending activity has no value in Current Value column. Using 0.0."
                     )
                     value = 0.0
 
@@ -312,102 +313,3 @@ def parse_portfolio_holdings(df: pd.DataFrame) -> list[PortfolioHolding]:
         logger.debug(f"Successfully parsed {len(holdings)} holdings")
 
     return holdings
-
-
-def detect_cash_positions(holdings: list[PortfolioHolding]) -> list[PortfolioHolding]:
-    """
-    Detect cash and cash-like positions in portfolio holdings.
-
-    This function identifies cash and cash-equivalent positions (money market funds,
-    short-term treasuries, etc.) from the list of portfolio holdings.
-
-    Cash detection is based on:
-    - Symbol patterns (e.g., symbols containing "MM", "CASH", "TREASURY")
-    - Description patterns (e.g., descriptions containing "Money Market", "Cash", "Treasury")
-    - Low beta and volatility characteristics
-
-    Args:
-        holdings: List of portfolio holdings from parse_portfolio_holdings()
-
-    Returns:
-        List of holdings that represent cash or cash-like positions
-    """
-    logger.debug("Detecting cash and cash-like positions")
-
-    cash_positions = []
-
-    for holding in holdings:
-        # Use StockOracle's is_cash_like method to determine if this is a cash-like position
-        if stockdata.is_cash_like(holding.symbol, holding.description):
-            logger.debug(f"Identified cash-like position: {holding.symbol}")
-            cash_positions.append(holding)
-
-    logger.debug(f"Found {len(cash_positions)} cash-like positions")
-    return cash_positions
-
-
-def detect_pending_activity(holdings: list[PortfolioHolding]) -> float:
-    """
-    Detect and calculate pending activity value.
-
-    This function identifies and calculates the total value of pending activity
-    in the portfolio.
-
-    Pending activity in the CSV always has a row called "Pending Activity"
-    but the value can show up in different columns, such as examples below:
-        [ACCOUNT ID],[ACCOUNT NAME],Pending Activity,,,,[PENDING ACTIVITY],,,,,
-        [ACCOUNT ID],[ACCOUNT NAME],Pending Activity,,,[PENDING ACTIVITY],,,,,,
-
-    Args:
-        holdings: List of portfolio holdings from parse_portfolio_holdings()
-
-    Returns:
-        Total value of pending activity (positive for incoming funds, negative for outgoing)
-    """
-    logger.debug("Detecting pending activity")
-
-    # Look for holdings with pending activity patterns
-    pending_activity_value = 0.0
-
-    for holding in holdings:
-        symbol_upper = holding.symbol.upper()
-
-        # Check if this is a pending activity position
-        if symbol_upper == "PENDING ACTIVITY":
-            # First try to use the value already parsed during CSV loading
-            if holding.value != 0.0:
-                logger.debug(
-                    f"Found pending activity: {holding.symbol} with value {holding.value} from Current Value column"
-                )
-                pending_activity_value += holding.value
-            # If the value is 0, try to extract it from raw_data if available
-            elif holding.raw_data:
-                logger.debug(
-                    "Trying to extract pending activity value from raw data dictionary"
-                )
-
-                # Check other columns that might contain the pending activity value
-                columns_to_check = [
-                    "Last Price Change",
-                    "Today's Gain/Loss Dollar",
-                    "Last Price",
-                ]
-
-                for column in columns_to_check:
-                    if column in holding.raw_data and holding.raw_data.get(column):
-                        try:
-                            value = clean_currency_value(holding.raw_data[column])
-                            if value != 0.0:
-                                logger.debug(
-                                    f"Found pending activity value in {column} column: {value}"
-                                )
-                                pending_activity_value += value
-                                break
-                        except (ValueError, TypeError):
-                            logger.debug(
-                                f"Could not parse pending activity value from {column}: {holding.raw_data[column]}"
-                            )
-                            continue
-
-    logger.debug(f"Total pending activity value: {pending_activity_value}")
-    return pending_activity_value
