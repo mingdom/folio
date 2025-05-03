@@ -38,16 +38,14 @@ def create_position_row(group: PortfolioGroup, _metrics: dict) -> dbc.Row:
             ),
             dbc.Col(
                 [
-                    html.Div(
-                        [
-                            html.Span("Stock" if group.stock_position else ""),
-                            html.Span(
-                                f" ({len(group.option_positions)} options)"
-                                if group.option_positions
-                                else ""
-                            ),
-                        ]
-                    )
+                    html.Div([
+                        html.Span("Stock" if group.stock_position else ""),
+                        html.Span(
+                            f" ({len(group.option_positions)} options)"
+                            if group.option_positions
+                            else ""
+                        ),
+                    ])
                 ],
                 width=2,
                 className="text-truncate text-center",

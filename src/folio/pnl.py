@@ -13,7 +13,7 @@ import numpy as np
 
 from .data_model import OptionPosition, StockPosition
 from .logger import logger
-from .options import OptionContract, calculate_bs_price
+from .options import OptionContract, calculate_black_scholes_delta, calculate_bs_price
 
 
 def calculate_position_pnl(

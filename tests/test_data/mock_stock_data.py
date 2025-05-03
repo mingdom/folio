@@ -55,16 +55,14 @@ def generate_price_series(base_price=100.0, volatility=0.01, days=252, seed=42):
         low_price = min(open_price, price) * (1 - abs(np.random.normal(0, 0.005)))
         volume = int(np.random.normal(1000000, 300000))
 
-        data.append(
-            {
-                "date": date,
-                "Open": open_price,
-                "High": high_price,
-                "Low": low_price,
-                "Close": price,
-                "Volume": max(0, volume),  # Ensure volume is positive
-            }
-        )
+        data.append({
+            "date": date,
+            "Open": open_price,
+            "High": high_price,
+            "Low": low_price,
+            "Close": price,
+            "Volume": max(0, volume),  # Ensure volume is positive
+        })
 
     # Create DataFrame
     df = pd.DataFrame(data)

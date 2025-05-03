@@ -108,26 +108,40 @@ ignore = [
 
 # Allow autofix for all enabled rules (when `--fix`) is provided
 fixable = ["ALL"]
+unfixable = []
 
 # Exclude a variety of commonly ignored directories
 exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
     ".git",
+    ".git-rewrite",
+    ".hg",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
     ".venv",
-    "venv",
-    "__pycache__",
+    "__pypackages__",
+    "_build",
+    "buck-out",
     "build",
     "dist",
-    "mlruns",
-    ".pytest_cache",
-    ".archive",
+    "node_modules",
+    "venv",
 ]
-
-# Allow unused variables when underscore-prefixed
-dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
 [tool.ruff.lint.per-file-ignores]
 # DO NOT IGNORE UNLESS IT'S A REALLY GOOD REASON!
 "__init__.py" = ["F401"]  # Re-exports are common in __init__.py files
+# Ignore PLC0415 for files outside of src/cli and src/folio
+"src/stockdata.py" = ["PLC0415"]
+"src/yfinance.py" = ["PLC0415"]
+"tests/**/*.py" = ["PLC0415"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["src"]

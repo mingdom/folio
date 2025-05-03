@@ -192,47 +192,39 @@ def create_dashboard_section():
                 ),
             ),
             dbc.Collapse(
-                dbc.CardBody(
-                    [
-                        # Asset Allocation Chart has been removed in favor of the more accurate Exposure Chart
-                        # Market Exposure Chart (in its own card)
-                        dbc.Card(
-                            [
-                                dbc.CardHeader("Market Exposure"),
-                                dbc.CardBody(
-                                    [
-                                        create_exposure_chart(),
-                                    ]
-                                ),
-                            ],
-                            className="mb-4 chart-card",
-                        ),
-                        # Position Treemap (in its own card)
-                        dbc.Card(
-                            [
-                                dbc.CardHeader("Position Size by Exposure"),
-                                dbc.CardBody(
-                                    [
-                                        create_position_treemap(),
-                                    ]
-                                ),
-                            ],
-                            className="mb-4 chart-card",
-                        ),
-                        # Portfolio Allocations Chart (in its own card)
-                        dbc.Card(
-                            [
-                                dbc.CardHeader("Portfolio Allocation"),
-                                dbc.CardBody(
-                                    [
-                                        create_allocations_chart(),
-                                    ]
-                                ),
-                            ],
-                            className="mb-4 chart-card",
-                        ),
-                    ]
-                ),
+                dbc.CardBody([
+                    # Asset Allocation Chart has been removed in favor of the more accurate Exposure Chart
+                    # Market Exposure Chart (in its own card)
+                    dbc.Card(
+                        [
+                            dbc.CardHeader("Market Exposure"),
+                            dbc.CardBody([
+                                create_exposure_chart(),
+                            ]),
+                        ],
+                        className="mb-4 chart-card",
+                    ),
+                    # Position Treemap (in its own card)
+                    dbc.Card(
+                        [
+                            dbc.CardHeader("Position Size by Exposure"),
+                            dbc.CardBody([
+                                create_position_treemap(),
+                            ]),
+                        ],
+                        className="mb-4 chart-card",
+                    ),
+                    # Portfolio Allocations Chart (in its own card)
+                    dbc.Card(
+                        [
+                            dbc.CardHeader("Portfolio Allocation"),
+                            dbc.CardBody([
+                                create_allocations_chart(),
+                            ]),
+                        ],
+                        className="mb-4 chart-card",
+                    ),
+                ]),
                 id="charts-collapse",
                 is_open=True,  # Initially open
             ),
@@ -279,25 +271,23 @@ def register_callbacks(app):
             metrics = create_dashboard_metrics(portfolio_summary)
 
             # Create a row of metric cards
-            return dbc.Row(
-                [
-                    dbc.Col(
-                        html.Div(
-                            [
-                                html.H5(metric["title"], className="metric-title"),
-                                html.H3(metric["value"], className="metric-value"),
-                                html.Div(
-                                    metric["help_text"],
-                                    className="metric-help-text small text-muted",
-                                ),
-                            ],
-                            className="metric-card",
-                        ),
-                        width=3,
-                    )
-                    for metric in metrics
-                ]
-            )
+            return dbc.Row([
+                dbc.Col(
+                    html.Div(
+                        [
+                            html.H5(metric["title"], className="metric-title"),
+                            html.H3(metric["value"], className="metric-value"),
+                            html.Div(
+                                metric["help_text"],
+                                className="metric-help-text small text-muted",
+                            ),
+                        ],
+                        className="metric-card",
+                    ),
+                    width=3,
+                )
+                for metric in metrics
+            ])
         except Exception as e:
             logger.error(f"Error updating dashboard metrics: {e}", exc_info=True)
             return html.Div(f"Error loading metrics: {e!s}", className="text-danger")

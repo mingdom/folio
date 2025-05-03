@@ -19,6 +19,8 @@ from datetime import datetime
 
 import pytz
 
+from src.yfinance import YFinanceDataFetcher
+
 logger = logging.getLogger(__name__)
 
 
@@ -82,8 +84,6 @@ def create_data_fetcher(cache_dir=None):
         else:
             # Use local directory for other environments
             cache_dir = ".cache_yf"
-
-    from src.yfinance import YFinanceDataFetcher
 
     logger.info(f"Creating YFinance data fetcher with cache dir: {cache_dir}")
     return YFinanceDataFetcher(cache_dir=cache_dir)

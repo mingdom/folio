@@ -105,13 +105,11 @@ class OptionPosition(Position):
     def to_dict(self) -> dict:
         """Convert the option position to a dictionary for display purposes."""
         base_dict = super().to_dict()
-        base_dict.update(
-            {
-                "strike": self.strike,
-                "expiry": self.expiry.isoformat(),
-                "option_type": self.option_type,
-            }
-        )
+        base_dict.update({
+            "strike": self.strike,
+            "expiry": self.expiry.isoformat(),
+            "option_type": self.option_type,
+        })
         return base_dict
 
 
@@ -162,11 +160,9 @@ class UnknownPosition(Position):
     def to_dict(self) -> dict:
         """Convert the unknown position to a dictionary for display purposes."""
         base_dict = super().to_dict()
-        base_dict.update(
-            {
-                "description": self.description,
-            }
-        )
+        base_dict.update({
+            "description": self.description,
+        })
         return base_dict
 
 

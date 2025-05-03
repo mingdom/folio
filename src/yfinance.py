@@ -11,7 +11,12 @@ import os
 import pandas as pd
 
 import yfinance as yf
-from src.stockdata import DataFetcherInterface
+from src.stockdata import DataFetcherInterface, should_use_cache
+
+try:
+    from src.v2.config import config
+except ImportError:
+    config = None
 
 logger = logging.getLogger(__name__)
 
@@ -37,11 +42,9 @@ class YFinanceDataFetcher(DataFetcherInterface):
 
         # Get cache TTL from config or use default (1 day)
         if cache_ttl is None:
-            try:
-                from src.v2.config import config
-
+            if config:
                 self.cache_ttl = config.get("app.cache.ttl", 86400)
-            except ImportError:
+            else:
                 self.cache_ttl = 86400
         else:
             self.cache_ttl = cache_ttl
@@ -62,8 +65,6 @@ class YFinanceDataFetcher(DataFetcherInterface):
         cache_path = self._get_cache_path(ticker, period, interval)
 
         # Use the centralized cache validation logic
-        from src.stockdata import should_use_cache
-
         should_use, reason = should_use_cache(cache_path, self.cache_ttl)
 
         if should_use:

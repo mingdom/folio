@@ -114,16 +114,14 @@ def simulate_portfolio_with_spy_changes(
             for pos in cash_like_positions:
                 if hasattr(pos, "to_dict"):
                     # It's a StockPosition object
-                    cash_like_dicts.append(
-                        {
-                            "ticker": pos.ticker,
-                            "quantity": pos.quantity,
-                            "beta": pos.beta,
-                            "market_value": pos.market_value,
-                            "beta_adjusted_exposure": pos.beta_adjusted_exposure,
-                            "price": pos.price,
-                        }
-                    )
+                    cash_like_dicts.append({
+                        "ticker": pos.ticker,
+                        "quantity": pos.quantity,
+                        "beta": pos.beta,
+                        "market_value": pos.market_value,
+                        "beta_adjusted_exposure": pos.beta_adjusted_exposure,
+                        "price": pos.price,
+                    })
                 else:
                     # It's already a dictionary
                     cash_like_dicts.append(pos)
@@ -158,14 +156,12 @@ def simulate_portfolio_with_spy_changes(
 
             # Store additional details for the 0% change case
             if abs(spy_change) < 0.001:
-                position_details[ticker].update(
-                    {
-                        "current_value": total_value,
-                        "current_exposure": group.net_exposure,
-                        "stock_value": stock_value,
-                        "option_value": option_value,
-                    }
-                )
+                position_details[ticker].update({
+                    "current_value": total_value,
+                    "current_exposure": group.net_exposure,
+                    "stock_value": stock_value,
+                    "option_value": option_value,
+                })
 
         # Store current values (at 0% change)
         if abs(spy_change) < 0.001:  # Close to 0%

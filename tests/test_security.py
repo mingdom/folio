@@ -138,18 +138,16 @@ class TestSecurity(unittest.TestCase):
     def test_sanitize_dataframe(self):
         """Test sanitizing a DataFrame."""
         # Create a test DataFrame with potentially dangerous content
-        df = pd.DataFrame(
-            {
-                "Symbol": ["AAPL", "=SUM(A1:B1)", "MSFT"],
-                "Description": [
-                    "Apple Inc",
-                    '<script>alert("XSS")</script>',
-                    "Microsoft Corp",
-                ],
-                "Quantity": [100, 200, 300],
-                "Last Price": ["$150.00", '=HYPERLINK("malicious.com")', "$250.00"],
-            }
-        )
+        df = pd.DataFrame({
+            "Symbol": ["AAPL", "=SUM(A1:B1)", "MSFT"],
+            "Description": [
+                "Apple Inc",
+                '<script>alert("XSS")</script>',
+                "Microsoft Corp",
+            ],
+            "Quantity": [100, 200, 300],
+            "Last Price": ["$150.00", '=HYPERLINK("malicious.com")', "$250.00"],
+        })
 
         # Sanitize the DataFrame
         sanitized_df = sanitize_dataframe(df)
@@ -169,13 +167,11 @@ class TestSecurity(unittest.TestCase):
     def test_validate_csv_upload(self):
         """Test validating a CSV upload."""
         # Create a valid CSV file
-        df = pd.DataFrame(
-            {
-                "Symbol": ["AAPL", "MSFT", "GOOGL"],
-                "Quantity": [100, 200, 300],
-                "Last Price": ["$150.00", "$250.00", "$2,500.00"],
-            }
-        )
+        df = pd.DataFrame({
+            "Symbol": ["AAPL", "MSFT", "GOOGL"],
+            "Quantity": [100, 200, 300],
+            "Last Price": ["$150.00", "$250.00", "$2,500.00"],
+        })
 
         # Convert to CSV and encode as base64
         csv_buffer = io.StringIO()
@@ -192,13 +188,11 @@ class TestSecurity(unittest.TestCase):
         self.assertEqual(len(result_df), 3)
 
         # Create a CSV with malicious content
-        df = pd.DataFrame(
-            {
-                "Symbol": ["AAPL", "=SUM(A1:B1)", "MSFT"],
-                "Quantity": [100, 200, 300],
-                "Last Price": ["$150.00", '=HYPERLINK("malicious.com")', "$250.00"],
-            }
-        )
+        df = pd.DataFrame({
+            "Symbol": ["AAPL", "=SUM(A1:B1)", "MSFT"],
+            "Quantity": [100, 200, 300],
+            "Last Price": ["$150.00", '=HYPERLINK("malicious.com")', "$250.00"],
+        })
 
         # Convert to CSV and encode as base64
         csv_buffer = io.StringIO()
@@ -223,12 +217,10 @@ class TestSecurity(unittest.TestCase):
         self.assertIn("Only CSV files are supported", str(context.exception))
 
         # Test with missing required columns
-        df = pd.DataFrame(
-            {
-                "Symbol": ["AAPL", "MSFT", "GOOGL"],
-                # Missing 'Quantity' and 'Last Price'
-            }
-        )
+        df = pd.DataFrame({
+            "Symbol": ["AAPL", "MSFT", "GOOGL"],
+            # Missing 'Quantity' and 'Last Price'
+        })
 
         # Convert to CSV and encode as base64
         csv_buffer = io.StringIO()

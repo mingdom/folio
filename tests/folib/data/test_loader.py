@@ -94,16 +94,14 @@ class TestParsePortfolioHoldings:
     def test_parse_portfolio_holdings(self):
         """Test parsing portfolio holdings from a DataFrame."""
         # Create a test DataFrame
-        df = pd.DataFrame(
-            {
-                "Symbol": ["AAPL", "MSFT"],
-                "Description": ["APPLE INC", "MICROSOFT CORP"],
-                "Quantity": [10, 5],
-                "Last Price": ["$150.00", "$300.00"],
-                "Current Value": ["$1500.00", "$1500.00"],
-                "Cost Basis Total": ["$1000.00", "$1200.00"],
-            }
-        )
+        df = pd.DataFrame({
+            "Symbol": ["AAPL", "MSFT"],
+            "Description": ["APPLE INC", "MICROSOFT CORP"],
+            "Quantity": [10, 5],
+            "Last Price": ["$150.00", "$300.00"],
+            "Current Value": ["$1500.00", "$1500.00"],
+            "Cost Basis Total": ["$1000.00", "$1200.00"],
+        })
 
         # Parse the holdings
         holdings = parse_portfolio_holdings(df)
@@ -117,16 +115,14 @@ class TestParsePortfolioHoldings:
     def test_parse_portfolio_holdings_with_empty_symbols(self):
         """Test parsing portfolio holdings with empty symbols."""
         # Create a test DataFrame with an empty symbol
-        df = pd.DataFrame(
-            {
-                "Symbol": ["AAPL", ""],
-                "Description": ["APPLE INC", "EMPTY SYMBOL"],
-                "Quantity": [10, 5],
-                "Last Price": ["$150.00", "$300.00"],
-                "Current Value": ["$1500.00", "$1500.00"],
-                "Cost Basis Total": ["$1000.00", "$1200.00"],
-            }
-        )
+        df = pd.DataFrame({
+            "Symbol": ["AAPL", ""],
+            "Description": ["APPLE INC", "EMPTY SYMBOL"],
+            "Quantity": [10, 5],
+            "Last Price": ["$150.00", "$300.00"],
+            "Current Value": ["$1500.00", "$1500.00"],
+            "Cost Basis Total": ["$1000.00", "$1200.00"],
+        })
 
         # Parse the holdings
         holdings = parse_portfolio_holdings(df)
@@ -136,16 +132,14 @@ class TestParsePortfolioHoldings:
     def test_parse_portfolio_holdings_with_invalid_values(self):
         """Test parsing portfolio holdings with invalid values."""
         # Create a test DataFrame with invalid values
-        df = pd.DataFrame(
-            {
-                "Symbol": ["AAPL", "MSFT"],
-                "Description": ["APPLE INC", "MICROSOFT CORP"],
-                "Quantity": [10, "invalid"],
-                "Last Price": ["$150.00", "invalid"],
-                "Current Value": ["$1500.00", "invalid"],
-                "Cost Basis Total": ["$1000.00", "invalid"],
-            }
-        )
+        df = pd.DataFrame({
+            "Symbol": ["AAPL", "MSFT"],
+            "Description": ["APPLE INC", "MICROSOFT CORP"],
+            "Quantity": [10, "invalid"],
+            "Last Price": ["$150.00", "invalid"],
+            "Current Value": ["$1500.00", "invalid"],
+            "Cost Basis Total": ["$1000.00", "invalid"],
+        })
 
         # Parse the holdings
         holdings = parse_portfolio_holdings(df)
@@ -164,16 +158,14 @@ class TestParsePortfolioHoldings:
     def test_parse_portfolio_holdings_with_pending_activity(self):
         """Test parsing portfolio holdings with pending activity."""
         # Create a test DataFrame with pending activity
-        df = pd.DataFrame(
-            {
-                "Symbol": ["AAPL", "Pending Activity"],
-                "Description": ["APPLE INC", ""],
-                "Quantity": [10, ""],
-                "Last Price": ["$150.00", ""],
-                "Current Value": ["$1500.00", "$529535.51"],
-                "Cost Basis Total": ["$1000.00", ""],
-            }
-        )
+        df = pd.DataFrame({
+            "Symbol": ["AAPL", "Pending Activity"],
+            "Description": ["APPLE INC", ""],
+            "Quantity": [10, ""],
+            "Last Price": ["$150.00", ""],
+            "Current Value": ["$1500.00", "$529535.51"],
+            "Cost Basis Total": ["$1000.00", ""],
+        })
 
         # Parse the holdings
         holdings = parse_portfolio_holdings(df)
@@ -188,26 +180,24 @@ class TestParsePortfolioHoldings:
         """Test parsing portfolio holdings with Fidelity-format pending activity."""
         # Create a test DataFrame with Fidelity-format pending activity
         # Format: Z26522634,GMX,Pending Activity,,,,,$529535.51,,,,,,,,
-        df = pd.DataFrame(
-            {
-                "Account Number": ["Z26522634", "Z26522634"],
-                "Account Name": ["GMX", "GMX"],
-                "Symbol": ["AAPL", "Pending Activity"],
-                "Description": ["APPLE INC", ""],
-                "Quantity": [10, ""],
-                "Last Price": ["$150.00", ""],
-                "Last Price Change": ["$1.00", ""],
-                "Current Value": ["$1500.00", "$529535.51"],
-                "Today's Gain/Loss Dollar": ["$10.00", ""],
-                "Today's Gain/Loss Percent": ["0.67%", ""],
-                "Total Gain/Loss Dollar": ["$500.00", ""],
-                "Total Gain/Loss Percent": ["50.00%", ""],
-                "Percent Of Account": ["1.00%", ""],
-                "Cost Basis Total": ["$1000.00", ""],
-                "Average Cost Basis": ["$100.00", ""],
-                "Type": ["Margin", ""],
-            }
-        )
+        df = pd.DataFrame({
+            "Account Number": ["Z26522634", "Z26522634"],
+            "Account Name": ["GMX", "GMX"],
+            "Symbol": ["AAPL", "Pending Activity"],
+            "Description": ["APPLE INC", ""],
+            "Quantity": [10, ""],
+            "Last Price": ["$150.00", ""],
+            "Last Price Change": ["$1.00", ""],
+            "Current Value": ["$1500.00", "$529535.51"],
+            "Today's Gain/Loss Dollar": ["$10.00", ""],
+            "Today's Gain/Loss Percent": ["0.67%", ""],
+            "Total Gain/Loss Dollar": ["$500.00", ""],
+            "Total Gain/Loss Percent": ["50.00%", ""],
+            "Percent Of Account": ["1.00%", ""],
+            "Cost Basis Total": ["$1000.00", ""],
+            "Average Cost Basis": ["$100.00", ""],
+            "Type": ["Margin", ""],
+        })
 
         # Parse the holdings
         holdings = parse_portfolio_holdings(df)
@@ -222,16 +212,14 @@ class TestParsePortfolioHoldings:
     def test_parse_portfolio_holdings_with_pending_activity_logging(self, mock_logger):
         """Test that pending activity parsing is properly logged."""
         # Create a test DataFrame with pending activity
-        df = pd.DataFrame(
-            {
-                "Symbol": ["Pending Activity"],
-                "Description": [""],
-                "Quantity": [""],
-                "Last Price": [""],
-                "Current Value": ["$529535.51"],
-                "Cost Basis Total": [""],
-            }
-        )
+        df = pd.DataFrame({
+            "Symbol": ["Pending Activity"],
+            "Description": [""],
+            "Quantity": [""],
+            "Last Price": [""],
+            "Current Value": ["$529535.51"],
+            "Cost Basis Total": [""],
+        })
 
         # Parse the holdings
         holdings = parse_portfolio_holdings(df)
@@ -248,16 +236,14 @@ class TestParsePortfolioHoldings:
     def test_parse_portfolio_holdings_with_special_symbols(self):
         """Test parsing portfolio holdings with special symbols like SPAXX**."""
         # Create a test DataFrame with a special symbol
-        df = pd.DataFrame(
-            {
-                "Symbol": ["SPAXX**"],
-                "Description": ["FIDELITY GOVERNMENT MONEY MARKET"],
-                "Quantity": [""],
-                "Last Price": [""],
-                "Current Value": ["$51151.25"],
-                "Cost Basis Total": [""],
-            }
-        )
+        df = pd.DataFrame({
+            "Symbol": ["SPAXX**"],
+            "Description": ["FIDELITY GOVERNMENT MONEY MARKET"],
+            "Quantity": [""],
+            "Last Price": [""],
+            "Current Value": ["$51151.25"],
+            "Cost Basis Total": [""],
+        })
 
         # Parse the holdings
         holdings = parse_portfolio_holdings(df)
@@ -271,16 +257,14 @@ class TestParsePortfolioHoldings:
     def test_parse_portfolio_holdings_with_special_symbols_logging(self, mock_logger):
         """Test that special symbol cleaning is properly logged."""
         # Create a test DataFrame with a special symbol
-        df = pd.DataFrame(
-            {
-                "Symbol": ["SPAXX**"],
-                "Description": ["FIDELITY GOVERNMENT MONEY MARKET"],
-                "Quantity": [""],
-                "Last Price": [""],
-                "Current Value": ["$51151.25"],
-                "Cost Basis Total": [""],
-            }
-        )
+        df = pd.DataFrame({
+            "Symbol": ["SPAXX**"],
+            "Description": ["FIDELITY GOVERNMENT MONEY MARKET"],
+            "Quantity": [""],
+            "Last Price": [""],
+            "Current Value": ["$51151.25"],
+            "Cost Basis Total": [""],
+        })
 
         # Mock the is_cash_like method to return True
         with patch("src.folib.data.stock.stockdata.is_cash_like", return_value=True):
