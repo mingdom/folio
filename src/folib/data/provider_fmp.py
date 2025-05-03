@@ -5,7 +5,6 @@ This module implements the MarketDataProvider interface using the fmpsdk package
 providing access to stock prices, historical data, and beta values from the FMP API.
 """
 
-import logging
 import os
 import re
 from datetime import datetime, timedelta
@@ -13,12 +12,11 @@ from datetime import datetime, timedelta
 import fmpsdk
 import pandas as pd
 
+from src.folib.logger import logger
+
 from .cache import DataCache
 from .provider import MarketDataProvider
 from .utils import is_valid_stock_symbol
-
-# Set up logging
-logger = logging.getLogger(__name__)
 
 
 class FMPProvider(MarketDataProvider):

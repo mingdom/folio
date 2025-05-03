@@ -5,19 +5,16 @@ This module implements the MarketDataProvider interface using the yfinance packa
 providing access to stock prices, historical data, and beta values from Yahoo Finance.
 """
 
-import logging
 import os
 
 import pandas as pd
 
 import yfinance as yf
+from src.folib.logger import logger
 
 from .cache import DataCache
 from .provider import MarketDataProvider
 from .utils import is_valid_stock_symbol
-
-# Set up logging
-logger = logging.getLogger(__name__)
 
 
 class YFinanceProvider(MarketDataProvider):
