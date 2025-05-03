@@ -78,10 +78,15 @@ class TestChartDataTransformations:
             short_exposure=short_exposure,
             options_exposure=options_exposure,
             short_percentage=33.0,
+            cash_like_positions=[],
             cash_like_value=4000.0,
             cash_like_count=1,
             cash_percentage=40.0,
+            stock_value=5000.0,
+            option_value=1000.0,
+            pending_activity_value=0.0,
             portfolio_estimate_value=10000.0,
+            price_updated_at="2025-05-03T09:00:00Z",
         )
 
     @pytest.fixture
@@ -303,6 +308,7 @@ class TestChartDataTransformations:
             option_value=1000.0,
             pending_activity_value=500.0,
             portfolio_estimate_value=15000.0,
+            price_updated_at="2025-05-03T09:00:00Z",
         )
 
     @pytest.fixture
@@ -337,6 +343,7 @@ class TestChartDataTransformations:
             option_value=0.0,
             pending_activity_value=0.0,
             portfolio_estimate_value=0.0,
+            price_updated_at="2025-05-03T09:00:00Z",
         )
 
     def test_allocations_chart_transformation(
@@ -501,7 +508,7 @@ class TestChartDataTransformations:
             option_value=400000.0,  # Net option value
             pending_activity_value=200000.0,  # $200K pending
             portfolio_estimate_value=3000000.0,  # $3M total
-            help_text={},
+            price_updated_at="2025-05-03T09:00:00Z",
         )
 
         # Transform data for allocations chart
@@ -662,7 +669,7 @@ class TestChartDataTransformations:
             option_value=-300000.0,  # Net option value (negative)
             pending_activity_value=100000.0,  # $100K pending
             portfolio_estimate_value=1100000.0,  # $1.1M total (net of shorts)
-            help_text={},
+            price_updated_at="2025-05-03T09:00:00Z",
         )
 
         # Transform data for allocations chart

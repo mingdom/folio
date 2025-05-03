@@ -90,6 +90,7 @@ class TestChartColors:
             option_value=1000.0,
             pending_activity_value=500.0,
             portfolio_estimate_value=15000.0,
+            price_updated_at="2025-05-03T09:09:46Z",
         )
 
     @pytest.fixture

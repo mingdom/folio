@@ -37,20 +37,8 @@ from dataclasses import dataclass
 logger = logging.getLogger(__name__)
 
 
-def calculate_notional_value(quantity: float, underlying_price: float) -> float:
-    """Calculate the notional value of an option position.
-
-    This is the canonical implementation that should be used throughout the codebase.
-    Notional value represents the total value controlled by the option contracts.
-
-    Args:
-        quantity: Number of contracts (can be negative for short positions)
-        underlying_price: Price of the underlying asset
-
-    Returns:
-        The absolute notional value (always positive)
-    """
-    return 100 * abs(quantity) * underlying_price
+# Import the canonical implementations from calculations.py
+from .calculations import calculate_notional_value, calculate_option_exposure
 
 
 def calculate_beta_adjusted_option_exposure(
@@ -614,65 +602,7 @@ def calculate_option_delta(
     return adjusted_delta
 
 
-def calculate_option_exposure(
-    option: OptionContract,
-    underlying_price: float,
-    beta: float = 1.0,
-    risk_free_rate: float = 0.05,
-    implied_volatility: float | None = None,
-) -> dict[str, float]:
-    """Calculate exposure metrics for an option position.
-
-    This function calculates various exposure metrics for an option position, including
-    delta, delta exposure (delta * notional_value), and beta-adjusted exposure
-    (delta_exposure * beta).
-
-    Args:
-        option: The option position
-        underlying_price: The price of the underlying asset
-        beta: The beta of the underlying asset relative to the market. Defaults to 1.0.
-        risk_free_rate: The risk-free interest rate. Defaults to 0.05 (5%).
-        implied_volatility: Optional override for implied volatility. Defaults to None.
-
-    Returns:
-        A dictionary containing exposure metrics:
-        - 'delta': The option's delta
-        - 'delta_exposure': The delta-adjusted exposure (delta * notional_value)
-        - 'beta_adjusted_exposure': The beta-adjusted exposure (delta_exposure * beta)
-        - 'notional_value': The notional value (100 * abs(quantity) * underlying_price)
-    """
-    # Set the underlying price on the option object to ensure notional_value property works
-    option.underlying_price = underlying_price
-
-    # Apply volatility skew if no implied volatility is provided
-    if implied_volatility is None:
-        implied_volatility = estimate_volatility_with_skew(option, underlying_price)
-
-    # Calculate delta using QuantLib
-    delta = calculate_option_delta(
-        option,
-        underlying_price,
-        risk_free_rate=risk_free_rate,
-        implied_volatility=implied_volatility,
-    )
-
-    # Calculate notional value using the canonical implementation
-    notional_value = calculate_notional_value(option.quantity, underlying_price)
-
-    # Calculate delta exposure
-    delta_exposure = delta * notional_value
-
-    # Calculate beta-adjusted exposure using the canonical implementation
-    beta_adjusted_exposure = calculate_beta_adjusted_option_exposure(
-        delta, notional_value, beta
-    )
-
-    return {
-        "delta": delta,
-        "delta_exposure": delta_exposure,
-        "beta_adjusted_exposure": beta_adjusted_exposure,
-        "notional_value": notional_value,  # Include notional value in the return value
-    }
+# calculate_option_exposure is now imported from calculations.py
 
 
 def estimate_volatility_with_skew(

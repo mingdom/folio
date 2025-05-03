@@ -78,6 +78,7 @@ class TestAIIntegration:
             cash_like_count=0,
             portfolio_estimate_value=20000.0,  # Add portfolio value for testing
             pending_activity_value=500.0,  # Add pending activity for testing
+            price_updated_at="2025-05-03T09:00:00Z",
         )
 
         # Test prepare_portfolio_data_for_analysis
@@ -202,6 +203,7 @@ class TestAIIntegration:
             cash_like_count=0,
             portfolio_estimate_value=20000.0,  # Add portfolio value for testing
             pending_activity_value=500.0,  # Add pending activity for testing
+            price_updated_at="2025-05-03T09:00:00Z",
         )
 
         # Convert to dictionary format as would be stored in Dash

@@ -13,6 +13,7 @@ import pandas as pd
 
 from src.folib.data.stock import stockdata
 
+from .calculations import calculate_beta_adjusted_exposure, calculate_net_exposure
 from .cash_detection import is_cash_or_short_term
 from .data_model import (
     ExposureBreakdown,
@@ -25,8 +26,6 @@ from .formatting import format_beta, format_currency
 from .logger import logger
 from .options import process_options
 from .portfolio_value import (
-    calculate_beta_adjusted_exposure,
-    calculate_net_exposure,
     calculate_portfolio_metrics,
     calculate_portfolio_values,
     create_value_breakdowns,

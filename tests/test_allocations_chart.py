@@ -70,11 +70,13 @@ class TestAllocationsChart:
             short_percentage=33.0,
             cash_like_value=4000.0,
             cash_like_count=1,
+            cash_like_positions=[],
             cash_percentage=40.0,
-            stock_value=5000.0,  # Net stock value (10000 - 5000)
-            option_value=1000.0,  # Net option value (2000 - 1000)
+            stock_value=5000.0,
+            option_value=1000.0,
             pending_activity_value=500.0,
-            portfolio_estimate_value=10500.0,  # 5000 + 1000 + 4000 + 500
+            portfolio_estimate_value=10500.0,
+            price_updated_at="2025-05-03T09:00:00Z",
         )
 
     def test_allocations_stacked_bar_chart(self, mock_portfolio_summary):
@@ -170,6 +172,8 @@ class TestAllocationsChart:
             option_value=0.0,
             pending_activity_value=0.0,
             portfolio_estimate_value=0.0,
+            cash_like_positions=[],
+            price_updated_at=None,
         )
 
         # Get the chart data
