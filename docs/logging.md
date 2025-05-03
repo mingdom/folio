@@ -33,7 +33,13 @@ LOG_LEVEL=DEBUG make folio
 
 # Or use the level parameter in make commands
 make folio level=DEBUG
+make cli level=DEBUG
+make test level=DEBUG
+make simulate level=DEBUG
+make analyze level=DEBUG
 ```
+
+All make commands that run Python code support the `level` parameter to control the log level.
 
 ### Default Log Levels
 
