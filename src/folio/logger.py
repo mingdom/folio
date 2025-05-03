@@ -78,15 +78,18 @@ def setup_logger() -> logging.Logger:
     # Get log level
     log_level = get_log_level(environment, config)
 
-    # Configure root logger (for third-party libraries)
+    # Configure root logger (for third-party libraries and src.folib)
     root_logger = logging.getLogger()
     if root_logger.hasHandlers():
         root_logger.handlers.clear()
-    root_logger.setLevel(logging.WARNING)
+
+    # Set root logger level to match the application log level
+    # This ensures src.folib logs are also displayed
+    root_logger.setLevel(log_level)
 
     # Add a basic handler to the root logger
     root_handler = logging.StreamHandler(sys.stderr)
-    root_handler.setFormatter(logging.Formatter("ROOT: %(levelname)s - %(message)s"))
+    root_handler.setFormatter(logging.Formatter("%(levelname)s - %(message)s"))
     root_logger.addHandler(root_handler)
 
     # Create application logger
