@@ -111,9 +111,10 @@ class GeminiClient:
             for msg in history[
                 -CONVERSATION_HISTORY_LIMIT:
             ]:  # Limit to last N messages for context window
-                formatted_history.append(
-                    {"role": msg["role"], "parts": [msg["content"]]}
-                )
+                formatted_history.append({
+                    "role": msg["role"],
+                    "parts": [msg["content"]],
+                })
 
             # Add the current message
             formatted_history.append({"role": "user", "parts": [message]})
@@ -190,9 +191,10 @@ class GeminiClient:
                     -CONVERSATION_HISTORY_LIMIT:
                 ]:  # Limit to last N messages for context window
                     role = "user" if msg["role"] == "user" else "model"
-                    formatted_history.append(
-                        {"role": role, "parts": [{"text": msg["content"]}]}
-                    )
+                    formatted_history.append({
+                        "role": role,
+                        "parts": [{"text": msg["content"]}],
+                    })
 
             # Create a chat session with history
             logger.info("Creating new chat session with history")
@@ -257,15 +259,13 @@ class GeminiClient:
         summary = portfolio_data["summary"]
 
         # Format positions data
-        positions_text = "\n".join(
-            [
-                f"- {pos['ticker']}: {pos['position_type'].upper()}, "
-                f"Value: ${pos['market_value']:.2f}, "
-                f"Beta: {pos['beta']:.2f}, "
-                f"Weight: {pos['weight']:.2%}"
-                for pos in positions
-            ]
-        )
+        positions_text = "\n".join([
+            f"- {pos['ticker']}: {pos['position_type'].upper()}, "
+            f"Value: ${pos['market_value']:.2f}, "
+            f"Beta: {pos['beta']:.2f}, "
+            f"Weight: {pos['weight']:.2%}"
+            for pos in positions
+        ])
 
         # Format summary data
         # Extract key metrics from the summary

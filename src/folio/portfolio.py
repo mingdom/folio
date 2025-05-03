@@ -23,6 +23,7 @@ from .data_model import (
 )
 from .formatting import format_beta, format_currency
 from .logger import logger
+from .options import process_options
 from .portfolio_value import (
     calculate_beta_adjusted_exposure,
     calculate_net_exposure,

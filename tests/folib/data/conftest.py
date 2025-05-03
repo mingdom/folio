@@ -20,28 +20,24 @@ def mock_external_apis():
     """
     # Create mock for yfinance.Ticker
     mock_ticker = MagicMock()
-    mock_ticker.history.return_value = pd.DataFrame(
-        {
+    mock_ticker.history.return_value = pd.DataFrame({
+        "Open": [150.0],
+        "High": [155.0],
+        "Low": [148.0],
+        "Close": [153.0],
+        "Volume": [1000000],
+    })
+    mock_ticker.info = {"beta": 1.2}
+
+    # Create mock for yfinance.download
+    mock_download = MagicMock(
+        return_value=pd.DataFrame({
             "Open": [150.0],
             "High": [155.0],
             "Low": [148.0],
             "Close": [153.0],
             "Volume": [1000000],
-        }
-    )
-    mock_ticker.info = {"beta": 1.2}
-
-    # Create mock for yfinance.download
-    mock_download = MagicMock(
-        return_value=pd.DataFrame(
-            {
-                "Open": [150.0],
-                "High": [155.0],
-                "Low": [148.0],
-                "Close": [153.0],
-                "Volume": [1000000],
-            }
-        )
+        })
     )
 
     # Mock yfinance

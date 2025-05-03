@@ -19,13 +19,11 @@ class TestValidateOptionData:
 
     def test_valid_option_data(self):
         """Test with valid option data."""
-        option_row = pd.Series(
-            {
-                "Description": "SPY JUN 15 2025 $100 CALL",
-                "Quantity": "2",
-                "Last Price": "5.00",
-            }
-        )
+        option_row = pd.Series({
+            "Description": "SPY JUN 15 2025 $100 CALL",
+            "Quantity": "2",
+            "Last Price": "5.00",
+        })
 
         description, quantity, price = validate_option_data(option_row)
 
@@ -35,78 +33,66 @@ class TestValidateOptionData:
 
     def test_missing_description(self):
         """Test with missing description."""
-        option_row = pd.Series(
-            {
-                "Description": None,
-                "Quantity": "2",
-                "Last Price": "5.00",
-            }
-        )
+        option_row = pd.Series({
+            "Description": None,
+            "Quantity": "2",
+            "Last Price": "5.00",
+        })
 
         with pytest.raises(DataError, match="Missing description"):
             validate_option_data(option_row)
 
     def test_missing_quantity(self):
         """Test with missing quantity."""
-        option_row = pd.Series(
-            {
-                "Description": "SPY JUN 15 2025 $100 CALL",
-                "Quantity": None,
-                "Last Price": "5.00",
-            }
-        )
+        option_row = pd.Series({
+            "Description": "SPY JUN 15 2025 $100 CALL",
+            "Quantity": None,
+            "Last Price": "5.00",
+        })
 
         with pytest.raises(DataError, match="Missing quantity"):
             validate_option_data(option_row)
 
     def test_invalid_quantity(self):
         """Test with invalid quantity format."""
-        option_row = pd.Series(
-            {
-                "Description": "SPY JUN 15 2025 $100 CALL",
-                "Quantity": "not a number",
-                "Last Price": "5.00",
-            }
-        )
+        option_row = pd.Series({
+            "Description": "SPY JUN 15 2025 $100 CALL",
+            "Quantity": "not a number",
+            "Last Price": "5.00",
+        })
 
         with pytest.raises(DataError, match="Invalid quantity format"):
             validate_option_data(option_row)
 
     def test_missing_price(self):
         """Test with missing price."""
-        option_row = pd.Series(
-            {
-                "Description": "SPY JUN 15 2025 $100 CALL",
-                "Quantity": "2",
-                "Last Price": None,
-            }
-        )
+        option_row = pd.Series({
+            "Description": "SPY JUN 15 2025 $100 CALL",
+            "Quantity": "2",
+            "Last Price": None,
+        })
 
         with pytest.raises(DataError, match="Missing price"):
             validate_option_data(option_row)
 
     def test_invalid_price(self):
         """Test with invalid price format."""
-        option_row = pd.Series(
-            {
-                "Description": "SPY JUN 15 2025 $100 CALL",
-                "Quantity": "2",
-                "Last Price": "not a price",
-            }
-        )
+        option_row = pd.Series({
+            "Description": "SPY JUN 15 2025 $100 CALL",
+            "Quantity": "2",
+            "Last Price": "not a price",
+        })
 
         with pytest.raises(DataError, match="Invalid price format"):
             validate_option_data(option_row)
 
     def test_custom_field_names(self):
         """Test with custom field names."""
-        option_row = pd.Series(
-            {
-                "OptionDesc": "SPY JUN 15 2025 $100 CALL",
-                "OptionQty": "2",
-                "OptionPrice": "5.00",
-            }
-        )
+        option_row = pd.Series({
+            "OptionDesc": "SPY JUN 15 2025 $100 CALL",
+            "OptionQty": "2",
+            "OptionPrice": "5.00",
+        })
 
         description, quantity, price = validate_option_data(
             option_row,
@@ -125,24 +111,22 @@ class TestExtractOptionData:
 
     def test_extract_valid_options(self):
         """Test extracting valid options."""
-        option_df = pd.DataFrame(
-            [
-                {
-                    "Description": "SPY JUN 15 2025 $100 CALL",
-                    "Symbol": "-SPY",
-                    "Quantity": "2",
-                    "Last Price": "5.00",
-                    "Current Value": "1000.00",
-                },
-                {
-                    "Description": "SPY JUN 15 2025 $110 CALL",
-                    "Symbol": "-SPY",
-                    "Quantity": "-1",
-                    "Last Price": "2.00",
-                    "Current Value": "-200.00",
-                },
-            ]
-        )
+        option_df = pd.DataFrame([
+            {
+                "Description": "SPY JUN 15 2025 $100 CALL",
+                "Symbol": "-SPY",
+                "Quantity": "2",
+                "Last Price": "5.00",
+                "Current Value": "1000.00",
+            },
+            {
+                "Description": "SPY JUN 15 2025 $110 CALL",
+                "Symbol": "-SPY",
+                "Quantity": "-1",
+                "Last Price": "2.00",
+                "Current Value": "-200.00",
+            },
+        ])
 
         options_data = extract_option_data(option_df)
 
@@ -159,22 +143,20 @@ class TestExtractOptionData:
 
     def test_extract_with_filter(self):
         """Test extracting options with a filter function."""
-        option_df = pd.DataFrame(
-            [
-                {
-                    "Description": "SPY JUN 15 2025 $100 CALL",
-                    "Symbol": "-SPY",
-                    "Quantity": "2",
-                    "Last Price": "5.00",
-                },
-                {
-                    "Description": "AAPL JUN 15 2025 $200 CALL",
-                    "Symbol": "-AAPL",
-                    "Quantity": "1",
-                    "Last Price": "10.00",
-                },
-            ]
-        )
+        option_df = pd.DataFrame([
+            {
+                "Description": "SPY JUN 15 2025 $100 CALL",
+                "Symbol": "-SPY",
+                "Quantity": "2",
+                "Last Price": "5.00",
+            },
+            {
+                "Description": "AAPL JUN 15 2025 $200 CALL",
+                "Symbol": "-AAPL",
+                "Quantity": "1",
+                "Last Price": "10.00",
+            },
+        ])
 
         # Filter for SPY options only
         options_data = extract_option_data(
@@ -188,28 +170,26 @@ class TestExtractOptionData:
 
     def test_extract_with_invalid_options(self):
         """Test extracting options with some invalid data."""
-        option_df = pd.DataFrame(
-            [
-                {
-                    "Description": "SPY JUN 15 2025 $100 CALL",
-                    "Symbol": "-SPY",
-                    "Quantity": "2",
-                    "Last Price": "5.00",
-                },
-                {
-                    "Description": None,  # Invalid: missing description
-                    "Symbol": "-AAPL",
-                    "Quantity": "1",
-                    "Last Price": "10.00",
-                },
-                {
-                    "Description": "AAPL JUN 15 2025 $200 CALL",
-                    "Symbol": "-AAPL",
-                    "Quantity": "not a number",  # Invalid: bad quantity
-                    "Last Price": "10.00",
-                },
-            ]
-        )
+        option_df = pd.DataFrame([
+            {
+                "Description": "SPY JUN 15 2025 $100 CALL",
+                "Symbol": "-SPY",
+                "Quantity": "2",
+                "Last Price": "5.00",
+            },
+            {
+                "Description": None,  # Invalid: missing description
+                "Symbol": "-AAPL",
+                "Quantity": "1",
+                "Last Price": "10.00",
+            },
+            {
+                "Description": "AAPL JUN 15 2025 $200 CALL",
+                "Symbol": "-AAPL",
+                "Quantity": "not a number",  # Invalid: bad quantity
+                "Last Price": "10.00",
+            },
+        ])
 
         options_data = extract_option_data(option_df)
 
@@ -219,16 +199,14 @@ class TestExtractOptionData:
 
     def test_extract_without_row_index(self):
         """Test extracting options without including row index."""
-        option_df = pd.DataFrame(
-            [
-                {
-                    "Description": "SPY JUN 15 2025 $100 CALL",
-                    "Symbol": "-SPY",
-                    "Quantity": "2",
-                    "Last Price": "5.00",
-                },
-            ]
-        )
+        option_df = pd.DataFrame([
+            {
+                "Description": "SPY JUN 15 2025 $100 CALL",
+                "Symbol": "-SPY",
+                "Quantity": "2",
+                "Last Price": "5.00",
+            },
+        ])
 
         options_data = extract_option_data(option_df, include_row_index=False)
 
@@ -241,13 +219,11 @@ class TestValidateDataframe:
 
     def test_valid_dataframe(self):
         """Test with a valid DataFrame."""
-        df = pd.DataFrame(
-            {
-                "Symbol": ["SPY", "AAPL"],
-                "Quantity": [10, 20],
-                "Price": [100.0, 200.0],
-            }
-        )
+        df = pd.DataFrame({
+            "Symbol": ["SPY", "AAPL"],
+            "Quantity": [10, 20],
+            "Price": [100.0, 200.0],
+        })
 
         result = validate_dataframe(df, ["Symbol", "Quantity", "Price"])
 
@@ -268,12 +244,10 @@ class TestValidateDataframe:
 
     def test_missing_columns(self):
         """Test with missing required columns."""
-        df = pd.DataFrame(
-            {
-                "Symbol": ["SPY", "AAPL"],
-                "Quantity": [10, 20],
-            }
-        )
+        df = pd.DataFrame({
+            "Symbol": ["SPY", "AAPL"],
+            "Quantity": [10, 20],
+        })
 
         with pytest.raises(DataError, match="missing required columns: Price"):
             validate_dataframe(df, ["Symbol", "Quantity", "Price"])

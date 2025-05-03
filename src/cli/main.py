@@ -18,6 +18,7 @@ import sys
 import typer
 from rich.console import Console
 
+from . import __version__
 from .commands.portfolio import portfolio_app
 from .commands.position import position_app
 from .shell import start_interactive_shell
@@ -40,8 +41,6 @@ console = Console()
 def version_callback(value: bool):
     """Print version information and exit."""
     if value:
-        from . import __version__
-
         console.print(f"Folio CLI version: {__version__}")
         raise typer.Exit()
 

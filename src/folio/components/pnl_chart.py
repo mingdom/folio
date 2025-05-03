@@ -16,6 +16,7 @@ from ..data_model import OptionPosition, PortfolioGroup, StockPosition
 from ..formatting import format_currency
 from ..logger import logger
 from ..pnl import calculate_strategy_pnl, determine_price_range, summarize_strategy_pnl
+from .position_details import create_position_details
 
 
 def create_pnl_chart(
@@ -205,51 +206,49 @@ def create_pnl_modal() -> dbc.Modal:
                 dbc.ModalTitle("Position Analysis"),
                 close_button=True,
             ),
-            dbc.ModalBody(
-                [
-                    # Tabs for different sections
-                    dbc.Tabs(
-                        [
-                            # P&L Analysis Tab
-                            dbc.Tab(
-                                [
-                                    # Mode toggle removed
-                                    # Summary information
-                                    html.Div(id="pnl-summary", className="mb-3"),
-                                    # Store for current ticker (for mode toggling)
-                                    dcc.Store(
-                                        id="pnl-current-ticker", storage_type="memory"
+            dbc.ModalBody([
+                # Tabs for different sections
+                dbc.Tabs(
+                    [
+                        # P&L Analysis Tab
+                        dbc.Tab(
+                            [
+                                # Mode toggle removed
+                                # Summary information
+                                html.Div(id="pnl-summary", className="mb-3"),
+                                # Store for current ticker (for mode toggling)
+                                dcc.Store(
+                                    id="pnl-current-ticker", storage_type="memory"
+                                ),
+                                # Loading spinner for the chart
+                                dbc.Spinner(
+                                    dcc.Graph(
+                                        id="pnl-chart",
+                                        config={
+                                            "displayModeBar": True,
+                                            "responsive": True,
+                                        },
+                                        className="dash-chart",
                                     ),
-                                    # Loading spinner for the chart
-                                    dbc.Spinner(
-                                        dcc.Graph(
-                                            id="pnl-chart",
-                                            config={
-                                                "displayModeBar": True,
-                                                "responsive": True,
-                                            },
-                                            className="dash-chart",
-                                        ),
-                                        color="primary",
-                                        type="border",
-                                        fullscreen=False,
-                                    ),
-                                ],
-                                label="P&L Analysis",
-                                tab_id="tab-pnl",
-                            ),
-                            # Position Details Tab
-                            dbc.Tab(
-                                html.Div(id="pnl-position-details", className="mt-2"),
-                                label="Position Details",
-                                tab_id="tab-details",
-                            ),
-                        ],
-                        id="position-tabs",
-                        active_tab="tab-pnl",
-                    ),
-                ]
-            ),
+                                    color="primary",
+                                    type="border",
+                                    fullscreen=False,
+                                ),
+                            ],
+                            label="P&L Analysis",
+                            tab_id="tab-pnl",
+                        ),
+                        # Position Details Tab
+                        dbc.Tab(
+                            html.Div(id="pnl-position-details", className="mt-2"),
+                            label="Position Details",
+                            tab_id="tab-details",
+                        ),
+                    ],
+                    id="position-tabs",
+                    active_tab="tab-pnl",
+                ),
+            ]),
             dbc.ModalFooter(
                 dbc.Button(
                     "Close",
@@ -284,105 +283,87 @@ def create_pnl_summary(summary: dict[str, Any], mode: str) -> html.Div:  # noqa:
     else:
         be_text = "None"
 
-    return html.Div(
-        [
-            dbc.Row(
+    return html.Div([
+        dbc.Row([
+            # P&L display removed
+            dbc.Col(
                 [
-                    # P&L display removed
-                    dbc.Col(
-                        [
-                            dbc.Card(
-                                [
-                                    dbc.CardBody(
-                                        [
-                                            html.H6(
-                                                "Max Profit",
-                                                className="card-subtitle mb-1 text-muted",
-                                            ),
-                                            html.H3(
-                                                "Unlimited"
-                                                if summary.get(
-                                                    "unbounded_profit"
-                                                )
-                                                else format_currency(
-                                                    summary["max_profit"]
-                                                ),
-                                                className="card-title mb-0 text-success",
-                                            ),
-                                            html.Small(
-                                                ""
-                                                if summary.get(
-                                                    "unbounded_profit"
-                                                )
-                                                else f"at ${summary['max_profit_price']:.2f}",
-                                                className="text-muted",
-                                            ),
-                                        ],
-                                        className="p-2 text-center",
-                                    )
-                                ]
-                            ),
-                        ],
-                        width=4,
-                    ),
-                    dbc.Col(
-                        [
-                            dbc.Card(
-                                [
-                                    dbc.CardBody(
-                                        [
-                                            html.H6(
-                                                "Max Loss",
-                                                className="card-subtitle mb-1 text-muted",
-                                            ),
-                                            html.H3(
-                                                "Unlimited"
-                                                if summary.get("unbounded_loss")
-                                                else format_currency(
-                                                    summary["max_loss"]
-                                                ),
-                                                className="card-title mb-0 text-danger",
-                                            ),
-                                            html.Small(
-                                                ""
-                                                if summary.get("unbounded_loss")
-                                                else f"at ${summary['max_loss_price']:.2f}",
-                                                className="text-muted",
-                                            ),
-                                        ],
-                                        className="p-2 text-center",
-                                    )
-                                ]
-                            ),
-                        ],
-                        width=4,
-                    ),
-                    dbc.Col(
-                        [
-                            dbc.Card(
-                                [
-                                    dbc.CardBody(
-                                        [
-                                            html.H6(
-                                                "Break-even",
-                                                className="card-subtitle mb-1 text-muted",
-                                            ),
-                                            html.H3(
-                                                be_text,
-                                                className="card-title mb-0",
-                                            ),
-                                        ],
-                                        className="p-2 text-center",
-                                    )
-                                ]
-                            ),
-                        ],
-                        width=4,
-                    ),
-                ]
+                    dbc.Card([
+                        dbc.CardBody(
+                            [
+                                html.H6(
+                                    "Max Profit",
+                                    className="card-subtitle mb-1 text-muted",
+                                ),
+                                html.H3(
+                                    "Unlimited"
+                                    if summary.get("unbounded_profit")
+                                    else format_currency(summary["max_profit"]),
+                                    className="card-title mb-0 text-success",
+                                ),
+                                html.Small(
+                                    ""
+                                    if summary.get("unbounded_profit")
+                                    else f"at ${summary['max_profit_price']:.2f}",
+                                    className="text-muted",
+                                ),
+                            ],
+                            className="p-2 text-center",
+                        )
+                    ]),
+                ],
+                width=4,
             ),
-        ]
-    )
+            dbc.Col(
+                [
+                    dbc.Card([
+                        dbc.CardBody(
+                            [
+                                html.H6(
+                                    "Max Loss",
+                                    className="card-subtitle mb-1 text-muted",
+                                ),
+                                html.H3(
+                                    "Unlimited"
+                                    if summary.get("unbounded_loss")
+                                    else format_currency(summary["max_loss"]),
+                                    className="card-title mb-0 text-danger",
+                                ),
+                                html.Small(
+                                    ""
+                                    if summary.get("unbounded_loss")
+                                    else f"at ${summary['max_loss_price']:.2f}",
+                                    className="text-muted",
+                                ),
+                            ],
+                            className="p-2 text-center",
+                        )
+                    ]),
+                ],
+                width=4,
+            ),
+            dbc.Col(
+                [
+                    dbc.Card([
+                        dbc.CardBody(
+                            [
+                                html.H6(
+                                    "Break-even",
+                                    className="card-subtitle mb-1 text-muted",
+                                ),
+                                html.H3(
+                                    be_text,
+                                    className="card-title mb-0",
+                                ),
+                            ],
+                            className="p-2 text-center",
+                        )
+                    ]),
+                ],
+                width=4,
+            ),
+        ]),
+    ])
 
 
 def register_callbacks(app):
@@ -637,9 +618,7 @@ def register_callbacks(app):
                 mode="cost_basis" if use_cost_basis else "default",
             )
 
-            # Create position details (reuse existing component)
-            from .position_details import create_position_details
-
+            # Create position details
             position_details = create_position_details(group)
 
             return (

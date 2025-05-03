@@ -12,30 +12,28 @@ from src.folio.portfolio import (
 def test_pending_activity_extraction():
     """Test that pending activity value is correctly extracted from CSV data."""
     # Create a test DataFrame with a Pending Activity row
-    df = pd.DataFrame(
-        [
-            {
-                "Symbol": "AAPL",
-                "Description": "APPLE INC",
-                "Quantity": 100,
-                "Current Value": "$10000.00",
-                "Last Price": "$100.00",
-                "Type": "Margin",
-                "Percent Of Account": "10%",
-                "Average Cost Basis": "$90.00",
-            },
-            {
-                "Symbol": "Pending Activity",
-                "Description": "",
-                "Quantity": None,
-                "Current Value": "$5000.00",
-                "Last Price": None,
-                "Type": None,
-                "Percent Of Account": None,
-                "Average Cost Basis": None,
-            },
-        ]
-    )
+    df = pd.DataFrame([
+        {
+            "Symbol": "AAPL",
+            "Description": "APPLE INC",
+            "Quantity": 100,
+            "Current Value": "$10000.00",
+            "Last Price": "$100.00",
+            "Type": "Margin",
+            "Percent Of Account": "10%",
+            "Average Cost Basis": "$90.00",
+        },
+        {
+            "Symbol": "Pending Activity",
+            "Description": "",
+            "Quantity": None,
+            "Current Value": "$5000.00",
+            "Last Price": None,
+            "Type": None,
+            "Percent Of Account": None,
+            "Average Cost Basis": None,
+        },
+    ])
 
     # Process the portfolio data
     _groups, summary, _ = process_portfolio_data(
@@ -57,30 +55,28 @@ def test_pending_activity_extraction():
 def test_pending_activity_with_missing_value():
     """Test that pending activity with missing value is handled correctly."""
     # Create a test DataFrame with a Pending Activity row with missing value
-    df = pd.DataFrame(
-        [
-            {
-                "Symbol": "AAPL",
-                "Description": "APPLE INC",
-                "Quantity": 100,
-                "Current Value": "$10000.00",
-                "Last Price": "$100.00",
-                "Type": "Margin",
-                "Percent Of Account": "10%",
-                "Average Cost Basis": "$90.00",
-            },
-            {
-                "Symbol": "Pending Activity",
-                "Description": "",
-                "Quantity": None,
-                "Current Value": None,  # Missing value
-                "Last Price": None,
-                "Type": None,
-                "Percent Of Account": None,
-                "Average Cost Basis": None,
-            },
-        ]
-    )
+    df = pd.DataFrame([
+        {
+            "Symbol": "AAPL",
+            "Description": "APPLE INC",
+            "Quantity": 100,
+            "Current Value": "$10000.00",
+            "Last Price": "$100.00",
+            "Type": "Margin",
+            "Percent Of Account": "10%",
+            "Average Cost Basis": "$90.00",
+        },
+        {
+            "Symbol": "Pending Activity",
+            "Description": "",
+            "Quantity": None,
+            "Current Value": None,  # Missing value
+            "Last Price": None,
+            "Type": None,
+            "Percent Of Account": None,
+            "Average Cost Basis": None,
+        },
+    ])
 
     # Process the portfolio data
     _groups, summary, _ = process_portfolio_data(
@@ -102,34 +98,32 @@ def test_pending_activity_with_missing_value():
 def test_pending_activity_from_different_columns():
     """Test that pending activity value is correctly extracted from different columns."""
     # Create a test DataFrame with a Pending Activity row with value in Last Price Change column
-    df = pd.DataFrame(
-        [
-            {
-                "Symbol": "AAPL",
-                "Description": "APPLE INC",
-                "Quantity": 100,
-                "Current Value": "$10000.00",
-                "Last Price": "$100.00",
-                "Type": "Margin",
-                "Percent Of Account": "10%",
-                "Average Cost Basis": "$90.00",
-                "Last Price Change": "$0.00",
-                "Today's Gain/Loss Dollar": "$0.00",
-            },
-            {
-                "Symbol": "Pending Activity",
-                "Description": "",
-                "Quantity": None,
-                "Current Value": None,  # Missing value
-                "Last Price": None,
-                "Type": None,
-                "Percent Of Account": None,
-                "Average Cost Basis": None,
-                "Last Price Change": "$6000.00",  # Value in Last Price Change column
-                "Today's Gain/Loss Dollar": "$0.00",
-            },
-        ]
-    )
+    df = pd.DataFrame([
+        {
+            "Symbol": "AAPL",
+            "Description": "APPLE INC",
+            "Quantity": 100,
+            "Current Value": "$10000.00",
+            "Last Price": "$100.00",
+            "Type": "Margin",
+            "Percent Of Account": "10%",
+            "Average Cost Basis": "$90.00",
+            "Last Price Change": "$0.00",
+            "Today's Gain/Loss Dollar": "$0.00",
+        },
+        {
+            "Symbol": "Pending Activity",
+            "Description": "",
+            "Quantity": None,
+            "Current Value": None,  # Missing value
+            "Last Price": None,
+            "Type": None,
+            "Percent Of Account": None,
+            "Average Cost Basis": None,
+            "Last Price Change": "$6000.00",  # Value in Last Price Change column
+            "Today's Gain/Loss Dollar": "$0.00",
+        },
+    ])
 
     # Process the portfolio data
     _groups, summary, _ = process_portfolio_data(
@@ -148,34 +142,32 @@ def test_pending_activity_from_different_columns():
     )  # Allow 10% tolerance
 
     # Create a test DataFrame with a Pending Activity row with value in Today's Gain/Loss Dollar column
-    df = pd.DataFrame(
-        [
-            {
-                "Symbol": "AAPL",
-                "Description": "APPLE INC",
-                "Quantity": 100,
-                "Current Value": "$10000.00",
-                "Last Price": "$100.00",
-                "Type": "Margin",
-                "Percent Of Account": "10%",
-                "Average Cost Basis": "$90.00",
-                "Last Price Change": "$0.00",
-                "Today's Gain/Loss Dollar": "$0.00",
-            },
-            {
-                "Symbol": "Pending Activity",
-                "Description": "",
-                "Quantity": None,
-                "Current Value": None,  # Missing value
-                "Last Price": None,
-                "Type": None,
-                "Percent Of Account": None,
-                "Average Cost Basis": None,
-                "Last Price Change": None,  # Missing value
-                "Today's Gain/Loss Dollar": "$7000.00",  # Value in Today's Gain/Loss Dollar column
-            },
-        ]
-    )
+    df = pd.DataFrame([
+        {
+            "Symbol": "AAPL",
+            "Description": "APPLE INC",
+            "Quantity": 100,
+            "Current Value": "$10000.00",
+            "Last Price": "$100.00",
+            "Type": "Margin",
+            "Percent Of Account": "10%",
+            "Average Cost Basis": "$90.00",
+            "Last Price Change": "$0.00",
+            "Today's Gain/Loss Dollar": "$0.00",
+        },
+        {
+            "Symbol": "Pending Activity",
+            "Description": "",
+            "Quantity": None,
+            "Current Value": None,  # Missing value
+            "Last Price": None,
+            "Type": None,
+            "Percent Of Account": None,
+            "Average Cost Basis": None,
+            "Last Price Change": None,  # Missing value
+            "Today's Gain/Loss Dollar": "$7000.00",  # Value in Today's Gain/Loss Dollar column
+        },
+    ])
 
     # Process the portfolio data
     _groups, summary, _ = process_portfolio_data(
