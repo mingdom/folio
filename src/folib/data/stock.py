@@ -253,7 +253,9 @@ class StockOracle:
         self.cache_dir = cache_dir
         self.cache_ttl = cache_ttl
 
-        logger.info(f"Initialized StockOracle with {provider_name} provider")
+        logger.info(
+            f"=== DATA SOURCE: Initialized StockOracle with {provider_name} provider ==="
+        )
 
     def get_price(self, ticker: str) -> float:
         """
@@ -552,12 +554,14 @@ FMP_API_KEY = os.environ.get("FMP_API_KEY")
 
 # Pre-initialized singleton instance for easier access
 if DATA_SOURCE == "fmp" and FMP_API_KEY:
-    logger.info("Using FMP provider from environment configuration")
+    logger.info(
+        "=== DATA SOURCE: Using FMP provider from environment configuration ==="
+    )
     stockdata = StockOracle.get_instance(provider_name="fmp", fmp_api_key=FMP_API_KEY)
 else:
     if DATA_SOURCE == "fmp" and not FMP_API_KEY:
         logger.warning(
-            "FMP provider selected in environment but no API key provided, falling back to yfinance"
+            "=== DATA SOURCE: FMP provider selected in environment but no API key provided, falling back to yfinance ==="
         )
-    logger.info("Using YFinance provider")
+    logger.info("=== DATA SOURCE: Using YFinance provider ===")
     stockdata = StockOracle.get_instance()

@@ -11,6 +11,7 @@ The tests use mocking to avoid actual API calls to external services.
 """
 
 import os
+import sys
 import tempfile
 from unittest.mock import MagicMock, patch
 
@@ -176,6 +177,61 @@ class TestStockOracleProviders:
         # Reset the singleton for other tests
         StockOracle._instance = None
 
+    def test_folio_respects_data_source(self, temp_cache_dir):
+        """Test that both folib and folio respect the DATA_SOURCE environment variable.
+
+        This test verifies that when we set the DATA_SOURCE environment variable to "fmp",
+        both folib and folio modules use the FMP provider.
+
+        Note: This test is related to a fix in src/folio/__init__.py that ensures
+        environment variables are loaded early in the module initialization process.
+        """
+        # Save original modules to restore later
+        original_modules = dict(sys.modules)
+
+        try:
+            # Remove relevant modules if they were previously imported
+            for module in list(sys.modules.keys()):
+                if module.startswith("src.folib") or module.startswith("src.folio"):
+                    del sys.modules[module]
+
+            # Reset the singleton
+            StockOracle._instance = None
+
+            # Set environment variables to use FMP provider
+            with patch.dict(
+                os.environ,
+                {"DATA_SOURCE": "fmp", "FMP_API_KEY": "test_key"},
+                clear=True,
+            ):
+                # Import folio first (which will trigger import of folib)
+                # Now import folib directly to verify its state
+                import src.folib.data.stock as folib_stock
+                from src.folio.utils import get_beta
+
+                # Verify both are using the FMP provider
+                assert folib_stock.DATA_SOURCE == "fmp"
+                assert folib_stock.stockdata.provider_name == "fmp"
+
+                # Patch the get_beta method to avoid actual API calls
+                with patch.object(
+                    folib_stock.stockdata, "get_beta", return_value=1.5
+                ) as mock_get_beta:
+                    # Call get_beta from folio
+                    beta = get_beta("AAPL")
+
+                    # Verify the mock was called, indicating folio is using the same provider
+                    mock_get_beta.assert_called_once_with("AAPL")
+                    assert beta == 1.5
+
+        finally:
+            # Restore original modules
+            sys.modules.clear()
+            sys.modules.update(original_modules)
+
+            # Reset the singleton for other tests
+            StockOracle._instance = None
+
 
 class TestYFinanceProvider:
     """Test the YFinanceProvider implementation."""
@@ -197,17 +253,17 @@ class TestYFinanceProvider:
             provider.get_historical_data("invalid-symbol-123")
 
         # Mock the yfinance.Ticker.history method to avoid actual API calls
-        with patch('yfinance.Ticker') as mock_ticker_class:
+        with patch("yfinance.Ticker") as mock_ticker_class:
             mock_ticker = MagicMock()
             mock_ticker_class.return_value = mock_ticker
 
             # Set up the mock to return a DataFrame
             mock_df = pd.DataFrame({
-                'Open': [100.0],
-                'High': [101.0],
-                'Low': [99.0],
-                'Close': [100.5],
-                'Volume': [1000000]
+                "Open": [100.0],
+                "High": [101.0],
+                "Low": [99.0],
+                "Close": [100.5],
+                "Volume": [1000000],
             })
             mock_ticker.history.return_value = mock_df
 
@@ -227,12 +283,12 @@ class TestYFinanceProvider:
     def test_try_get_beta_from_provider(self, provider):
         """Test that try_get_beta_from_provider works correctly."""
         # Mock the yfinance.Ticker.info property to avoid actual API calls
-        with patch('yfinance.Ticker') as mock_ticker_class:
+        with patch("yfinance.Ticker") as mock_ticker_class:
             mock_ticker = MagicMock()
             mock_ticker_class.return_value = mock_ticker
 
             # Set up the mock to return beta
-            mock_ticker.info = {'beta': 1.2}
+            mock_ticker.info = {"beta": 1.2}
 
             # Test with a valid ticker
             beta = provider.try_get_beta_from_provider("AAPL")
@@ -264,17 +320,17 @@ class TestFMPProvider:
             provider.get_historical_data("invalid-symbol-123")
 
         # Mock the fmpsdk.historical_price_full method to avoid actual API calls
-        with patch('fmpsdk.historical_price_full') as mock_historical:
+        with patch("fmpsdk.historical_price_full") as mock_historical:
             # Set up the mock to return a list of dictionaries
             mock_historical.return_value = {
-                'historical': [
+                "historical": [
                     {
-                        'date': '2023-01-01',
-                        'open': 100.0,
-                        'high': 101.0,
-                        'low': 99.0,
-                        'close': 100.5,
-                        'volume': 1000000
+                        "date": "2023-01-01",
+                        "open": 100.0,
+                        "high": 101.0,
+                        "low": 99.0,
+                        "close": 100.5,
+                        "volume": 1000000,
                     }
                 ]
             }
@@ -289,15 +345,15 @@ class TestFMPProvider:
             # Verify that the API was called with the correct parameters
             mock_historical.assert_called_once()
             call_args = mock_historical.call_args[1]
-            assert call_args['apikey'] == "test_key"
-            assert call_args['symbol'] == "AAPL"
+            assert call_args["apikey"] == "test_key"
+            assert call_args["symbol"] == "AAPL"
 
     def test_try_get_beta_from_provider(self, provider):
         """Test that try_get_beta_from_provider works correctly."""
         # Mock the fmpsdk.company_profile method to avoid actual API calls
-        with patch('fmpsdk.company_profile') as mock_profile:
+        with patch("fmpsdk.company_profile") as mock_profile:
             # Set up the mock to return a list with a dictionary containing beta
-            mock_profile.return_value = [{'beta': 1.2}]
+            mock_profile.return_value = [{"beta": 1.2}]
 
             # Test with a valid ticker
             beta = provider.try_get_beta_from_provider("AAPL")
