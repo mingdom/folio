@@ -22,10 +22,6 @@ Module Overview:
   - calculate_option_delta: Calculate option delta (price sensitivity)
   - calculate_implied_volatility: Calculate implied volatility from option price
 
-- portfolio.py: Functions for portfolio-level calculations
-  - calculate_portfolio_metrics: Calculate summary metrics for a portfolio
-  - create_value_breakdowns: Create breakdowns of portfolio value by category
-
 Usage:
 -----
 These functions are typically used by the service layer rather than called directly.
@@ -44,7 +40,6 @@ from .options import (
     calculate_option_delta,
     calculate_option_price,
 )
-from .portfolio import calculate_portfolio_metrics, create_value_breakdowns
 
 __all__ = [
     # Exposure calculations
@@ -55,9 +50,6 @@ __all__ = [
     "calculate_option_delta",
     "calculate_option_exposure",
     "calculate_option_price",
-    # Portfolio calculations
-    "calculate_portfolio_metrics",
     "calculate_position_exposure",
     "calculate_stock_exposure",
-    "create_value_breakdowns",
 ]

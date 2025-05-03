@@ -26,7 +26,9 @@ class Position:
     price: float
     position_type: Literal["stock", "option", "cash", "unknown"]
     cost_basis: float | None = None
-    raw_data: dict | None = None  # Original CSV data for debugging and recalculation
+    raw_data: dict | None = (
+        None  # Original CSV row data for debugging and recalculation
+    )
 
     @property
     def market_value(self) -> float:
@@ -195,6 +197,9 @@ class PortfolioHolding:
     price: float  # Last Price in the CSV
     value: float  # Current Value in the CSV
     cost_basis_total: float | None = None  # Cost Basis Total in the CSV
+    raw_data: dict | None = (
+        None  # Original CSV row data for debugging and recalculation
+    )
 
     @property
     def market_value(self) -> float:
@@ -263,7 +268,8 @@ class PortfolioSummary:
     unknown_value: float
     pending_activity_value: float
     net_market_exposure: float
-    portfolio_beta: float | None = None
+    net_exposure_pct: float
+    beta_adjusted_exposure: float
 
     def to_dict(self) -> dict:
         """Convert the portfolio summary to a dictionary for display purposes."""
@@ -275,7 +281,7 @@ class PortfolioSummary:
             "unknown_value": self.unknown_value,
             "pending_activity_value": self.pending_activity_value,
             "net_market_exposure": self.net_market_exposure,
-            "portfolio_beta": self.portfolio_beta,
+            "beta_adjusted_exposure": self.beta_adjusted_exposure,
         }
 
 
@@ -288,15 +294,5 @@ class ExposureMetrics:
     delta_exposure: float | None = None  # For options only
 
 
-# Keep PortfolioGroup for backward compatibility during migration
-@dataclass(frozen=True)
-class PortfolioGroup:
-    """Group of related positions (stock + options).
-
-    Note: This class is deprecated and will be removed in a future version.
-    Use the helper functions in portfolio_service.py instead.
-    """
-
-    ticker: str
-    stock_position: StockPosition | None = None
-    option_positions: list[OptionPosition] = field(default_factory=list)
+# PortfolioGroup class has been removed as part of the migration to the new data model.
+# Use group_positions_by_ticker() from portfolio_service.py instead.

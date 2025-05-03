@@ -8,8 +8,6 @@ that can be further processed by the portfolio service.
 Key functions:
 - load_portfolio_from_csv: Load portfolio data from a CSV file
 - parse_portfolio_holdings: Parse raw CSV data into portfolio holdings
-- detect_cash_positions: Identify cash and cash-like positions
-- detect_pending_activity: Calculate pending activity value
 
 CSV Format:
 ----------
@@ -188,25 +186,28 @@ def parse_portfolio_holdings(df: pd.DataFrame) -> list[PortfolioHolding]:
                     f"Row {index}: Cleaned up symbol from {original_symbol} to {symbol}"
                 )
 
-            # Special handling for pending activity rows
+            # Identify pending activity rows but don't do special value extraction
             is_pending_activity = (
                 symbol.upper() == "PENDING ACTIVITY" or "PENDING" in symbol.upper()
             )
 
             if is_pending_activity:
-                logger.debug(f"Row {index}: Processing Pending Activity row")
-                # For pending activity, we care about the value, not quantity or price
-                # Set quantity to 0 or 1 (doesn't matter) and price to 0
+                logger.debug(f"Row {index}: Identified pending activity row")
+                # For pending activity, we just create a basic holding with the raw data
+                # Set quantity to 0 and price to 0
                 quantity = 0
                 price = 0
 
-                # Make sure we get the value from the Current Value column
+                # Try to get the value from the Current Value column for backward compatibility
+                # But the comprehensive detection will happen in portfolio_service.py
                 try:
                     value = clean_currency_value(row["Current Value"])
-                    logger.debug(f"Found pending activity value: {value}")
+                    logger.debug(
+                        f"Found pending activity value in Current Value column: {value}"
+                    )
                 except (ValueError, TypeError):
                     logger.debug(
-                        f"Row {index}: Pending activity has invalid value: '{row['Current Value']}'. Using 0.0."
+                        f"Row {index}: Pending activity has no value in Current Value column. Using 0.0."
                     )
                     value = 0.0
 
@@ -284,6 +285,9 @@ def parse_portfolio_holdings(df: pd.DataFrame) -> list[PortfolioHolding]:
                         f"Row {index}: {symbol} has invalid cost basis: '{row['Cost Basis Total']}'. Using None."
                     )
 
+            # Store the raw row data as a dictionary
+            raw_data = row.to_dict()
+
             # Create PortfolioHolding object
             holding = PortfolioHolding(
                 symbol=symbol,
@@ -292,6 +296,7 @@ def parse_portfolio_holdings(df: pd.DataFrame) -> list[PortfolioHolding]:
                 price=price,
                 value=value,
                 cost_basis_total=cost_basis_total,
+                raw_data=raw_data,
             )
 
             holdings.append(holding)
@@ -308,90 +313,3 @@ def parse_portfolio_holdings(df: pd.DataFrame) -> list[PortfolioHolding]:
         logger.debug(f"Successfully parsed {len(holdings)} holdings")
 
     return holdings
-
-
-def detect_cash_positions(holdings: list[PortfolioHolding]) -> list[PortfolioHolding]:
-    """
-    Detect cash and cash-like positions in portfolio holdings.
-
-    This function identifies cash and cash-equivalent positions (money market funds,
-    short-term treasuries, etc.) from the list of portfolio holdings.
-
-    Cash detection is based on:
-    - Symbol patterns (e.g., symbols containing "MM", "CASH", "TREASURY")
-    - Description patterns (e.g., descriptions containing "Money Market", "Cash", "Treasury")
-    - Low beta and volatility characteristics
-
-    Args:
-        holdings: List of portfolio holdings from parse_portfolio_holdings()
-
-    Returns:
-        List of holdings that represent cash or cash-like positions
-    """
-    logger.debug("Detecting cash and cash-like positions")
-
-    cash_positions = []
-
-    for holding in holdings:
-        # Use StockOracle's is_cash_like method to determine if this is a cash-like position
-        if stockdata.is_cash_like(holding.symbol, holding.description):
-            logger.debug(f"Identified cash-like position: {holding.symbol}")
-            cash_positions.append(holding)
-
-    logger.debug(f"Found {len(cash_positions)} cash-like positions")
-    return cash_positions
-
-
-def detect_pending_activity(holdings: list[PortfolioHolding]) -> float:
-    """
-    Detect and calculate pending activity value.
-
-    This function identifies and calculates the total value of pending activity
-    in the portfolio (e.g., unsettled trades, dividends, etc.).
-
-    Pending activity detection is based on:
-    - Symbol patterns (e.g., "PENDING", "UNSETTLED")
-    - Description patterns (e.g., descriptions containing "Pending", "Unsettled", "Dividend")
-    - Special account types or flags in the original CSV
-
-    Args:
-        holdings: List of portfolio holdings from parse_portfolio_holdings()
-
-    Returns:
-        Total value of pending activity (positive for incoming funds, negative for outgoing)
-    """
-    logger.debug("Detecting pending activity")
-
-    # In the current implementation, pending activity is detected during CSV loading
-    # and not included in the holdings list. This function is provided for future
-    # enhancements where pending activity might be detected from the holdings.
-
-    # Look for holdings with pending activity patterns
-    pending_activity_value = 0.0
-
-    pending_patterns = [
-        "PENDING",
-        "UNSETTLED",
-        "DIVIDEND",
-        "INTEREST",
-        "DEPOSIT",
-        "WITHDRAWAL",
-    ]
-
-    for holding in holdings:
-        symbol_upper = holding.symbol.upper()
-        description_upper = holding.description.upper()
-
-        # Check if this is a pending activity position
-        if (
-            symbol_upper == "PENDING ACTIVITY"
-            or any(pattern in symbol_upper for pattern in pending_patterns)
-            or any(pattern in description_upper for pattern in pending_patterns)
-        ):
-            logger.debug(
-                f"Found pending activity: {holding.symbol} with value {holding.value}"
-            )
-            pending_activity_value += holding.value
-
-    logger.debug(f"Total pending activity value: {pending_activity_value}")
-    return pending_activity_value

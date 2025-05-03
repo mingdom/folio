@@ -240,8 +240,10 @@ class TestParsePortfolioHoldings:
         assert holdings[0].value == 529535.51
 
         # Check that the correct log messages were generated
-        mock_logger.debug.assert_any_call("Row 0: Processing Pending Activity row")
-        mock_logger.debug.assert_any_call("Found pending activity value: 529535.51")
+        mock_logger.debug.assert_any_call("Row 0: Identified pending activity row")
+        mock_logger.debug.assert_any_call(
+            "Found pending activity value in Current Value column: 529535.51"
+        )
 
     def test_parse_portfolio_holdings_with_special_symbols(self):
         """Test parsing portfolio holdings with special symbols like SPAXX**."""

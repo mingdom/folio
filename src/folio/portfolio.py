@@ -9,7 +9,7 @@ This module provides core functionality for portfolio analysis, including:
 
 import pandas as pd
 
-from src.stockdata import get_data_fetcher
+from src.folib.data.stock import stockdata
 
 from .cash_detection import is_cash_or_short_term
 from .data_model import (
@@ -29,9 +29,6 @@ from .portfolio_value import (
     process_stock_positions,
 )
 from .utils import clean_currency_value, get_beta
-
-# Get the singleton data fetcher instance
-data_fetcher = get_data_fetcher()
 
 
 def process_portfolio_data(
@@ -306,17 +303,8 @@ def process_portfolio_data(
                 else:
                     # Try to fetch the current price for non-cash positions with missing price
                     try:
-                        df = data_fetcher.fetch_data(symbol, period="1d")
-                        if not df.empty:
-                            price = df.iloc[-1]["Close"]
-                            logger.info(
-                                f"Row {index}: Updated price for {symbol}: {price}"
-                            )
-                        else:
-                            logger.warning(
-                                f"Row {index}: Could not fetch price for {symbol}. Skipping."
-                            )
-                            continue
+                        price = stockdata.get_price(symbol)
+                        logger.info(f"Row {index}: Updated price for {symbol}: {price}")
                     except Exception as e:
                         logger.warning(
                             f"Row {index}: Error fetching price for {symbol}: {e}. Skipping."
@@ -335,16 +323,8 @@ def process_portfolio_data(
                         logger.debug(
                             f"Row {index}: {symbol} has zero price. Attempting to fetch current price."
                         )
-                        df = data_fetcher.fetch_data(symbol, period="1d")
-                        if not df.empty:
-                            price = df.iloc[-1]["Close"]
-                            logger.info(
-                                f"Row {index}: Updated price for {symbol}: {price}"
-                            )
-                        else:
-                            logger.warning(
-                                f"Row {index}: Could not fetch price for {symbol}. Calculations may be affected."
-                            )
+                        price = stockdata.get_price(symbol)
+                        logger.info(f"Row {index}: Updated price for {symbol}: {price}")
                     except Exception as e:
                         logger.warning(
                             f"Row {index}: Error fetching price for {symbol}: {e}. Calculations may be affected."
@@ -679,29 +659,13 @@ def process_portfolio_data(
             # Get the latest price for the underlying
             try:
                 # Try to fetch the latest price
-                price_data = data_fetcher.fetch_data(underlying, period="1d")
-                if price_data is not None and not price_data.empty:
-                    underlying_price = price_data.iloc[-1]["Close"]
-                    if underlying_price <= 0:
-                        # If we get an invalid price, we can't process the options
-                        logger.error(
-                            f"Invalid price for {underlying}: {underlying_price}"
-                        )
-                        raise ValueError(
-                            f"Cannot process options for {underlying} with invalid price: {underlying_price}"
-                        )
-                else:
-                    # If we can't get the price data, we can't process the options
-                    logger.error(f"Could not fetch price data for {underlying}")
+                underlying_price = stockdata.get_price(underlying)
+                if underlying_price <= 0:
+                    # If we get an invalid price, we can't process the options
+                    logger.error(f"Invalid price for {underlying}: {underlying_price}")
                     raise ValueError(
-                        f"Cannot process options for {underlying} without price data"
+                        f"Cannot process options for {underlying} with invalid price: {underlying_price}"
                     )
-            except (pd.errors.EmptyDataError, KeyError) as data_err:
-                # Handle specific data errors
-                logger.error(f"Data error for {underlying}: {data_err}", exc_info=True)
-                raise ValueError(
-                    f"Cannot process options for {underlying} due to data error"
-                ) from data_err
             except Exception as price_err:
                 # Log unexpected errors and re-raise
                 logger.error(
@@ -1081,22 +1045,19 @@ def calculate_portfolio_summary(
 
 
 def update_portfolio_prices(
-    portfolio_groups: list[PortfolioGroup], data_fetcher=None
+    portfolio_groups: list[PortfolioGroup],
+    data_fetcher=None,  # Kept for backward compatibility but not used  # noqa: ARG001
 ) -> str:
     """Update prices for all positions in the portfolio groups.
 
     Args:
         portfolio_groups: List of portfolio groups to update prices for
-        data_fetcher: Optional data fetcher to use for price updates
+        data_fetcher: Optional data fetcher (kept for backward compatibility)
 
     Returns:
         ISO format timestamp of when prices were updated
     """
     from datetime import UTC, datetime
-
-    # Use the default data fetcher if none is provided
-    if data_fetcher is None:
-        data_fetcher = get_data_fetcher()
 
     # Extract unique tickers from all positions
     tickers = set()
@@ -1119,18 +1080,13 @@ def update_portfolio_prices(
     # Fetch latest prices for all tickers
     logger.info(f"Fetching latest prices for {len(tickers)} tickers")
 
-    # Use a small period to get just the latest price
+    # Get the latest price for each ticker
     latest_prices = {}
     for ticker in tickers:
         try:
-            # Fetch data for the last day
-            df = data_fetcher.fetch_data(ticker, period="1d")
-            if not df.empty:
-                # Get the latest close price
-                latest_prices[ticker] = df.iloc[-1]["Close"]
-                logger.debug(f"Updated price for {ticker}: {latest_prices[ticker]}")
-            else:
-                logger.warning(f"No price data available for {ticker}")
+            # Get the current price
+            latest_prices[ticker] = stockdata.get_price(ticker)
+            logger.debug(f"Updated price for {ticker}: {latest_prices[ticker]}")
         except Exception as e:
             logger.error(f"Error fetching price for {ticker}: {e!s}")
 
@@ -1180,22 +1136,19 @@ def update_portfolio_prices(
 
 
 def update_zero_price_positions(
-    portfolio_groups: list[PortfolioGroup], data_fetcher=None
+    portfolio_groups: list[PortfolioGroup],
+    data_fetcher=None,  # Kept for backward compatibility but not used  # noqa: ARG001
 ) -> list[PortfolioGroup]:
     """Update positions with zero prices by fetching current market prices.
 
     Args:
         portfolio_groups: List of portfolio groups to update
-        data_fetcher: Optional data fetcher to use for price updates
+        data_fetcher: Optional data fetcher (kept for backward compatibility)
 
     Returns:
         Updated list of portfolio groups
     """
     logger.debug("Updating positions with zero prices...")
-
-    # Use the default data fetcher if none is provided
-    if data_fetcher is None:
-        data_fetcher = get_data_fetcher()
 
     # Find positions with zero prices
     zero_price_tickers = []
@@ -1214,32 +1167,26 @@ def update_zero_price_positions(
     # Fetch prices for tickers with zero prices
     for ticker in zero_price_tickers:
         try:
-            # Fetch data for the last day
-            df = data_fetcher.fetch_data(ticker, period="1d")
-            if not df.empty:
-                # Get the latest close price
-                new_price = df.iloc[-1]["Close"]
-                logger.info(f"Fetched price for {ticker}: {new_price}")
+            # Get the current price
+            new_price = stockdata.get_price(ticker)
+            logger.info(f"Fetched price for {ticker}: {new_price}")
 
-                # Update the price in all matching groups
-                for group in portfolio_groups:
-                    if group.ticker == ticker and group.stock_position:
-                        # Update the stock position
-                        group.stock_position.price = new_price
-                        group.stock_position.market_exposure = (
-                            new_price * group.stock_position.quantity
-                        )
-                        group.stock_position.market_value = (
-                            new_price * group.stock_position.quantity
-                        )
-                        group.stock_position.beta_adjusted_exposure = (
-                            group.stock_position.market_exposure
-                            * group.stock_position.beta
-                        )
+            # Update the price in all matching groups
+            for group in portfolio_groups:
+                if group.ticker == ticker and group.stock_position:
+                    # Update the stock position
+                    group.stock_position.price = new_price
+                    group.stock_position.market_exposure = (
+                        new_price * group.stock_position.quantity
+                    )
+                    group.stock_position.market_value = (
+                        new_price * group.stock_position.quantity
+                    )
+                    group.stock_position.beta_adjusted_exposure = (
+                        group.stock_position.market_exposure * group.stock_position.beta
+                    )
 
-                        logger.info(f"Updated price for {ticker} to {new_price}")
-            else:
-                logger.warning(f"Could not fetch price data for {ticker}")
+                    logger.info(f"Updated price for {ticker} to {new_price}")
         except Exception as e:
             logger.error(f"Error fetching price for {ticker}: {e!s}")
 
@@ -1263,22 +1210,19 @@ def update_zero_price_positions(
 
 
 def update_all_prices(
-    portfolio_groups: list[PortfolioGroup], data_fetcher=None
+    portfolio_groups: list[PortfolioGroup],
+    data_fetcher=None,  # Kept for backward compatibility but not used  # noqa: ARG001
 ) -> list[PortfolioGroup]:
     """Update prices for all positions by fetching current market prices.
 
     Args:
         portfolio_groups: List of portfolio groups to update
-        data_fetcher: Optional data fetcher to use for price updates
+        data_fetcher: Optional data fetcher (kept for backward compatibility)
 
     Returns:
         Updated list of portfolio groups
     """
     logger.debug("Updating prices for all positions...")
-
-    # Use the default data fetcher if none is provided
-    if data_fetcher is None:
-        data_fetcher = get_data_fetcher()
 
     # Get all tickers that need price updates
     tickers_to_update = []
@@ -1295,32 +1239,26 @@ def update_all_prices(
     # Fetch prices for all tickers
     for ticker in tickers_to_update:
         try:
-            # Fetch data for the last day
-            df = data_fetcher.fetch_data(ticker, period="1d")
-            if not df.empty:
-                # Get the latest close price
-                new_price = df.iloc[-1]["Close"]
-                logger.debug(f"Fetched price for {ticker}: {new_price}")
+            # Get the current price
+            new_price = stockdata.get_price(ticker)
+            logger.debug(f"Fetched price for {ticker}: {new_price}")
 
-                # Update the price in all matching groups
-                for group in portfolio_groups:
-                    if group.ticker == ticker and group.stock_position:
-                        # Update the stock position
-                        group.stock_position.price = new_price
-                        group.stock_position.market_exposure = (
-                            new_price * group.stock_position.quantity
-                        )
-                        group.stock_position.market_value = (
-                            new_price * group.stock_position.quantity
-                        )
-                        group.stock_position.beta_adjusted_exposure = (
-                            group.stock_position.market_exposure
-                            * group.stock_position.beta
-                        )
+            # Update the price in all matching groups
+            for group in portfolio_groups:
+                if group.ticker == ticker and group.stock_position:
+                    # Update the stock position
+                    group.stock_position.price = new_price
+                    group.stock_position.market_exposure = (
+                        new_price * group.stock_position.quantity
+                    )
+                    group.stock_position.market_value = (
+                        new_price * group.stock_position.quantity
+                    )
+                    group.stock_position.beta_adjusted_exposure = (
+                        group.stock_position.market_exposure * group.stock_position.beta
+                    )
 
-                        logger.debug(f"Updated price for {ticker} to {new_price}")
-            else:
-                logger.warning(f"Could not fetch price data for {ticker}")
+                    logger.debug(f"Updated price for {ticker} to {new_price}")
         except Exception as e:
             logger.error(f"Error fetching price for {ticker}: {e!s}")
 
@@ -1328,14 +1266,16 @@ def update_all_prices(
 
 
 def update_portfolio_summary_with_prices(
-    portfolio_groups: list[PortfolioGroup], summary: PortfolioSummary, data_fetcher=None
+    portfolio_groups: list[PortfolioGroup],
+    summary: PortfolioSummary,
+    data_fetcher=None,  # Kept for backward compatibility but not used
 ) -> PortfolioSummary:
     """Update the portfolio summary with the latest prices.
 
     Args:
         portfolio_groups: List of portfolio groups to update prices for
         summary: The current portfolio summary
-        data_fetcher: Optional data fetcher to use for price updates
+        data_fetcher: Optional data fetcher (kept for backward compatibility)
 
     Returns:
         Updated portfolio summary with the latest prices

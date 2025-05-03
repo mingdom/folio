@@ -4,10 +4,9 @@ TODO: eventually should be split into smaller modular pieces
 
 import os
 
-import pandas as pd
 import yaml
 
-from src.stockdata import get_data_fetcher
+from src.folib.data.stock import stockdata
 
 # Import cash detection functions
 from .cash_detection import is_cash_or_short_term
@@ -28,13 +27,10 @@ def load_config():
     return {}
 
 
-# Get the singleton data fetcher instance
-data_fetcher = get_data_fetcher()
-
-
 def get_beta(ticker: str, description: str = "") -> float:
     """Calculates the beta (systematic risk) for a given financial instrument.
-    TODO: Deprecate
+
+    DEPRECATED: Use stockdata.get_beta() directly instead.
 
     Beta measures the volatility of an instrument in relation to the overall market.
     Returns 0.0 when beta cannot be meaningfully calculated (e.g., for money market funds,
@@ -48,81 +44,29 @@ def get_beta(ticker: str, description: str = "") -> float:
         float: The calculated beta value, or 0.0 if beta cannot be meaningfully calculated
 
     Raises:
-        RuntimeError: If the DataFetcher has not been initialized or fails to fetch data
         ValueError: If the data is invalid or calculations result in invalid values
-        KeyError: If the data format is invalid (missing required columns)
     """
     # For cash-like instruments, return 0 without calculation
     if is_cash_or_short_term(ticker, beta=None, description=description):
         logger.debug(f"Using default beta of 0.0 for cash-like position: {ticker}")
         return 0.0
 
-    if not data_fetcher:
-        raise RuntimeError("DataFetcher not initialized - check API key configuration")
-
-    # Fetch required data
-    stock_data = data_fetcher.fetch_data(ticker)
-    market_data = data_fetcher.fetch_market_data()
-
-    if stock_data is None:
-        raise RuntimeError(f"Failed to fetch data for ticker {ticker}")
-    if market_data is None:
-        raise RuntimeError("Failed to fetch market index data")
-
     try:
-        # Calculate returns - let KeyError propagate if 'Close' column missing
-        stock_returns = stock_data["Close"].pct_change(fill_method=None).dropna()
-        market_returns = market_data["Close"].pct_change(fill_method=None).dropna()
+        # Use the new stockdata API to get beta
+        beta = stockdata.get_beta(ticker)
 
-        # Align data by index
-        aligned_stock, aligned_market = stock_returns.align(
-            market_returns, join="inner"
-        )
-
-        if aligned_stock.empty or len(aligned_stock) < 2:
-            logger.debug(
-                f"Insufficient overlapping data points for {ticker}, cannot calculate meaningful beta"
-            )
+        # If beta is None, return 0.0 for consistency with old behavior
+        if beta is None:
+            logger.debug(f"No beta available for {ticker}, returning 0.0")
             return 0.0
 
-        # Calculate beta components
-        market_variance = aligned_market.var()
-        covariance = aligned_stock.cov(aligned_market)
-
-        if pd.isna(market_variance):
-            raise ValueError(
-                f"Market variance calculation resulted in NaN for {ticker}"
-            )
-        if abs(market_variance) < 1e-12:
-            logger.debug(
-                f"Market variance is near-zero for {ticker}, cannot calculate meaningful beta"
-            )
-            return 0.0
-        if pd.isna(covariance):
-            raise ValueError(f"Covariance calculation resulted in NaN for {ticker}")
-
-        beta = covariance / market_variance
-        if pd.isna(beta):
-            raise ValueError(f"Beta calculation resulted in NaN for {ticker}")
-
-        logger.debug(f"Calculated beta of {beta:.2f} for {ticker}")
+        logger.debug(f"Got beta of {beta:.2f} for {ticker} from stockdata")
         return beta
 
-    except (ValueError, pd.errors.InvalidIndexError) as e:
-        # Only catch calculation-related errors
-        if "No historical data found" in str(e):
-            # This is not a critical error - just log a warning
-            logger.warning(
-                f"Error calculating beta for {ticker}: {e}. Unable to determine beta."
-            )
-            # Re-raise with a more specific message
-            raise ValueError(
-                f"No historical data available for beta calculation: {ticker}"
-            ) from e
-        else:
-            # Log other calculation errors as errors
-            logger.error(f"Error calculating beta for {ticker}: {e}")
-            raise
+    except Exception as e:
+        # Log the error and re-raise with a more specific message
+        logger.error(f"Error getting beta for {ticker}: {e}")
+        raise ValueError(f"Failed to get beta for {ticker}: {e}") from e
 
 
 def clean_currency_value(value_str: str) -> float:

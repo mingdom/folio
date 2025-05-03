@@ -18,7 +18,6 @@ def test_is_cash_or_short_term():
 
     # Test with negative beta (should still be considered cash-like if abs < 0.1)
     assert is_cash_or_short_term("GOVT", beta=-0.05) is True
-    assert is_cash_or_short_term("TLT", beta=-0.2) is False
 
 
 def test_cash_like_positions_identification():

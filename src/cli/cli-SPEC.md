@@ -61,6 +61,7 @@ This document outlines the specifications for the `Folio CLI`, a command-line in
 
 * The interactive shell maintains state within a session (e.g., loaded portfolio path, last results).
 * This state is primarily for user convenience in interactive mode and MUST NOT be relied upon by the core command logic, which needs to function independently for direct execution. Caching of loaded data within the shell session is acceptable.
+* When starting the interactive shell, it should automatically display the portfolio summary view after loading the default portfolio to provide immediate insights to users.
 
 ## 5. Command Specifications
 

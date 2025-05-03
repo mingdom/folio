@@ -101,7 +101,8 @@ class TestDomainToDictMethods:
             unknown_value=0.0,
             pending_activity_value=100.0,
             net_market_exposure=2500.0,
-            portfolio_beta=1.2,
+            net_exposure_pct=1.0,
+            beta_adjusted_exposure=3000.0,
         )
 
         # Act
@@ -116,4 +117,5 @@ class TestDomainToDictMethods:
         assert result["unknown_value"] == 0.0
         assert result["pending_activity_value"] == 100.0
         assert result["net_market_exposure"] == 2500.0
-        assert result["portfolio_beta"] == 1.2
+        assert result["beta_adjusted_exposure"] == 3000.0
+        # net_exposure_pct is not included in to_dict() output

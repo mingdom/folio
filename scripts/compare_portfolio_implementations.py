@@ -22,15 +22,18 @@ import pandas as pd
 from rich.console import Console
 from rich.table import Table
 
-# Add the project root to the Python path
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
 # Import old implementation
 # Import new implementation
 from src.folib.data.loader import load_portfolio_from_csv, parse_portfolio_holdings
 from src.folib.domain import Portfolio, PortfolioSummary
 from src.folib.services.portfolio_service import create_portfolio_summary
 from src.folio.portfolio import process_portfolio_data
+
+# Constants
+DEFAULT_PORTFOLIO_CSV = "private-data/portfolios/portfolio-default.csv"
+
+# Add the project root to the Python path
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Set up logging
 logging.basicConfig(
@@ -75,44 +78,17 @@ def load_portfolio_new_method(file_path: str) -> tuple[Portfolio, PortfolioSumma
         Tuple of (portfolio, summary)
     """
     logger.info(f"Loading portfolio using new method from: {file_path}")
+
+    # Load the portfolio data
     df = load_portfolio_from_csv(file_path)
     holdings = parse_portfolio_holdings(df)
 
-    # Create portfolio groups for comparison with old implementation
-    # Extract pending activity value
-    from src.folib.services.portfolio_service import (
-        _get_pending_activity,
-        create_portfolio_groups,
-    )
+    # Use the portfolio service to process the holdings
+    from src.folib.services.portfolio_service import process_portfolio
 
-    pending_activity_value = _get_pending_activity(holdings)
-
-    # Filter out pending activity from holdings
-    filtered_holdings = [
-        h for h in holdings if not h.symbol.upper().startswith("PENDING")
-    ]
-
-    # Create portfolio groups
-    groups = create_portfolio_groups(filtered_holdings)
-
-    # Create positions list from groups
-    positions = []
-    for group in groups:
-        if group.stock_position:
-            positions.append(group.stock_position)
-        positions.extend(group.option_positions)
-
-    # Create cash positions
-    # Note: We don't need to create CashPosition objects here because the portfolio_service.py
-    # will automatically identify cash-like positions (FMPXX, FZDXX, etc.) and treat them as cash
-    # in the create_portfolio_summary function.
-    # This avoids double-counting cash positions.
-
-    # Create portfolio
-    portfolio = Portfolio(
-        positions=positions,
-        pending_activity_value=pending_activity_value,
-    )
+    # Process the portfolio using the service - this handles all the business logic
+    # including pending activity detection, cash positions, and portfolio grouping
+    portfolio = process_portfolio(holdings, update_prices=False)
 
     # Create portfolio summary
     summary = create_portfolio_summary(portfolio)
@@ -698,7 +674,7 @@ def main():
         "--portfolio",
         "-p",
         type=str,
-        default="private-data/portfolio-private.csv",
+        default=DEFAULT_PORTFOLIO_CSV,
         help="Path to portfolio CSV file",
     )
     parser.add_argument(
@@ -915,8 +891,9 @@ def sample_option_positions(old_groups, new_portfolio, num_samples=5):
 
             try:
                 underlying_price = stockdata.get_price(new_opt["ticker"])
-            except:
+            except Exception as e:
                 # Fallback to using strike as proxy
+                logger.debug(f"Could not get price for {new_opt['ticker']}: {e}")
                 underlying_price = new_opt["strike"]
 
             new_delta = calculate_option_delta(
@@ -1007,8 +984,9 @@ def sample_option_positions(old_groups, new_portfolio, num_samples=5):
 
             try:
                 underlying_price = stockdata.get_price(new_opt["ticker"])
-            except:
+            except Exception as e:
                 # Fallback to using strike as proxy
+                logger.debug(f"Could not get price for {new_opt['ticker']}: {e}")
                 underlying_price = new_opt["strike"]
 
             new_delta = calculate_option_delta(
