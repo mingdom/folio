@@ -14,6 +14,7 @@ import yfinance as yf
 
 from .cache import DataCache
 from .provider import MarketDataProvider
+from .utils import is_valid_stock_symbol
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -121,7 +122,7 @@ class YFinanceProvider(MarketDataProvider):
             raise ValueError("Ticker cannot be empty")
 
         # Check if the ticker appears to be a valid stock symbol
-        if not self.is_valid_stock_symbol(ticker):
+        if not is_valid_stock_symbol(ticker):
             raise ValueError(f"Invalid stock symbol format: {ticker}")
 
         # Check cache first
