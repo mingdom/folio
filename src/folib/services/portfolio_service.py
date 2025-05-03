@@ -418,11 +418,11 @@ def create_portfolio_summary(portfolio: Portfolio) -> PortfolioSummary:
                 # or short positions with negative delta (short puts)
                 long_options["value"] += position_value
                 long_options["beta_adjusted"] += beta_adjusted
-                long_options["delta_exposure"] += abs(
-                    market_exposure
-                )  # Use absolute value for delta exposure
+                # Store the actual market_exposure value with its sign
+                # This preserves the sign semantics which are important
+                long_options["delta_exposure"] += market_exposure
                 logger.debug(
-                    f"Categorized as LONG option exposure: {position.ticker} {position.option_type} {position.strike} (delta: {delta}, exposure: {abs(market_exposure)})"
+                    f"Categorized as LONG option exposure: {position.ticker} {position.option_type} {position.strike} (delta: {delta}, exposure: {market_exposure})"
                 )
             else:  # option_category == "short" - Negative delta = Short position (regardless of quantity)
                 # For long positions with negative delta (long puts)
@@ -435,14 +435,22 @@ def create_portfolio_summary(portfolio: Portfolio) -> PortfolioSummary:
                 short_options["beta_adjusted"] += (
                     beta_adjusted  # Already negative from market_exposure
                 )
-                # In the old implementation, short_options["delta_exposure"] is stored as a negative value
-                # But we need to make sure it's negative regardless of the market_exposure sign
-                short_options["delta_exposure"] += -abs(
-                    market_exposure
-                )  # Store as negative value
-                logger.debug(
-                    f"Categorized as SHORT option exposure: {position.ticker} {position.option_type} {position.strike} (delta: {delta}, exposure: {-abs(market_exposure)})"
-                )
+                # Store the actual market_exposure value with its sign
+                # For short options, this should already be negative
+                # If it's not, we'll negate it to ensure it's stored as negative
+                if market_exposure > 0:
+                    # If somehow the market_exposure is positive for a short option,
+                    # we'll negate it to ensure it's stored as negative
+                    short_options["delta_exposure"] += -market_exposure
+                    logger.debug(
+                        f"Categorized as SHORT option exposure (negated positive exposure): {position.ticker} {position.option_type} {position.strike} (delta: {delta}, exposure: {-market_exposure})"
+                    )
+                else:
+                    # If market_exposure is already negative, use it as is
+                    short_options["delta_exposure"] += market_exposure
+                    logger.debug(
+                        f"Categorized as SHORT option exposure: {position.ticker} {position.option_type} {position.strike} (delta: {delta}, exposure: {market_exposure})"
+                    )
 
         elif position.position_type == "cash":
             cash_value += position_value
@@ -451,24 +459,21 @@ def create_portfolio_summary(portfolio: Portfolio) -> PortfolioSummary:
             unknown_value += position_value
             logger.debug(f"Unknown position type for {position.ticker}")
 
-    # Import portfolio calculation functions
-    from ..calculations.portfolio import (
-        calculate_portfolio_metrics,
-        create_value_breakdowns,
-    )
+    # Calculate value breakdowns (moved from calculations/portfolio.py)
+    # Calculate long value (positive exposure)
+    long_value = long_stocks["value"]
 
-    # Create exposure breakdowns using portfolio_value module
-    long_value, short_value, options_value = create_value_breakdowns(
-        long_stocks=long_stocks,
-        short_stocks=short_stocks,
-        long_options=long_options,
-        short_options=short_options,
-    )
+    # Calculate short value (negative exposure)
+    short_value = short_stocks["value"]
 
-    # Calculate portfolio metrics
-    net_market_exposure, portfolio_beta, short_percentage = calculate_portfolio_metrics(
-        long_value=long_value, short_value=short_value
-    )
+    # Calculate options value (both long and short)
+    long_options["value"] + short_options["value"]
+
+    # Calculate net market exposure (moved from calculations/portfolio.py)
+    net_market_exposure = long_value - short_value
+
+    # We don't need to calculate short percentage anymore
+    # The percentage calculations are now done by dividing by total portfolio value
 
     # Calculate total value - in the old implementation, the total value is calculated as:
     # stock_value + option_value + cash_value + pending_activity_value
@@ -501,7 +506,15 @@ def create_portfolio_summary(portfolio: Portfolio) -> PortfolioSummary:
 
     # Calculate exposures using the get_portfolio_exposures function
     exposures = get_portfolio_exposures(portfolio)
-    old_style_net_exposure = exposures["net_market_exposure"]
+
+    # Get the net market exposure from the exposures calculation
+    net_market_exposure = exposures["net_market_exposure"]
+
+    # Get the beta-adjusted exposure from the exposures calculation
+    beta_adjusted_exposure = exposures["beta_adjusted_exposure"]
+
+    # Calculate net exposure percentage
+    net_exposure_pct = (net_market_exposure / total_value) if total_value > 0 else 0.0
 
     summary = PortfolioSummary(
         total_value=total_value,
@@ -512,8 +525,9 @@ def create_portfolio_summary(portfolio: Portfolio) -> PortfolioSummary:
         cash_value=cash_value,
         unknown_value=unknown_value,
         pending_activity_value=pending_activity,  # Use the fixed pending_activity value
-        net_market_exposure=old_style_net_exposure,  # Use the exposure-based calculation
-        portfolio_beta=portfolio_beta,
+        net_market_exposure=net_market_exposure,
+        net_exposure_pct=net_exposure_pct,
+        beta_adjusted_exposure=beta_adjusted_exposure,
     )
 
     logger.debug("Portfolio summary created successfully")
@@ -785,16 +799,20 @@ def filter_positions_by_criteria(
         elif key == "min_value":
             try:
                 min_value = float(value)
+                # Don't use abs() - respect the sign of market_value
+                # This means min_value will filter based on the actual value, not the magnitude
                 filtered_positions = [
-                    p for p in filtered_positions if abs(p.market_value) >= min_value
+                    p for p in filtered_positions if p.market_value >= min_value
                 ]
             except ValueError:
                 logger.warning(f"Invalid min_value: {value}. Skipping filter.")
         elif key == "max_value":
             try:
                 max_value = float(value)
+                # Don't use abs() - respect the sign of market_value
+                # This means max_value will filter based on the actual value, not the magnitude
                 filtered_positions = [
-                    p for p in filtered_positions if abs(p.market_value) <= max_value
+                    p for p in filtered_positions if p.market_value <= max_value
                 ]
             except ValueError:
                 logger.warning(f"Invalid max_value: {value}. Skipping filter.")
@@ -818,7 +836,7 @@ def sort_positions(
     """
     # Define sorting key functions
     sort_keys = {
-        "value": lambda p: abs(p.market_value),
+        "value": lambda p: p.market_value,  # Don't use abs() - respect the sign
         "symbol": lambda p: p.ticker.upper(),
         "type": lambda p: p.position_type,
     }

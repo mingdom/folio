@@ -82,6 +82,12 @@ class TestCreatePortfolioSummary:
         assert summary.option_value == 1000.0  # 2 contracts * 100 shares * 5.0
         assert summary.pending_activity_value == 100.0
 
+        # Verify new fields
+        assert hasattr(summary, "net_exposure_pct")
+        assert hasattr(summary, "beta_adjusted_exposure")
+        assert summary.net_exposure_pct >= 0
+        assert summary.beta_adjusted_exposure != 0
+
         # Verify the exposure calculations were called correctly
         mock_stockdata.get_beta.assert_called_with("AAPL")
         # The function is called twice, once for exposure calculation and once for categorization
