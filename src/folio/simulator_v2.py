@@ -266,8 +266,7 @@ def simulate_option_position(
     else:
         expiry_date = position.expiry
 
-    # Import from options module
-    from .options import OptionContract, calculate_bs_price
+    # Create a contract for the option
 
     # Create a contract for the current option
     option_contract = OptionContract(

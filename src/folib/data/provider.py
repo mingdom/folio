@@ -69,22 +69,3 @@ class MarketDataProvider(ABC):
         # Unused argument is intentional - this is a base method that subclasses will override
         # with their own implementation that uses the ticker parameter
         return None
-
-    def is_valid_stock_symbol(self, ticker: str) -> bool:
-        """
-        Check if a ticker symbol is likely a valid stock symbol.
-
-        This method uses a simple regex pattern to check if a ticker symbol follows
-        common stock symbol patterns. It's designed to filter out obviously invalid
-        symbols before sending them to the provider API.
-
-        Args:
-            ticker: The ticker symbol to check
-
-        Returns:
-            True if the ticker appears to be a valid stock symbol, False otherwise
-        """
-        # Import here to avoid circular imports
-        from .stock import is_valid_stock_symbol
-
-        return is_valid_stock_symbol(ticker)

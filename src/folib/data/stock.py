@@ -21,14 +21,15 @@ Features:
 
 import logging
 import os
-import re
 from typing import Any
 
 import pandas as pd
 from dotenv import load_dotenv
 
+from .cache import DataCache
 from .provider_fmp import FMPProvider
 from .provider_yfinance import YFinanceProvider
+from .utils import is_valid_stock_symbol
 
 # Load environment variables from .env file
 load_dotenv()
@@ -61,45 +62,6 @@ def get_current_price(historical_data: pd.DataFrame) -> float:
         raise ValueError("Historical data doesn't have a 'Close' column")
 
     return historical_data["Close"].iloc[-1]
-
-
-def is_valid_stock_symbol(ticker: str) -> bool:
-    """
-    Check if a ticker symbol is likely a valid stock symbol.
-
-    This function uses a simple regex pattern to check if a ticker symbol follows
-    common stock symbol patterns. It's designed to filter out obviously invalid
-    symbols before sending them to provider APIs.
-
-    Common stock symbol patterns:
-    - 1-5 uppercase letters (most US stocks: AAPL, MSFT, GOOGL)
-    - 1-5 uppercase letters with a period (some international stocks: BHP.AX)
-    - 1-5 uppercase letters with a hyphen (some ETFs: SPY-X)
-    - 1-5 uppercase letters followed by 1-3 uppercase letters after a period (ADRs: SONY.TO)
-
-    Args:
-        ticker: The ticker symbol to check
-
-    Returns:
-        True if the ticker appears to be a valid stock symbol, False otherwise
-    """
-    if not ticker:
-        return False
-
-    # Simple regex pattern for common stock symbols
-    # This covers most US stocks, ETFs, and common international formats
-    pattern = r"^[A-Z]{1,5}(\.[A-Z]{1,3}|-[A-Z]{1})?$"
-
-    # Special case for fund symbols that often have numbers and special formats
-    fund_pattern = r"^[A-Z]{1,5}[0-9X]{0,3}$"
-
-    # Check if the ticker matches either pattern
-    if re.match(pattern, ticker) or re.match(fund_pattern, ticker):
-        return True
-
-    # Log invalid symbols for debugging
-    logger.debug(f"Symbol '{ticker}' does not match standard stock symbol patterns")
-    return False
 
 
 def calculate_beta_from_history(
@@ -255,7 +217,7 @@ class StockOracle:
             )
 
         # Validate provider name
-        if provider_name not in [self.PROVIDER_YFINANCE, self.PROVIDER_FMP]:
+        if provider_name not in {self.PROVIDER_YFINANCE, self.PROVIDER_FMP}:
             raise ValueError(f"Unknown provider: {provider_name}")
 
         # Validate FMP API key if FMP provider is selected
@@ -353,7 +315,6 @@ class StockOracle:
             return None
 
         # Check cache first
-        from .cache import DataCache
 
         cache = getattr(self.provider, "cache", None)
         if cache and isinstance(cache, DataCache):
@@ -474,7 +435,6 @@ class StockOracle:
             raise ValueError(f"Invalid stock symbol format: {ticker}")
 
         # Check cache first
-        from .cache import DataCache
 
         cache = getattr(self.provider, "cache", None)
         if cache and isinstance(cache, DataCache):

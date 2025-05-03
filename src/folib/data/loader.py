@@ -61,7 +61,7 @@ def clean_currency_value(value: Any) -> float:
     value_str = str(value)
 
     # Handle empty or dash values
-    if value_str in ("--", ""):
+    if value_str in {"--", ""}:
         return 0.0
 
     # Remove currency symbols and commas

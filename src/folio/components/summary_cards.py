@@ -6,7 +6,7 @@ formatting the values.
 """
 
 import dash_bootstrap_components as dbc
-from dash import html
+from dash import Input, Output, html
 
 from ..formatting import format_currency
 from ..logger import logger
@@ -194,15 +194,13 @@ def create_portfolio_value_card():
     return dbc.Col(
         [
             dbc.Card(
-                dbc.CardBody(
-                    [
-                        html.H6(
-                            "Portfolio Value",
-                            className="card-subtitle",
-                        ),
-                        portfolio_value,  # Nest the component here
-                    ]
-                ),
+                dbc.CardBody([
+                    html.H6(
+                        "Portfolio Value",
+                        className="card-subtitle",
+                    ),
+                    portfolio_value,  # Nest the component here
+                ]),
                 className="mb-3",
                 id="portfolio-value-card",
             ),
@@ -235,16 +233,14 @@ def create_net_exposure_card():
     return dbc.Col(
         [
             dbc.Card(
-                dbc.CardBody(
-                    [
-                        html.H6(
-                            "Net Exposure",
-                            className="card-subtitle",
-                        ),
-                        total_value,  # Nest the component here
-                        total_value_percent,  # Nest the component here
-                    ]
-                ),
+                dbc.CardBody([
+                    html.H6(
+                        "Net Exposure",
+                        className="card-subtitle",
+                    ),
+                    total_value,  # Nest the component here
+                    total_value_percent,  # Nest the component here
+                ]),
                 className="mb-3",
                 id="total-value-card",
             ),
@@ -277,16 +273,14 @@ def create_long_exposure_card():
     return dbc.Col(
         [
             dbc.Card(
-                dbc.CardBody(
-                    [
-                        html.H6(
-                            "Long Exposure",
-                            className="card-subtitle",
-                        ),
-                        long_exposure,  # Nest the component here
-                        long_exposure_percent,  # Nest the component here
-                    ]
-                ),
+                dbc.CardBody([
+                    html.H6(
+                        "Long Exposure",
+                        className="card-subtitle",
+                    ),
+                    long_exposure,  # Nest the component here
+                    long_exposure_percent,  # Nest the component here
+                ]),
                 className="mb-3",
                 id="long-exposure-card",
             ),
@@ -319,16 +313,14 @@ def create_short_exposure_card():
     return dbc.Col(
         [
             dbc.Card(
-                dbc.CardBody(
-                    [
-                        html.H6(
-                            "Short Exposure",
-                            className="card-subtitle",
-                        ),
-                        short_exposure,  # Nest the component here
-                        short_exposure_percent,  # Nest the component here
-                    ]
-                ),
+                dbc.CardBody([
+                    html.H6(
+                        "Short Exposure",
+                        className="card-subtitle",
+                    ),
+                    short_exposure,  # Nest the component here
+                    short_exposure_percent,  # Nest the component here
+                ]),
                 className="mb-3",
                 id="short-exposure-card",
             ),
@@ -361,16 +353,14 @@ def create_options_exposure_card():
     return dbc.Col(
         [
             dbc.Card(
-                dbc.CardBody(
-                    [
-                        html.H6(
-                            "Options Exposure",
-                            className="card-subtitle",
-                        ),
-                        options_exposure,  # Nest the component here
-                        options_exposure_percent,  # Nest the component here
-                    ]
-                ),
+                dbc.CardBody([
+                    html.H6(
+                        "Options Exposure",
+                        className="card-subtitle",
+                    ),
+                    options_exposure,  # Nest the component here
+                    options_exposure_percent,  # Nest the component here
+                ]),
                 className="mb-3",
                 id="options-exposure-card",
             ),
@@ -403,16 +393,14 @@ def create_cash_card():
     return dbc.Col(
         [
             dbc.Card(
-                dbc.CardBody(
-                    [
-                        html.H6(
-                            "Cash & Equivalents",
-                            className="card-subtitle",
-                        ),
-                        cash_like_value,  # Nest the component here
-                        cash_like_percent,  # Nest the component here
-                    ]
-                ),
+                dbc.CardBody([
+                    html.H6(
+                        "Cash & Equivalents",
+                        className="card-subtitle",
+                    ),
+                    cash_like_value,  # Nest the component here
+                    cash_like_percent,  # Nest the component here
+                ]),
                 className="mb-3",
                 id="cash-like-card",
             ),
@@ -445,16 +433,14 @@ def create_beta_adjusted_exposure_card():
     return dbc.Col(
         [
             dbc.Card(
-                dbc.CardBody(
-                    [
-                        html.H6(
-                            "Beta-Adjusted Net Exposure",
-                            className="card-subtitle",
-                        ),
-                        beta_adjusted_exposure,  # Nest the component here
-                        beta_adjusted_percent,  # Nest the component here
-                    ]
-                ),
+                dbc.CardBody([
+                    html.H6(
+                        "Beta-Adjusted Net Exposure",
+                        className="card-subtitle",
+                    ),
+                    beta_adjusted_exposure,  # Nest the component here
+                    beta_adjusted_percent,  # Nest the component here
+                ]),
                 className="mb-3",
                 id="beta-adjusted-exposure-card",
             ),
@@ -486,28 +472,26 @@ def create_summary_cards():
 
     # Create the portfolio value banner card
     portfolio_value_banner = dbc.Card(
-        dbc.CardBody(
-            [
-                html.Div(
-                    [
-                        html.H4(
-                            [
-                                html.Span(
-                                    "Total Portfolio Value: ", className="text-muted"
-                                ),
-                                html.Span(
-                                    id="portfolio-value",
-                                    children="$0.00",
-                                    className="text-primary",
-                                ),
-                            ],
-                            className="text-center mb-0",
-                        ),
-                    ],
-                    className="d-flex justify-content-center",
-                ),
-            ]
-        ),
+        dbc.CardBody([
+            html.Div(
+                [
+                    html.H4(
+                        [
+                            html.Span(
+                                "Total Portfolio Value: ", className="text-muted"
+                            ),
+                            html.Span(
+                                id="portfolio-value",
+                                children="$0.00",
+                                className="text-primary",
+                            ),
+                        ],
+                        className="text-center mb-0",
+                    ),
+                ],
+                className="d-flex justify-content-center",
+            ),
+        ]),
         className="mb-3",
         style={
             "background-color": "#f8f9fa"
@@ -516,28 +500,26 @@ def create_summary_cards():
 
     # Create the summary card with all the components nested inside it
     return dbc.Card(
-        dbc.CardBody(
-            [
-                html.H4("Portfolio Summary", className="text-center mb-3"),
-                portfolio_value_banner,
-                dbc.Row(
-                    [
-                        net_exposure_card,
-                        beta_adjusted_exposure_card,
-                        long_exposure_card,
-                    ],
-                    className="mb-3",
-                ),
-                dbc.Row(
-                    [
-                        short_exposure_card,
-                        options_exposure_card,
-                        cash_card,
-                    ],
-                    className="mb-3",
-                ),
-            ]
-        ),
+        dbc.CardBody([
+            html.H4("Portfolio Summary", className="text-center mb-3"),
+            portfolio_value_banner,
+            dbc.Row(
+                [
+                    net_exposure_card,
+                    beta_adjusted_exposure_card,
+                    long_exposure_card,
+                ],
+                className="mb-3",
+            ),
+            dbc.Row(
+                [
+                    short_exposure_card,
+                    options_exposure_card,
+                    cash_card,
+                ],
+                className="mb-3",
+            ),
+        ]),
         className="mb-3",
         id="summary-card",
     )
@@ -554,8 +536,6 @@ def register_callbacks(app):
     logger.debug(
         f"Callback map before summary cards registration: {len(app.callback_map)} callbacks"
     )
-
-    from dash import Input, Output
 
     @app.callback(
         [

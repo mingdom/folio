@@ -41,7 +41,7 @@ def test_cash_like_positions_identification():
     df = pd.DataFrame(data)
 
     # Process the portfolio
-    groups, summary, cash_like_positions = process_portfolio_data(df)
+    _groups, _summary, cash_like_positions = process_portfolio_data(df)
 
     # Check that cash-like positions were identified correctly
     assert len(cash_like_positions) == 3  # SPAXX, SHY, and CASH
@@ -82,7 +82,7 @@ def test_portfolio_summary_cash_like_metrics():
     df = pd.DataFrame(data)
 
     # Process the portfolio
-    groups, summary, cash_like_positions = process_portfolio_data(df)
+    _groups, summary, _cash_like_positions = process_portfolio_data(df)
 
     # Check that the summary includes cash-like metrics
     assert summary.cash_like_count == 1  # Only SPAXX
@@ -155,7 +155,7 @@ def test_only_cash_portfolio():
     df = pd.DataFrame(data)
 
     # Process the portfolio
-    groups, summary, cash_like_positions = process_portfolio_data(df)
+    _groups, summary, cash_like_positions = process_portfolio_data(df)
 
     # Check that all positions are identified as cash-like
     assert len(cash_like_positions) == 3
@@ -192,7 +192,7 @@ def test_position_deduplication():
     df = pd.DataFrame(data)
 
     # Process the portfolio
-    groups, summary, cash_like_positions = process_portfolio_data(df)
+    _groups, _summary, cash_like_positions = process_portfolio_data(df)
 
     # Should have 2 cash-like positions (TLT and SPAXX, each combined)
     assert len(cash_like_positions) == 2

@@ -38,7 +38,7 @@ def test_pending_activity_extraction():
     )
 
     # Process the portfolio data
-    groups, summary, _ = process_portfolio_data(
+    _groups, summary, _ = process_portfolio_data(
         df, update_prices=False
     )  # Don't update prices
 
@@ -83,7 +83,7 @@ def test_pending_activity_with_missing_value():
     )
 
     # Process the portfolio data
-    groups, summary, _ = process_portfolio_data(
+    _groups, summary, _ = process_portfolio_data(
         df, update_prices=False
     )  # Don't update prices
 
@@ -132,7 +132,7 @@ def test_pending_activity_from_different_columns():
     )
 
     # Process the portfolio data
-    groups, summary, _ = process_portfolio_data(
+    _groups, summary, _ = process_portfolio_data(
         df, update_prices=False
     )  # Don't update prices
 
@@ -178,7 +178,7 @@ def test_pending_activity_from_different_columns():
     )
 
     # Process the portfolio data
-    groups, summary, _ = process_portfolio_data(
+    _groups, summary, _ = process_portfolio_data(
         df, update_prices=False
     )  # Don't update prices
 

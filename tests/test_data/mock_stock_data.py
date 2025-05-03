@@ -273,7 +273,7 @@ def get_mock_raw_data(ticker, period="1y"):
         raise ValueError(f"No sample file found for {ticker} with period {period}")
 
     # Load sample data
-    with open(sample_file) as f:
+    with open(sample_file, encoding="utf-8") as f:
         sample_data = json.load(f)
 
     # Get full data
@@ -323,7 +323,7 @@ def get_real_beta(ticker):
     if not os.path.exists(beta_file):
         raise ValueError("Beta values file not found")
 
-    with open(beta_file) as f:
+    with open(beta_file, encoding="utf-8") as f:
         betas = json.load(f)
 
     if ticker not in betas:

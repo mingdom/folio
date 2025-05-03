@@ -108,7 +108,7 @@ def is_cash_or_short_term(
     # Check various conditions that would make this a cash-like position
 
     # 1. Check if it's a cash symbol
-    if ticker in ["CASH", "USD"]:
+    if ticker in {"CASH", "USD"}:
         is_cash_like = True
 
     # 2. Check if it's a money market fund

@@ -57,7 +57,7 @@ class TestChartConfig(unittest.TestCase):
         charts_file = Path(inspect.getfile(get_chart_config))
 
         # Parse the file
-        with open(charts_file) as f:
+        with open(charts_file, encoding="utf-8") as f:
             tree = ast.parse(f.read())
 
         # Visit the AST to find chart configurations

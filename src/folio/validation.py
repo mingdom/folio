@@ -60,7 +60,7 @@ def validate_option_data(
 
     # Validate price
     price_raw = option_row.get(price_field)
-    if pd.isna(price_raw) or price_raw in ("--", ""):
+    if pd.isna(price_raw) or price_raw in {"--", ""}:
         raise DataError(f"Missing price for option '{description}'")
 
     try:

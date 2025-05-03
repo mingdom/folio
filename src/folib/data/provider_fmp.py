@@ -7,12 +7,15 @@ providing access to stock prices, historical data, and beta values from the FMP 
 
 import logging
 import os
+import re
 from datetime import datetime, timedelta
 
 import fmpsdk
 import pandas as pd
 
+from .cache import DataCache
 from .provider import MarketDataProvider
+from .utils import is_valid_stock_symbol
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -60,7 +63,6 @@ class FMPProvider(MarketDataProvider):
                 cache_dir = ".cache_fmp"
 
         # Initialize the cache manager
-        from .cache import DataCache
 
         self.cache = DataCache(cache_dir=cache_dir, cache_ttl=cache_ttl or 86400)
 
@@ -130,7 +132,7 @@ class FMPProvider(MarketDataProvider):
             raise ValueError("Ticker cannot be empty")
 
         # Check if the ticker appears to be a valid stock symbol
-        if not self.is_valid_stock_symbol(ticker):
+        if not is_valid_stock_symbol(ticker):
             raise ValueError(f"Invalid stock symbol format: {ticker}")
 
         # Check cache first
@@ -306,11 +308,10 @@ class FMPProvider(MarketDataProvider):
             ValueError: If the period format cannot be parsed
         """
         # Handle special cases
-        if period in ["ytd", "max"]:
+        if period in {"ytd", "max"}:
             return period
 
         # Parse the numeric part and unit
-        import re
 
         match = re.match(r"(\d+)([dmy].*)", period)
         if not match:
@@ -358,7 +359,6 @@ class FMPProvider(MarketDataProvider):
             return "monthly"
 
         # Parse the numeric part and unit
-        import re
 
         match = re.match(r"(\d+)([mh])", interval)
         if not match:

@@ -235,7 +235,7 @@ def generate_spy_changes(range_pct: float, steps: int) -> list[float]:
     # Ensure we have a zero point
     if 0.0 not in spy_changes and steps > 2:
         # Find the closest point to zero and replace it with zero
-        closest_to_zero = min(spy_changes, key=lambda x: abs(x))
+        closest_to_zero = min(spy_changes, key=abs)
         zero_index = spy_changes.index(closest_to_zero)
         spy_changes[zero_index] = 0.0
 

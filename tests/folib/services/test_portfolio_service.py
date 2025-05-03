@@ -61,7 +61,7 @@ class TestCreatePortfolioSummary:
     """Tests for the create_portfolio_summary function."""
 
     @patch("src.folib.services.portfolio_service.stockdata")
-    @patch("src.folib.calculations.options.calculate_option_delta")
+    @patch("src.folib.services.portfolio_service.calculate_option_delta")
     def test_create_portfolio_summary_with_stock_and_option(
         self, mock_calculate_delta, mock_stockdata, sample_portfolio
     ):
@@ -98,7 +98,7 @@ class TestGetPortfolioExposures:
     """Tests for the get_portfolio_exposures function."""
 
     @patch("src.folib.services.portfolio_service.stockdata")
-    @patch("src.folib.calculations.options.calculate_option_delta")
+    @patch("src.folib.services.portfolio_service.calculate_option_delta")
     def test_get_portfolio_exposures(
         self, mock_calculate_delta, mock_stockdata, sample_portfolio
     ):

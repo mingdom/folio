@@ -28,7 +28,7 @@ def validate_option_inputs(
     underlying_price: float,
 ) -> None:
     """Validate inputs for option calculations."""
-    if option_type not in ("CALL", "PUT"):
+    if option_type not in {"CALL", "PUT"}:
         raise ValueError(f"Invalid option_type: {option_type}. Must be 'CALL' or 'PUT'")
     if strike <= 0:
         raise ValueError(f"Invalid strike price: {strike}. Must be positive")

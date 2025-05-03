@@ -302,7 +302,7 @@ def create_pnl_summary(summary: dict[str, Any], mode: str) -> html.Div:  # noqa:
                                             html.H3(
                                                 "Unlimited"
                                                 if summary.get(
-                                                    "unbounded_profit", False
+                                                    "unbounded_profit"
                                                 )
                                                 else format_currency(
                                                     summary["max_profit"]
@@ -312,7 +312,7 @@ def create_pnl_summary(summary: dict[str, Any], mode: str) -> html.Div:  # noqa:
                                             html.Small(
                                                 ""
                                                 if summary.get(
-                                                    "unbounded_profit", False
+                                                    "unbounded_profit"
                                                 )
                                                 else f"at ${summary['max_profit_price']:.2f}",
                                                 className="text-muted",
@@ -337,7 +337,7 @@ def create_pnl_summary(summary: dict[str, Any], mode: str) -> html.Div:  # noqa:
                                             ),
                                             html.H3(
                                                 "Unlimited"
-                                                if summary.get("unbounded_loss", False)
+                                                if summary.get("unbounded_loss")
                                                 else format_currency(
                                                     summary["max_loss"]
                                                 ),
@@ -345,7 +345,7 @@ def create_pnl_summary(summary: dict[str, Any], mode: str) -> html.Div:  # noqa:
                                             ),
                                             html.Small(
                                                 ""
-                                                if summary.get("unbounded_loss", False)
+                                                if summary.get("unbounded_loss")
                                                 else f"at ${summary['max_loss_price']:.2f}",
                                                 className="text-muted",
                                             ),
@@ -415,7 +415,7 @@ def register_callbacks(app):
         # Prevent the callback from firing when the app first loads
         prevent_initial_call=True,
     )
-    def toggle_pnl_modal(  # noqa: PLR0911 - Complex callback with multiple return paths
+    def toggle_pnl_modal(
         btn_clicks,
         close_clicks,  # noqa: ARG001 - required by Dash
         groups_data,

@@ -10,7 +10,7 @@ class TestExposures:
     def test_summary_cards_match_position_details(self, processed_portfolio):
         """Test that summary card values match position details."""
         # Get the processed portfolio data
-        groups, summary, summary_dict = processed_portfolio
+        groups, _summary, summary_dict = processed_portfolio
 
         # Get the summary card values
         formatted_values = format_summary_card_values(summary_dict)
@@ -86,8 +86,6 @@ class TestExposures:
             if isinstance(value, dict):
                 for _subkey, _subvalue in value.items():
                     pass
-            else:
-                pass
 
         summary_dict.get("pending_activity_value", 0.0)
 

@@ -141,7 +141,6 @@ class TestStockOracleProviders:
         required_methods = [
             "get_historical_data",
             "try_get_beta_from_provider",
-            "is_valid_stock_symbol",
         ]
         for method in required_methods:
             assert method in yf_methods, f"YFinance provider missing {method} method"

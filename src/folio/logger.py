@@ -26,7 +26,7 @@ def load_config() -> dict[str, Any]:
         return {}
 
     try:
-        with open(config_path) as f:
+        with open(config_path, encoding="utf-8") as f:
             return yaml.safe_load(f) or {}
     except Exception:
         # Log error but continue with empty config

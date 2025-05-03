@@ -50,12 +50,14 @@ from ..calculations.options import calculate_option_delta, categorize_option_by_
 from ..data.loader import clean_currency_value
 from ..data.stock import stockdata
 from ..domain import (
+    CashPosition,
     OptionPosition,
     Portfolio,
     PortfolioHolding,
     PortfolioSummary,
     Position,
     StockPosition,
+    UnknownPosition,
 )
 
 # Set up logging
@@ -123,8 +125,6 @@ def process_portfolio(
         # Check for cash-like positions
         if stockdata.is_cash_like(holding.symbol, holding.description):
             # Convert to CashPosition for cash-like holdings
-            from ..domain import CashPosition
-
             cash_position = CashPosition(
                 ticker=holding.symbol,
                 quantity=holding.quantity,
@@ -150,8 +150,6 @@ def process_portfolio(
         # Check for unknown/invalid positions
         else:
             # Convert to UnknownPosition
-            from ..domain import UnknownPosition
-
             unknown_position = UnknownPosition(
                 ticker=holding.symbol,
                 quantity=holding.quantity,
@@ -611,14 +609,6 @@ def get_portfolio_exposures(portfolio: Portfolio) -> dict:
         Dictionary with exposure metrics
     """
     logger.debug("Calculating portfolio exposures")
-
-    # Import calculation functions
-    from ..calculations.exposure import (
-        calculate_beta_adjusted_exposure,
-        calculate_option_exposure,
-        calculate_stock_exposure,
-    )
-    from ..calculations.options import calculate_option_delta
 
     # Calculate total portfolio value for percentage calculations
     # This is needed for the CLI to calculate percentages correctly
