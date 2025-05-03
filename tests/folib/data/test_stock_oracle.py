@@ -1,20 +1,24 @@
 """
-Unit tests for the StockOracle class in src/folib/data/stock.py.
+Unit tests for the StockOracle class and provider implementations in src/folib/data/stock.py.
 
-These tests focus only on:
+These tests focus on:
 1. Provider selection logic
 2. The ability to switch between providers
 3. Basic interface validation
+4. Provider functionality with mocked API responses
 
-No actual provider functionality is tested to avoid API calls.
+The tests use mocking to avoid actual API calls to external services.
 """
 
 import os
 import tempfile
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
+import pandas as pd
 import pytest
 
+from src.folib.data.provider_fmp import FMPProvider
+from src.folib.data.provider_yfinance import YFinanceProvider
 from src.folib.data.stock import StockOracle
 
 
@@ -171,3 +175,135 @@ class TestStockOracleProviders:
 
         # Reset the singleton for other tests
         StockOracle._instance = None
+
+
+class TestYFinanceProvider:
+    """Test the YFinanceProvider implementation."""
+
+    @pytest.fixture
+    def provider(self):
+        """Create a YFinanceProvider instance with a temporary cache directory."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            yield YFinanceProvider(cache_dir=temp_dir)
+
+    def test_get_historical_data_validates_ticker(self, provider):
+        """Test that get_historical_data validates the ticker symbol."""
+        # Test with an empty ticker
+        with pytest.raises(ValueError, match="Ticker cannot be empty"):
+            provider.get_historical_data("")
+
+        # Test with an invalid ticker format
+        with pytest.raises(ValueError, match="Invalid stock symbol format"):
+            provider.get_historical_data("invalid-symbol-123")
+
+        # Mock the yfinance.Ticker.history method to avoid actual API calls
+        with patch('yfinance.Ticker') as mock_ticker_class:
+            mock_ticker = MagicMock()
+            mock_ticker_class.return_value = mock_ticker
+
+            # Set up the mock to return a DataFrame
+            mock_df = pd.DataFrame({
+                'Open': [100.0],
+                'High': [101.0],
+                'Low': [99.0],
+                'Close': [100.5],
+                'Volume': [1000000]
+            })
+            mock_ticker.history.return_value = mock_df
+
+            # Test with a valid ticker
+            result = provider.get_historical_data("AAPL")
+
+            # Verify the result
+            assert isinstance(result, pd.DataFrame)
+            assert not result.empty
+
+            # Verify that the ticker was created with the correct symbol
+            mock_ticker_class.assert_called_once_with("AAPL")
+
+            # Verify that history was called with the correct parameters
+            mock_ticker.history.assert_called_once_with(period="1y", interval="1d")
+
+    def test_try_get_beta_from_provider(self, provider):
+        """Test that try_get_beta_from_provider works correctly."""
+        # Mock the yfinance.Ticker.info property to avoid actual API calls
+        with patch('yfinance.Ticker') as mock_ticker_class:
+            mock_ticker = MagicMock()
+            mock_ticker_class.return_value = mock_ticker
+
+            # Set up the mock to return beta
+            mock_ticker.info = {'beta': 1.2}
+
+            # Test with a valid ticker
+            beta = provider.try_get_beta_from_provider("AAPL")
+
+            # Verify the result
+            assert beta == 1.2
+
+            # Verify that the ticker was created with the correct symbol
+            mock_ticker_class.assert_called_once_with("AAPL")
+
+
+class TestFMPProvider:
+    """Test the FMPProvider implementation."""
+
+    @pytest.fixture
+    def provider(self):
+        """Create a FMPProvider instance with a temporary cache directory."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            yield FMPProvider(api_key="test_key", cache_dir=temp_dir)
+
+    def test_get_historical_data_validates_ticker(self, provider):
+        """Test that get_historical_data validates the ticker symbol."""
+        # Test with an empty ticker
+        with pytest.raises(ValueError, match="Ticker cannot be empty"):
+            provider.get_historical_data("")
+
+        # Test with an invalid ticker format
+        with pytest.raises(ValueError, match="Invalid stock symbol format"):
+            provider.get_historical_data("invalid-symbol-123")
+
+        # Mock the fmpsdk.historical_price_full method to avoid actual API calls
+        with patch('fmpsdk.historical_price_full') as mock_historical:
+            # Set up the mock to return a list of dictionaries
+            mock_historical.return_value = {
+                'historical': [
+                    {
+                        'date': '2023-01-01',
+                        'open': 100.0,
+                        'high': 101.0,
+                        'low': 99.0,
+                        'close': 100.5,
+                        'volume': 1000000
+                    }
+                ]
+            }
+
+            # Test with a valid ticker
+            result = provider.get_historical_data("AAPL")
+
+            # Verify the result
+            assert isinstance(result, pd.DataFrame)
+            assert not result.empty
+
+            # Verify that the API was called with the correct parameters
+            mock_historical.assert_called_once()
+            call_args = mock_historical.call_args[1]
+            assert call_args['apikey'] == "test_key"
+            assert call_args['symbol'] == "AAPL"
+
+    def test_try_get_beta_from_provider(self, provider):
+        """Test that try_get_beta_from_provider works correctly."""
+        # Mock the fmpsdk.company_profile method to avoid actual API calls
+        with patch('fmpsdk.company_profile') as mock_profile:
+            # Set up the mock to return a list with a dictionary containing beta
+            mock_profile.return_value = [{'beta': 1.2}]
+
+            # Test with a valid ticker
+            beta = provider.try_get_beta_from_provider("AAPL")
+
+            # Verify the result
+            assert beta == 1.2
+
+            # Verify that the API was called with the correct parameters
+            mock_profile.assert_called_once_with(apikey="test_key", symbol="AAPL")
