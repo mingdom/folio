@@ -165,7 +165,8 @@ focli:
 		echo "Poetry not found. Please run 'make env' first."; \
 		exit 1; \
 	fi
-	@$(POETRY) run python src/focli/focli.py
+	@LOG_LEVEL=$(if $(level),$(level),INFO) \
+	$(POETRY) run python src/focli/focli.py
 
 cli:
 	@echo "Starting new Folio CLI interactive shell..."
@@ -173,7 +174,8 @@ cli:
 		echo "Poetry not found. Please run 'make env' first."; \
 		exit 1; \
 	fi
-	@$(POETRY) run python -m src.cli
+	@LOG_LEVEL=$(if $(level),$(level),INFO) \
+	$(POETRY) run python -m src.cli
 
 simulate:
 	@echo "Running portfolio simulation with simulator_v2..."
@@ -181,7 +183,8 @@ simulate:
 		echo "Poetry not found. Please run 'make env' first."; \
 		exit 1; \
 	fi
-	@if [ -n "$(portfolio)" ]; then \
+	@LOG_LEVEL=$(if $(level),$(level),INFO) \
+	if [ -n "$(portfolio)" ]; then \
 		$(POETRY) run python -m src.focli.commands.sim $(portfolio) --min-spy-change -0.1 --max-spy-change 0.1 --steps 5 $(if $(ticker),--ticker $(ticker),) $(if $(detailed),--detailed,) $(if $(type),--position-type $(type),); \
 	elif [ -f "@private-data/private-portfolio.csv" ]; then \
 		$(POETRY) run python -m src.focli.commands.sim @private-data/private-portfolio.csv --min-spy-change -0.1 --max-spy-change 0.1 --steps 5 $(if $(ticker),--ticker $(ticker),) $(if $(detailed),--detailed,) $(if $(type),--position-type $(type),); \
@@ -199,7 +202,8 @@ analyze:
 		echo "Poetry not found. Please run 'make env' first."; \
 		exit 1; \
 	fi
-	@if [ -n "$(portfolio)" ]; then \
+	@LOG_LEVEL=$(if $(level),$(level),INFO) \
+	if [ -n "$(portfolio)" ]; then \
 		$(POETRY) run python -m src.focli.commands.analyze $(portfolio) --min-spy-change -0.2 --max-spy-change 0.2 --steps 21 $(if $(focus_spy),--focus-spy $(focus_spy),) $(if $(top_n),--top-n $(top_n),); \
 	elif [ -f "@private-data/private-portfolio.csv" ]; then \
 		$(POETRY) run python -m src.focli.commands.analyze @private-data/private-portfolio.csv --min-spy-change -0.2 --max-spy-change 0.2 --steps 21 $(if $(focus_spy),--focus-spy $(focus_spy),) $(if $(top_n),--top-n $(top_n),); \
@@ -225,6 +229,7 @@ test:
 	@mkdir -p $(LOGS_DIR)
 	@(echo "=== Test Run Log $(TIMESTAMP) ===" && \
 	echo "Starting tests at: $$(date)" && \
+	LOG_LEVEL=$(if $(level),$(level),INFO) \
 	$(POETRY) run pytest tests/ --ignore=tests/e2e/ -v 2>&1) | tee $(LOGS_DIR)/test_latest.log
 	@echo "Test log saved to: $(LOGS_DIR)/test_latest.log"
 
@@ -241,6 +246,7 @@ test-e2e:
 	@mkdir -p $(LOGS_DIR)
 	@(echo "=== E2E Test Run Log $(TIMESTAMP) ===" && \
 	echo "Starting E2E tests at: $$(date)" && \
+	LOG_LEVEL=$(if $(level),$(level),INFO) \
 	$(POETRY) run pytest tests/e2e/ -v 2>&1) | tee $(LOGS_DIR)/test_e2e_latest.log
 	@echo "E2E test log saved to: $(LOGS_DIR)/test_e2e_latest.log"
 
@@ -254,6 +260,7 @@ test-cli:
 	@mkdir -p tests/cli/reports
 	@(echo "=== CLI Test Run Log $(TIMESTAMP) ===" && \
 	echo "Starting CLI tests at: $$(date)" && \
+	LOG_LEVEL=$(if $(level),$(level),INFO) \
 	$(POETRY) run bash tests/cli/e2e/test_cli_errors.sh 2>&1) | tee $(LOGS_DIR)/test_cli_latest.log
 	@echo "CLI test log saved to: $(LOGS_DIR)/test_cli_latest.log"
 	@echo "CLI test report saved to: tests/cli/reports/cli-error-report.md"
