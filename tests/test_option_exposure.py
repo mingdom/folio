@@ -361,15 +361,17 @@ def test_portfolio_level_exposure():
 
 def test_calculate_option_exposure(option_fixtures):
     """Test the calculate_option_exposure function."""
-    # Import calculate_option_exposure from options module
-    from src.folio.options import calculate_option_exposure
+    # Import calculate_option_exposure from calculations module
+    from src.folio.calculations import calculate_option_exposure
 
     underlying_price = 100.0
     beta = 1.2
 
     # Test with a long call
     long_call = option_fixtures["long_call_atm"]
-    long_call_exposures = calculate_option_exposure(long_call, underlying_price, beta)
+    # Set the underlying_beta attribute for the beta-adjusted calculation
+    long_call.underlying_beta = beta
+    long_call_exposures = calculate_option_exposure(long_call, underlying_price)
 
     # Verify the keys in the result
     assert "delta" in long_call_exposures
@@ -392,7 +394,9 @@ def test_calculate_option_exposure(option_fixtures):
 
     # Test with a short call
     short_call = option_fixtures["short_call_atm"]
-    short_call_exposures = calculate_option_exposure(short_call, underlying_price, beta)
+    # Set the underlying_beta attribute for the beta-adjusted calculation
+    short_call.underlying_beta = beta
+    short_call_exposures = calculate_option_exposure(short_call, underlying_price)
 
     # Delta should be negative for a short call
     assert short_call_exposures["delta"] < 0, (
@@ -406,7 +410,9 @@ def test_calculate_option_exposure(option_fixtures):
 
     # Test with a long put
     long_put = option_fixtures["long_put_atm"]
-    long_put_exposures = calculate_option_exposure(long_put, underlying_price, beta)
+    # Set the underlying_beta attribute for the beta-adjusted calculation
+    long_put.underlying_beta = beta
+    long_put_exposures = calculate_option_exposure(long_put, underlying_price)
 
     # Delta should be negative for a long put
     assert long_put_exposures["delta"] < 0, "Delta should be negative for a long put"
@@ -418,7 +424,9 @@ def test_calculate_option_exposure(option_fixtures):
 
     # Test with a short put
     short_put = option_fixtures["short_put_atm"]
-    short_put_exposures = calculate_option_exposure(short_put, underlying_price, beta)
+    # Set the underlying_beta attribute for the beta-adjusted calculation
+    short_put.underlying_beta = beta
+    short_put_exposures = calculate_option_exposure(short_put, underlying_price)
 
     # Delta should be positive for a short put
     assert short_put_exposures["delta"] > 0, "Delta should be positive for a short put"

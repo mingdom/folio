@@ -2,16 +2,10 @@ from dataclasses import dataclass
 from typing import Literal, TypedDict
 
 from .logger import logger
-from .options import (
-    OptionContract,
-    calculate_bs_price,
-)
-from .portfolio_value import (
-    calculate_beta_adjusted_exposure,
-    calculate_net_exposure,
-    calculate_notional_value,
-    calculate_option_exposure,
-)
+from .options import OptionContract, calculate_bs_price
+
+# Circular dependency between data_model.py and portfolio_value.py has been fixed
+# by moving common calculation functions to calculations.py
 
 
 class PositionDict(TypedDict):
@@ -292,6 +286,8 @@ class OptionPosition(Position):
         Returns:
             A new OptionPosition instance with updated values
         """
+        # Import from calculations module to avoid circular imports
+        from .calculations import calculate_notional_value, calculate_option_exposure
 
         # Create a temporary OptionContract for calculations
         temp_contract = OptionContract(
@@ -638,17 +634,12 @@ class PortfolioGroup:
         # but we have a custom __init__, so we need to call it explicitly
         self._calculate_option_counts()
 
-    def _calculate_option_counts(self) -> None:
-        """Calculate the number of calls and puts"""
-        self.call_count = sum(
-            1 for opt in self.option_positions if opt.option_type == "CALL"
-        )
-        self.put_count = sum(
-            1 for opt in self.option_positions if opt.option_type == "PUT"
-        )
-
     def recalculate_net_exposure(self) -> None:
         """Recalculate net exposure using the canonical function."""
+        from .calculations import (
+            calculate_beta_adjusted_exposure,
+            calculate_net_exposure,
+        )
 
         self.net_exposure = calculate_net_exposure(
             self.stock_position, self.option_positions
@@ -656,6 +647,15 @@ class PortfolioGroup:
 
         self.beta_adjusted_exposure = calculate_beta_adjusted_exposure(
             self.stock_position, self.option_positions
+        )
+
+    def _calculate_option_counts(self) -> None:
+        """Calculate the number of calls and puts"""
+        self.call_count = sum(
+            1 for opt in self.option_positions if opt.option_type == "CALL"
+        )
+        self.put_count = sum(
+            1 for opt in self.option_positions if opt.option_type == "PUT"
         )
 
     def to_dict(self) -> PortfolioGroupDict:
@@ -1248,6 +1248,8 @@ def create_portfolio_group(
         logger.debug(f"  Notional Value: {opt.notional_value}")
 
     # Use the canonical functions to calculate net exposure and beta-adjusted exposure
+    from .calculations import calculate_beta_adjusted_exposure, calculate_net_exposure
+
     net_exposure = calculate_net_exposure(stock_position, option_positions)
     beta_adjusted_exposure = calculate_beta_adjusted_exposure(
         stock_position, option_positions

@@ -531,6 +531,7 @@ class TestPortfolioSummary:
             cash_like_count=1,
             cash_percentage=32.1,  # (5000 / (10550 + 5000)) * 100
             portfolio_estimate_value=15550.0,  # 10550 + 5000
+            price_updated_at="2025-05-03T09:00:00Z",
         )
 
         assert summary.net_market_exposure == 10550.0

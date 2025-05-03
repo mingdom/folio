@@ -141,6 +141,7 @@ exclude = [
 # Ignore PLC0415 for files outside of src/cli and src/folio
 "src/stockdata.py" = ["PLC0415"]
 "src/yfinance.py" = ["PLC0415"]
+"src/folio/**/*.py" = ["PLC0415"]
 "tests/**/*.py" = ["PLC0415"]
 
 [tool.ruff.lint.isort]

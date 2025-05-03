@@ -185,6 +185,7 @@ class TestChartDataTransformation:
             cash_like_count=1,
             cash_percentage=0.4,
             portfolio_estimate_value=10000.0,
+            price_updated_at="2025-05-03T09:09:46Z",
         )
 
     @pytest.fixture
@@ -344,6 +345,7 @@ class TestChartIntegration:
             cash_like_count=1,
             cash_percentage=0.4,
             portfolio_estimate_value=10000.0,
+            price_updated_at="2025-05-03T09:09:46Z",
         )
 
     @pytest.fixture
