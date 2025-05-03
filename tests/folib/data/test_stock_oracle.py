@@ -177,7 +177,7 @@ class TestStockOracleProviders:
         # Reset the singleton for other tests
         StockOracle._instance = None
 
-    def test_folio_respects_data_source(self, temp_cache_dir):
+    def test_folio_respects_data_source(self):
         """Test that both folib and folio respect the DATA_SOURCE environment variable.
 
         This test verifies that when we set the DATA_SOURCE environment variable to "fmp",

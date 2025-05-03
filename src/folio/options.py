@@ -12,6 +12,9 @@ import datetime
 import logging
 import warnings
 
+# Import the canonical implementations from calculations.py
+from .calculations import calculate_notional_value, calculate_option_exposure
+
 # Import QuantLib and suppress SWIG-related DeprecationWarnings
 with warnings.catch_warnings():
     warnings.filterwarnings(
@@ -35,10 +38,6 @@ from dataclasses import dataclass
 
 # Configure module logger
 logger = logging.getLogger(__name__)
-
-
-# Import the canonical implementations from calculations.py
-from .calculations import calculate_notional_value, calculate_option_exposure
 
 
 def calculate_beta_adjusted_option_exposure(
