@@ -18,7 +18,7 @@ def load_config():
     config_path = os.path.join(os.path.dirname(__file__), "folio.yaml")
     if os.path.exists(config_path):
         try:
-            with open(config_path) as f:
+            with open(config_path, encoding="utf-8") as f:
                 return yaml.safe_load(f)
         except Exception as e:
             logger.warning(
@@ -95,7 +95,7 @@ def clean_currency_value(value_str: str) -> float:
     value_str = str(value_str)
 
     # Handle empty or dash values
-    if value_str in ("--", ""):
+    if value_str in {"--", ""}:
         return 0.0
 
     # Remove currency symbols and commas

@@ -63,6 +63,8 @@ ignore_missing_imports = true
 # Line length and target version are top-level
 line-length = 88
 target-version = "py311"
+# Enable preview features (required for PLC0415)
+preview = true
 
 [tool.ruff.lint]
 # Enable recommended rules + specific ones useful for data science projects
@@ -72,7 +74,6 @@ select = [
     "I",        # isort
     "N",        # pep8-naming
     "UP",       # pyupgrade
-    "PL",       # pylint
     "RUF",      # ruff-specific rules
     "W",        # pycodestyle warnings
     "F401",     # Module imported but unused
@@ -81,6 +82,7 @@ select = [
     "F811",     # Redefined name
     "F822",     # Undefined name in __all__
     "PLC0414",  # Useless import alias
+    "PLC0415",  # Import outside top-level (prevents imports inside functions)
     "PLE0101",  # Function defined outside __init__
     "PLE0604",  # Invalid object in __all__, or invalid __all__ format
     "PLE0605",  # Invalid format for __all__

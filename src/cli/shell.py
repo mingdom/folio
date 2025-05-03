@@ -103,7 +103,7 @@ def process_command(command: str) -> bool:
             # Call the appropriate command function
             subcmd = parts[2]
             ticker = parts[1]
-            args = [ticker] + parts[3:]
+            args = [ticker, *parts[3:]]
             try:
                 COMMANDS["position"][subcmd](state=state, args=args)
             except Exception as e:

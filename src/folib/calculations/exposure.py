@@ -5,10 +5,14 @@ This module provides functions for calculating market exposure for different
 position types and aggregating exposures across positions.
 """
 
+import logging
 from collections.abc import Sequence
 from typing import cast
 
 from ..domain import ExposureMetrics, OptionPosition, Position, StockPosition
+
+# Set up logging
+logger = logging.getLogger(__name__)
 
 
 def calculate_stock_exposure(
@@ -44,9 +48,6 @@ def calculate_option_exposure(
     Returns:
         float: Market exposure in dollars
     """
-    import logging
-
-    logger = logging.getLogger(__name__)
 
     # Standard contract multiplier for equity options
     CONTRACT_SIZE = 100

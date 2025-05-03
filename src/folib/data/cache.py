@@ -178,7 +178,7 @@ class DataCache:
             )
 
         try:
-            with open(cache_path) as f:
+            with open(cache_path, encoding="utf-8") as f:
                 value = float(f.read().strip())
             logger.debug(f"Loaded value from cache: {value:.3f}")
             return value
@@ -198,7 +198,7 @@ class DataCache:
             True if successful, False otherwise
         """
         try:
-            with open(cache_path, "w") as f:
+            with open(cache_path, "w", encoding="utf-8") as f:
                 f.write(f"{value:.6f}")
             logger.debug(f"Cached value: {value:.3f} to {cache_path}")
             return True

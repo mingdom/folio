@@ -484,7 +484,7 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
                 logger.debug(f"Loading portfolio from: {portfolio_path}")
 
                 # Debug the file content
-                with open(portfolio_path) as f:
+                with open(portfolio_path, encoding="utf-8") as f:
                     content = f.read()
                     logger.debug(
                         f"Portfolio content (first 100 chars): {content[:100]}"

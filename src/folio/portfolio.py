@@ -7,6 +7,8 @@ This module provides core functionality for portfolio analysis, including:
 - Portfolio metrics and summary calculations
 """
 
+from datetime import UTC, datetime
+
 import pandas as pd
 
 from src.folib.data.stock import stockdata
@@ -22,6 +24,8 @@ from .data_model import (
 from .formatting import format_beta, format_currency
 from .logger import logger
 from .portfolio_value import (
+    calculate_beta_adjusted_exposure,
+    calculate_net_exposure,
     calculate_portfolio_metrics,
     calculate_portfolio_values,
     create_value_breakdowns,
@@ -29,6 +33,7 @@ from .portfolio_value import (
     process_stock_positions,
 )
 from .utils import clean_currency_value, get_beta
+from .validation import extract_option_data
 
 
 def process_portfolio_data(
@@ -204,7 +209,7 @@ def process_portfolio_data(
         if len(parts) != 6:
             return False
         # Check if the 5th part starts with '$' and the 6th is CALL/PUT
-        return parts[4].startswith("$") and parts[5].upper() in ["CALL", "PUT"]
+        return parts[4].startswith("$") and parts[5].upper() in {"CALL", "PUT"}
 
     # Basic portfolio statistics
     total_positions = len(df)
@@ -291,7 +296,7 @@ def process_portfolio_data(
             )
 
             # Process price
-            if pd.isna(row["Last Price"]) or row["Last Price"] in ("--", ""):
+            if pd.isna(row["Last Price"]) or row["Last Price"] in {"--", ""}:
                 if is_known_cash:
                     # Use default values for cash-like positions with missing price
                     price = 0.0
@@ -474,9 +479,7 @@ def process_portfolio_data(
                 f"  Found {len(potential_options)} potential option(s) for {symbol} based on description prefix."
             )
 
-            # Import the necessary functions
-            from .options import process_options
-            from .validation import extract_option_data
+            # Process options using the imported functions
 
             # Extract and validate option data using our utility function
             # This replaces all the manual validation and extraction code
@@ -526,29 +529,27 @@ def process_portfolio_data(
                     )
 
                     # Add to the group data
-                    option_data_for_group.append(
-                        {
-                            "ticker": opt["ticker"],
-                            "option_symbol": opt["option_symbol"],
-                            "description": opt["description"],
-                            "quantity": opt["quantity"],
-                            "beta": opt["beta"],
-                            "beta_adjusted_exposure": opt["beta_adjusted_exposure"],
-                            "market_exposure": opt[
-                                "delta_exposure"
-                            ],  # Delta-adjusted exposure is the market exposure
-                            "strike": opt["strike"],
-                            "expiry": opt["expiry"],
-                            "option_type": opt["option_type"],
-                            "delta": opt["delta"],
-                            "delta_exposure": opt["delta_exposure"],
-                            "notional_value": opt["notional_value"],
-                            "price": opt["price"],
-                            "cost_basis": opt.get(
-                                "cost_basis", opt["price"]
-                            ),  # Use price as default cost basis
-                        }
-                    )
+                    option_data_for_group.append({
+                        "ticker": opt["ticker"],
+                        "option_symbol": opt["option_symbol"],
+                        "description": opt["description"],
+                        "quantity": opt["quantity"],
+                        "beta": opt["beta"],
+                        "beta_adjusted_exposure": opt["beta_adjusted_exposure"],
+                        "market_exposure": opt[
+                            "delta_exposure"
+                        ],  # Delta-adjusted exposure is the market exposure
+                        "strike": opt["strike"],
+                        "expiry": opt["expiry"],
+                        "option_type": opt["option_type"],
+                        "delta": opt["delta"],
+                        "delta_exposure": opt["delta_exposure"],
+                        "notional_value": opt["notional_value"],
+                        "price": opt["price"],
+                        "cost_basis": opt.get(
+                            "cost_basis", opt["price"]
+                        ),  # Use price as default cost basis
+                    })
             except Exception as e:
                 logger.error(
                     f"    Error processing options for {symbol}: {e}", exc_info=True
@@ -622,9 +623,7 @@ def process_portfolio_data(
                 f"Creating standalone option group for {underlying} with {len(option_indices)} options"
             )
 
-            # Import the necessary functions
-            from .options import process_options
-            from .validation import extract_option_data
+            # Process options using the imported functions
 
             # Extract option data for the specified indices
             orphaned_df = option_df.loc[option_indices]
@@ -709,29 +708,27 @@ def process_portfolio_data(
                     )
 
                     # Add to the group data
-                    option_data_for_group.append(
-                        {
-                            "ticker": opt["ticker"],
-                            "option_symbol": opt["option_symbol"],
-                            "description": opt["description"],
-                            "quantity": opt["quantity"],
-                            "beta": opt["beta"],
-                            "beta_adjusted_exposure": opt["beta_adjusted_exposure"],
-                            "market_exposure": opt[
-                                "delta_exposure"
-                            ],  # Delta-adjusted exposure is the market exposure
-                            "strike": opt["strike"],
-                            "expiry": opt["expiry"],
-                            "option_type": opt["option_type"],
-                            "delta": opt["delta"],
-                            "delta_exposure": opt["delta_exposure"],
-                            "notional_value": opt["notional_value"],
-                            "price": opt["price"],
-                            "cost_basis": opt.get(
-                                "cost_basis", opt["price"]
-                            ),  # Use price as default cost basis
-                        }
-                    )
+                    option_data_for_group.append({
+                        "ticker": opt["ticker"],
+                        "option_symbol": opt["option_symbol"],
+                        "description": opt["description"],
+                        "quantity": opt["quantity"],
+                        "beta": opt["beta"],
+                        "beta_adjusted_exposure": opt["beta_adjusted_exposure"],
+                        "market_exposure": opt[
+                            "delta_exposure"
+                        ],  # Delta-adjusted exposure is the market exposure
+                        "strike": opt["strike"],
+                        "expiry": opt["expiry"],
+                        "option_type": opt["option_type"],
+                        "delta": opt["delta"],
+                        "delta_exposure": opt["delta_exposure"],
+                        "notional_value": opt["notional_value"],
+                        "price": opt["price"],
+                        "cost_basis": opt.get(
+                            "cost_basis", opt["price"]
+                        ),  # Use price as default cost basis
+                    })
             except Exception as e:
                 logger.error(
                     f"Error processing orphaned options for {underlying}: {e}",
@@ -1012,8 +1009,6 @@ def calculate_portfolio_summary(
         ]
 
         # Get current timestamp in ISO format
-        from datetime import UTC, datetime
-
         current_time = datetime.now(UTC).isoformat()
 
         # Create and return the portfolio summary
@@ -1057,7 +1052,6 @@ def update_portfolio_prices(
     Returns:
         ISO format timestamp of when prices were updated
     """
-    from datetime import UTC, datetime
 
     # Extract unique tickers from all positions
     tickers = set()
@@ -1483,10 +1477,6 @@ def recalculate_portfolio_with_prices(
         # where notional_value is calculated using the canonical implementation in options.py
 
         # Use the canonical functions to calculate net exposure and beta-adjusted exposure
-        from .portfolio_value import (
-            calculate_beta_adjusted_exposure,
-            calculate_net_exposure,
-        )
 
         net_exposure = calculate_net_exposure(recalculated_stock, recalculated_options)
         beta_adjusted_exposure = calculate_beta_adjusted_exposure(

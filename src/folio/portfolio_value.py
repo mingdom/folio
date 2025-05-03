@@ -283,7 +283,6 @@ def calculate_portfolio_metrics(
     net_market_exposure = long_value.total_exposure + short_value.total_exposure
 
     # Add debug logging
-    from .logger import logger
 
     logger.debug(f"Long total exposure: {long_value.total_exposure}")
     logger.debug(f"Short total exposure: {short_value.total_exposure}")

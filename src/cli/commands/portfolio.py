@@ -12,7 +12,9 @@ from rich.console import Console
 
 from src.folib.services.portfolio_service import (
     create_portfolio_summary,
+    filter_positions_by_criteria,
     get_portfolio_exposures,
+    sort_positions,
 )
 
 from ..formatters import (
@@ -137,15 +139,10 @@ def portfolio_list_cmd(
                         # Add to filter criteria
                         filter_criteria[key.lower()] = value
 
-        # Apply filters using the new filter_positions_by_criteria function
-        from src.folib.services.portfolio_service import (
-            filter_positions_by_criteria,
-            sort_positions,
-        )
-
+        # Apply filters using the filter_positions_by_criteria function
         filtered_positions = filter_positions_by_criteria(positions, filter_criteria)
 
-        # Sort positions using the new sort_positions function
+        # Sort positions using the sort_positions function
         filtered_positions = sort_positions(filtered_positions, sort_by, sort_direction)
 
         # Display positions
@@ -278,15 +275,10 @@ def portfolio_list(state, args):
                     # Add to filter criteria
                     filter_criteria[key.lower()] = value
 
-        # Apply filters using the new filter_positions_by_criteria function
-        from src.folib.services.portfolio_service import (
-            filter_positions_by_criteria,
-            sort_positions,
-        )
-
+        # Apply filters using the filter_positions_by_criteria function
         filtered_positions = filter_positions_by_criteria(positions, filter_criteria)
 
-        # Sort positions using the new sort_positions function
+        # Sort positions using the sort_positions function
         filtered_positions = sort_positions(filtered_positions, sort_by, sort_direction)
 
         # Display positions

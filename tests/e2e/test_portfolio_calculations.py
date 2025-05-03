@@ -9,7 +9,7 @@ class TestPortfolioCalculations:
     def test_portfolio_value_matches_components(self, processed_portfolio):
         """Test that portfolio value matches the sum of its components."""
         # Get the processed portfolio data
-        groups, summary, summary_dict = processed_portfolio
+        _groups, summary, _summary_dict = processed_portfolio
 
         # Get the portfolio value and its components
         portfolio_value = summary.portfolio_estimate_value
@@ -29,7 +29,7 @@ class TestPortfolioCalculations:
     def test_net_exposure_matches_long_minus_short(self, processed_portfolio):
         """Test that net exposure matches long minus short."""
         # Get the processed portfolio data
-        groups, summary, summary_dict = processed_portfolio
+        _groups, summary, _summary_dict = processed_portfolio
 
         # Get the net exposure and its components
         net_exposure = summary.net_market_exposure
@@ -49,7 +49,7 @@ class TestPortfolioCalculations:
     def test_beta_adjusted_net_exposure_calculation(self, processed_portfolio):
         """Test that beta-adjusted net exposure is calculated correctly."""
         # Get the processed portfolio data
-        groups, summary, summary_dict = processed_portfolio
+        _groups, summary, _summary_dict = processed_portfolio
 
         # Get the beta-adjusted net exposure and its components
         beta_adjusted_net_exposure = (
@@ -74,7 +74,7 @@ class TestPortfolioCalculations:
     def test_portfolio_beta_calculation(self, processed_portfolio):
         """Test that portfolio beta is calculated correctly."""
         # Get the processed portfolio data
-        groups, summary, summary_dict = processed_portfolio
+        _groups, summary, _summary_dict = processed_portfolio
 
         # Get the portfolio beta and its components
         portfolio_beta = summary.portfolio_beta

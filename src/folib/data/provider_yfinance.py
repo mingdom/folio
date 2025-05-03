@@ -12,6 +12,7 @@ import pandas as pd
 
 import yfinance as yf
 
+from .cache import DataCache
 from .provider import MarketDataProvider
 
 # Set up logging
@@ -52,7 +53,6 @@ class YFinanceProvider(MarketDataProvider):
                 cache_dir = ".cache_yf"
 
         # Initialize the cache manager
-        from .cache import DataCache
 
         self.cache = DataCache(cache_dir=cache_dir, cache_ttl=cache_ttl or 86400)
 
