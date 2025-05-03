@@ -19,12 +19,13 @@ Features:
 - Calculates beta values when not available directly from providers
 """
 
-import logging
 import os
 from typing import Any
 
 import pandas as pd
 from dotenv import load_dotenv
+
+from src.folib.logger import logger
 
 from .cache import DataCache
 from .provider_fmp import FMPProvider
@@ -33,9 +34,6 @@ from .utils import is_valid_stock_symbol
 
 # Load environment variables from .env file
 load_dotenv()
-
-# Set up logging
-logger = logging.getLogger(__name__)
 
 
 def get_current_price(historical_data: pd.DataFrame) -> float:

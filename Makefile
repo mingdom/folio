@@ -140,7 +140,7 @@ folio:
 		echo "Poetry not found. Please run 'make env' first."; \
 		exit 1; \
 	fi
-	@LOG_LEVEL=$(if $(log),$(log),INFO) \
+	@LOG_LEVEL=$(if $(level),$(level),INFO) \
 	$(POETRY) run python -m src.folio.app --port 8051 --debug $(if $(portfolio),--portfolio $(portfolio),)
 
 stop-folio:
