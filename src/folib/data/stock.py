@@ -14,9 +14,12 @@ Example usage:
 
 Features:
 - Supports multiple data providers (Yahoo Finance, Financial Modeling Prep)
-- Implements caching to improve performance and reduce API calls
 - Provides validation for stock symbols
 - Calculates beta values when not available directly from providers
+- Delegates caching to the StockDataService class
+
+Note: This module no longer handles caching directly. For cached access to stock data,
+use the StockDataService class from stock_data.py instead.
 """
 
 import os

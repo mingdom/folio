@@ -3,6 +3,9 @@ Yahoo Finance market data provider.
 
 This module implements the MarketDataProvider interface using the yfinance package,
 providing access to stock prices, historical data, and beta values from Yahoo Finance.
+
+Note: This provider no longer implements caching. Caching is now handled by the
+StockDataService class in stock_data.py.
 """
 
 import pandas as pd

@@ -3,6 +3,9 @@ Financial Modeling Prep (FMP) market data provider.
 
 This module implements the MarketDataProvider interface using the fmpsdk package,
 providing access to stock prices, historical data, and beta values from the FMP API.
+
+Note: This provider no longer implements caching. Caching is now handled by the
+StockDataService class in stock_data.py.
 """
 
 import re

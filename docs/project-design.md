@@ -72,11 +72,13 @@ Pure functions for financial calculations with no side effects:
 Handles external data access and portfolio loading:
 
 - **stock.py**: Market data access with provider abstraction
-  - **StockOracle**: Central class for market data retrieval with caching
+  - **StockOracle**: Central class for market data retrieval
   - Supports multiple providers (Yahoo Finance, Financial Modeling Prep)
+- **stock_data.py**: Stock data management with caching
+  - **StockData**: Container for stock-related information
+  - **StockDataService**: Service for fetching and caching stock data
 - **loader.py**: Portfolio loading and parsing from CSV files
 - **provider_*.py**: Implementations for different market data providers
-- **cache.py**: Caching utilities for market data
 
 ### 4. Service Layer (`services/`)
 
@@ -158,7 +160,9 @@ CSV File → load_portfolio_from_csv() → parse_portfolio_holdings() → proces
 ### Market Data Flow
 
 ```
-Ticker → StockOracle → Provider (YFinance/FMP) → Cache → Market Data
+Ticker → StockDataService → StockOracle → Provider (YFinance/FMP) → Market Data
+                         ↓
+                    Cache (.cache_stock_data)
 ```
 
 ## Key Design Decisions
@@ -182,9 +186,11 @@ Market data can be fetched from multiple providers:
 ### 3. Caching Strategy
 
 Market data is cached to improve performance and reduce API calls:
-- File-based caching with TTL (time-to-live)
-- Cache invalidation based on market hours
-- Different cache directories for different providers
+- Centralized caching through the StockDataService class
+- In-memory caching for fast access
+- File-based persistence in a single .cache_stock_data directory
+- Time-based cache invalidation (default: 1 hour)
+- Clear separation between data fetching (StockOracle) and caching (StockDataService)
 
 ### 4. Separation of Concerns
 
