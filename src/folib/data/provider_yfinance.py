@@ -5,14 +5,11 @@ This module implements the MarketDataProvider interface using the yfinance packa
 providing access to stock prices, historical data, and beta values from Yahoo Finance.
 """
 
-import os
-
 import pandas as pd
 
 import yfinance as yf
 from src.folib.logger import logger
 
-from .cache import DataCache
 from .provider import MarketDataProvider
 from .utils import is_valid_stock_symbol
 
@@ -22,7 +19,6 @@ class YFinanceProvider(MarketDataProvider):
     Yahoo Finance implementation of market data provider.
 
     This class provides access to market data from Yahoo Finance using the yfinance package.
-    It implements caching to improve performance and reduce API calls.
     """
 
     # Default period for beta calculations (3 months provides more current market behavior)
@@ -31,31 +27,11 @@ class YFinanceProvider(MarketDataProvider):
     # Default market index for beta calculations
     market_index = "SPY"
 
-    def __init__(self, cache_dir=None, cache_ttl=None):
+    def __init__(self):
         """
         Initialize the YFinanceProvider.
-
-        Args:
-            cache_dir: Directory to store cached data (default: .cache_yf)
-            cache_ttl: Cache TTL in seconds (default: 86400 - 1 day)
         """
-        # Set default cache directory
-        # Special case for Hugging Face Spaces
-        if cache_dir is None:
-            if (
-                os.environ.get("HF_SPACE") == "1"
-                or os.environ.get("SPACE_ID") is not None
-            ):
-                cache_dir = "/tmp/cache_yf"
-            else:
-                cache_dir = ".cache_yf"
-
-        # Initialize the cache manager
-
-        self.cache = DataCache(cache_dir=cache_dir, cache_ttl=cache_ttl or 86400)
-
-        # Store cache directory for reference
-        self.cache_dir = cache_dir
+        pass
 
     def try_get_beta_from_provider(self, ticker: str) -> float | None:
         """
@@ -98,8 +74,7 @@ class YFinanceProvider(MarketDataProvider):
         Get historical price data for a ticker.
 
         This method fetches historical price data for the given ticker
-        using the Yahoo Finance API, with caching to improve performance
-        and reduce API calls.
+        using the Yahoo Finance API.
 
         Args:
             ticker: The ticker symbol
@@ -122,17 +97,6 @@ class YFinanceProvider(MarketDataProvider):
         if not is_valid_stock_symbol(ticker):
             raise ValueError(f"Invalid stock symbol format: {ticker}")
 
-        # Check cache first
-        cache_path = self.cache.get_cache_path(ticker, period, interval)
-        df = self.cache.read_dataframe_from_cache(cache_path)
-        if df is not None:
-            logger.debug(
-                f"Using cached historical data for {ticker} ({period}, {interval})"
-            )
-            return df
-        else:
-            logger.debug(f"No valid cache found for {ticker} historical data")
-
         # Fetch from yfinance
         logger.debug(f"Fetching data for {ticker} from yfinance: {period}, {interval}")
         ticker_data = yf.Ticker(ticker)
@@ -140,9 +104,5 @@ class YFinanceProvider(MarketDataProvider):
 
         if df.empty:
             raise ValueError(f"No historical data available for {ticker}")
-
-        # Save to cache
-        self.cache.write_dataframe_to_cache(df, cache_path)
-        logger.debug(f"Cached historical data for {ticker} ({period}, {interval})")
 
         return df

@@ -7,6 +7,12 @@ and provides a clean interface for the rest of the library.
 
 Module Overview:
 --------------
+- stock_data.py: Structured stock data management
+  - StockData: Container for stock-related information
+  - StockDataService: Service for managing stock data with caching
+  - default_stock_service: Pre-initialized service instance for convenience
+  - Key features: in-memory caching, automatic cache invalidation
+
 - stock.py: Market data access with provider abstraction
   - StockOracle: Central class for market data retrieval with caching
   - stockdata: Pre-initialized singleton instance for easier access
@@ -44,6 +50,16 @@ The data layer can be configured using environment variables:
 Usage:
 -----
 The data layer is typically accessed through the service layer rather than directly.
-The StockOracle class provides a unified interface for market data access regardless
-of the underlying provider.
+For stock data, use the StockDataService which provides a structured way to access
+and cache stock information.
+
+Example:
+    from src.folib.data.stock_data import default_stock_service
+
+    # Get stock data
+    stock_data = default_stock_service.load_market_data("AAPL")
+
+    # Use the data
+    price = stock_data.price
+    beta = stock_data.beta
 """

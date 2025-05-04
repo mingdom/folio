@@ -27,7 +27,6 @@ from dotenv import load_dotenv
 
 from src.folib.logger import logger
 
-from .cache import DataCache
 from .provider_fmp import FMPProvider
 from .provider_yfinance import YFinanceProvider
 from .utils import is_valid_stock_symbol
@@ -65,8 +64,8 @@ def get_current_price(historical_data: pd.DataFrame) -> float:
 def calculate_beta_from_history(
     stock_data: pd.DataFrame,
     market_data: pd.DataFrame,
-    cache_instance: Any | None = None,
-    ticker: str | None = None,
+    cache_instance: Any | None = None,  # Kept for backward compatibility
+    ticker: str | None = None,  # Kept for backward compatibility
 ) -> float | None:
     """
     Calculate beta from historical stock and market data.
@@ -79,8 +78,8 @@ def calculate_beta_from_history(
     Args:
         stock_data: DataFrame with historical price data for the stock (must have 'Close' column)
         market_data: DataFrame with historical price data for the market index (must have 'Close' column)
-        cache_instance: Optional DataCache instance for caching the result
-        ticker: Optional ticker symbol (required if cache_instance is provided)
+        cache_instance: Deprecated, kept for backward compatibility
+        ticker: Deprecated, kept for backward compatibility
 
     Returns:
         The calculated beta value, or None if beta cannot be calculated
@@ -115,11 +114,6 @@ def calculate_beta_from_history(
 
     beta = covariance / market_variance
 
-    # Cache the calculated beta if a cache instance is provided
-    if cache_instance and ticker:
-        cache_path = cache_instance.get_beta_cache_path(ticker)
-        cache_instance.write_value_to_cache(beta, cache_path)
-
     return beta
 
 
@@ -149,9 +143,7 @@ class StockOracle:
     PROVIDER_FMP = "fmp"
 
     @classmethod
-    def get_instance(
-        cls, provider_name=None, fmp_api_key=None, cache_dir=None, cache_ttl=None
-    ):
+    def get_instance(cls, provider_name=None, fmp_api_key=None):
         """
         Get the singleton instance of StockOracle.
 
@@ -160,8 +152,6 @@ class StockOracle:
                            If None, will use the DATA_SOURCE environment variable or default to "yfinance"
             fmp_api_key: API key for FMP provider (required if provider_name is "fmp")
                          If None, will use the FMP_API_KEY environment variable
-            cache_dir: Directory to store cached data (default: .cache_yf or .cache_fmp based on provider)
-            cache_ttl: Cache TTL in seconds (default: 86400 - 1 day)
 
         Returns:
             The singleton StockOracle instance
@@ -183,23 +173,17 @@ class StockOracle:
             cls._instance = cls(
                 provider_name=provider_name,
                 fmp_api_key=fmp_api_key,
-                cache_dir=cache_dir,
-                cache_ttl=cache_ttl,
             )
 
         return cls._instance
 
-    def __init__(
-        self, provider_name="yfinance", fmp_api_key=None, cache_dir=None, cache_ttl=None
-    ):
+    def __init__(self, provider_name="yfinance", fmp_api_key=None):
         """
         Initialize the StockOracle.
 
         Args:
             provider_name: Name of the market data provider to use ("yfinance" or "fmp")
             fmp_api_key: API key for FMP provider (required if provider_name is "fmp")
-            cache_dir: Directory to store cached data (default: .cache_yf or .cache_fmp based on provider)
-            cache_ttl: Cache TTL in seconds (default: 86400 - 1 day)
 
         Note:
             This should not be called directly. Use StockOracle.get_instance() instead.
@@ -222,34 +206,14 @@ class StockOracle:
         if provider_name == self.PROVIDER_FMP and not fmp_api_key:
             raise ValueError("API key is required for FMP provider")
 
-        # Set default cache directory based on provider
-        if cache_dir is None:
-            # Special case for Hugging Face Spaces
-            if (
-                os.environ.get("HF_SPACE") == "1"
-                or os.environ.get("SPACE_ID") is not None
-            ):
-                cache_dir = f"/tmp/cache_{provider_name}"
-            else:
-                cache_dir = f".cache_{provider_name}"
-
-        # Set cache TTL (default: 1 day)
-        cache_ttl = 86400 if cache_ttl is None else cache_ttl
-
         # Initialize the appropriate provider
         if provider_name == self.PROVIDER_YFINANCE:
-            self.provider = YFinanceProvider(cache_dir=cache_dir, cache_ttl=cache_ttl)
+            self.provider = YFinanceProvider()
         elif provider_name == self.PROVIDER_FMP:
-            self.provider = FMPProvider(
-                api_key=fmp_api_key, cache_dir=cache_dir, cache_ttl=cache_ttl
-            )
+            self.provider = FMPProvider(api_key=fmp_api_key)
 
         # Store provider name for reference
         self.provider_name = provider_name
-
-        # Store cache directory and TTL for reference
-        self.cache_dir = cache_dir
-        self.cache_ttl = cache_ttl
 
         logger.info(
             f"=== DATA SOURCE: Initialized StockOracle with {provider_name} provider ==="
@@ -292,7 +256,7 @@ class StockOracle:
         This method first tries to get beta directly from the provider.
         If that fails, it calculates the beta (systematic risk) for a given ticker
         by comparing its price movements to a market index (default: SPY) over a period
-        of time (default: 3 months). Results are cached to improve performance.
+        of time (default: 3 months).
 
         Beta measures the volatility of a security in relation to the overall market.
         A beta of 1 indicates the security's price moves with the market.
@@ -314,27 +278,11 @@ class StockOracle:
             logger.warning(f"Invalid stock symbol format: {ticker}")
             return None
 
-        # Check cache first
-
-        cache = getattr(self.provider, "cache", None)
-        if cache and isinstance(cache, DataCache):
-            cache_path = cache.get_beta_cache_path(ticker)
-            beta = cache.read_value_from_cache(cache_path)
-            if beta is not None:
-                logger.debug(f"Using cached beta value for {ticker}: {beta:.2f}")
-                return beta
-            else:
-                logger.debug(f"No valid cache found for beta value of {ticker}")
-
         # Try to get beta directly from the provider
         logger.debug(f"Fetching beta for {ticker} from {self.provider_name} provider")
         beta = self.provider.try_get_beta_from_provider(ticker)
         if beta is not None:
             logger.debug(f"Got beta value for {ticker} from provider: {beta:.2f}")
-            # Cache the result if possible
-            if cache and isinstance(cache, DataCache):
-                cache.write_value_to_cache(beta, cache_path)
-                logger.debug(f"Cached beta value for {ticker}")
             return beta
         else:
             logger.debug(
@@ -358,7 +306,7 @@ class StockOracle:
             beta = calculate_beta_from_history(
                 stock_data=stock_data,
                 market_data=market_data,
-                cache_instance=cache,
+                cache_instance=None,  # No caching
                 ticker=ticker,
             )
 
@@ -434,20 +382,6 @@ class StockOracle:
         if not is_valid_stock_symbol(ticker):
             raise ValueError(f"Invalid stock symbol format: {ticker}")
 
-        # Check cache first
-
-        cache = getattr(self.provider, "cache", None)
-        if cache and isinstance(cache, DataCache):
-            cache_path = cache.get_volatility_cache_path(ticker)
-            volatility = cache.read_value_from_cache(cache_path)
-            if volatility is not None:
-                logger.debug(
-                    f"Using cached volatility value for {ticker}: {volatility:.2f}"
-                )
-                return volatility
-            else:
-                logger.debug(f"No valid cache found for volatility value of {ticker}")
-
         try:
             # Get historical data for the last 30 days
             df = self.provider.get_historical_data(ticker, period="30d")
@@ -462,11 +396,6 @@ class StockOracle:
 
             # Calculate volatility (standard deviation of returns)
             volatility = df["Returns"].std() * (252**0.5)  # Annualized
-
-            # Cache the result
-            if cache and isinstance(cache, DataCache):
-                cache.write_value_to_cache(volatility, cache_path)
-                logger.debug(f"Cached volatility value for {ticker}: {volatility:.2f}")
 
             return volatility
 

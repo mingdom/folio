@@ -5,7 +5,6 @@ This module implements the MarketDataProvider interface using the fmpsdk package
 providing access to stock prices, historical data, and beta values from the FMP API.
 """
 
-import os
 import re
 from datetime import datetime, timedelta
 
@@ -14,7 +13,6 @@ import pandas as pd
 
 from src.folib.logger import logger
 
-from .cache import DataCache
 from .provider import MarketDataProvider
 from .utils import is_valid_stock_symbol
 
@@ -24,7 +22,6 @@ class FMPProvider(MarketDataProvider):
     Financial Modeling Prep implementation of market data provider.
 
     This class provides access to market data from Financial Modeling Prep API.
-    It implements caching to improve performance and reduce API calls.
     """
 
     # Default period for beta calculations
@@ -35,37 +32,17 @@ class FMPProvider(MarketDataProvider):
 
     # No longer using static period mapping - using dynamic parsing instead
 
-    def __init__(self, api_key: str, cache_dir=None, cache_ttl=None):
+    def __init__(self, api_key: str):
         """
         Initialize the FMPProvider.
 
         Args:
             api_key: FMP API key
-            cache_dir: Directory to store cached data (default: .cache_fmp)
-            cache_ttl: Cache TTL in seconds (default: 86400 - 1 day)
         """
         if not api_key:
             raise ValueError("API key is required for FMP provider")
 
         self.api_key = api_key
-
-        # Set default cache directory
-        # Special case for Hugging Face Spaces
-        if cache_dir is None:
-            if (
-                os.environ.get("HF_SPACE") == "1"
-                or os.environ.get("SPACE_ID") is not None
-            ):
-                cache_dir = "/tmp/cache_fmp"
-            else:
-                cache_dir = ".cache_fmp"
-
-        # Initialize the cache manager
-
-        self.cache = DataCache(cache_dir=cache_dir, cache_ttl=cache_ttl or 86400)
-
-        # Store cache directory for reference
-        self.cache_dir = cache_dir
 
     def try_get_beta_from_provider(self, ticker: str) -> float | None:
         """
@@ -110,8 +87,7 @@ class FMPProvider(MarketDataProvider):
         Get historical price data for a ticker.
 
         This method fetches historical price data for the given ticker
-        using the FMP API, with caching to improve performance
-        and reduce API calls.
+        using the FMP API.
 
         Args:
             ticker: The ticker symbol
@@ -133,12 +109,6 @@ class FMPProvider(MarketDataProvider):
         if not is_valid_stock_symbol(ticker):
             raise ValueError(f"Invalid stock symbol format: {ticker}")
 
-        # Check cache first
-        cache_path = self.cache.get_cache_path(ticker, period, interval)
-        df = self.cache.read_dataframe_from_cache(cache_path)
-        if df is not None:
-            return df
-
         # Map period to FMP timeframe
         days = self._map_period_to_days(period)
 
@@ -154,13 +124,13 @@ class FMPProvider(MarketDataProvider):
                 "%Y-%m-%d"
             )
 
-        logger.info(f"Fetching data for {ticker} from FMP: {from_date} to {to_date}")
+        logger.debug(f"Fetching data for {ticker} from FMP: {from_date} to {to_date}")
 
         try:
             # Using fmpsdk
             if interval.lower() == "1d":
                 # Use historical price endpoint for daily data
-                logger.info(
+                logger.debug(
                     f"Calling FMP API for {ticker} historical data from {from_date} to {to_date}"
                 )
                 historical_data = fmpsdk.historical_price_full(
@@ -170,7 +140,7 @@ class FMPProvider(MarketDataProvider):
                     to_date=to_date,
                 )
 
-                logger.info(f"Response type for {ticker}: {type(historical_data)}")
+                logger.debug(f"Response type for {ticker}: {type(historical_data)}")
 
                 if not historical_data:
                     raise ValueError(f"No historical data returned for {ticker}")
@@ -178,7 +148,9 @@ class FMPProvider(MarketDataProvider):
                 # Handle different response formats
                 if isinstance(historical_data, list):
                     # If the response is a list, use it directly
-                    logger.info(f"Response is a list with {len(historical_data)} items")
+                    logger.debug(
+                        f"Response is a list with {len(historical_data)} items"
+                    )
                     if not historical_data:
                         raise ValueError(f"Empty list returned for {ticker}")
 
@@ -186,7 +158,7 @@ class FMPProvider(MarketDataProvider):
                     df = pd.DataFrame(historical_data)
                 elif isinstance(historical_data, dict):
                     # If the response is a dict, check for the 'historical' key
-                    logger.info(
+                    logger.debug(
                         f"Response is a dict with keys: {historical_data.keys()}"
                     )
 
@@ -213,7 +185,7 @@ class FMPProvider(MarketDataProvider):
 
                 # For intraday data, we might need to limit the date range
                 # as FMP might have restrictions on how far back intraday data goes
-                logger.info(
+                logger.debug(
                     f"Calling FMP API for {ticker} intraday data with interval {fmp_interval}"
                 )
                 historical_data = fmpsdk.historical_chart(
@@ -224,7 +196,7 @@ class FMPProvider(MarketDataProvider):
                     to_date=to_date,
                 )
 
-                logger.info(f"Response type for {ticker}: {type(historical_data)}")
+                logger.debug(f"Response type for {ticker}: {type(historical_data)}")
 
                 if not historical_data:
                     raise ValueError(f"No historical data returned for {ticker}")
@@ -232,7 +204,9 @@ class FMPProvider(MarketDataProvider):
                 # Handle different response formats
                 if isinstance(historical_data, list):
                     # If the response is a list, use it directly
-                    logger.info(f"Response is a list with {len(historical_data)} items")
+                    logger.debug(
+                        f"Response is a list with {len(historical_data)} items"
+                    )
                     if not historical_data:
                         raise ValueError(f"Empty list returned for {ticker}")
 
@@ -240,7 +214,7 @@ class FMPProvider(MarketDataProvider):
                     df = pd.DataFrame(historical_data)
                 elif isinstance(historical_data, dict):
                     # If the response is a dict, check for data
-                    logger.info(
+                    logger.debug(
                         f"Response is a dict with keys: {historical_data.keys()}"
                     )
 
@@ -276,9 +250,6 @@ class FMPProvider(MarketDataProvider):
                 },
                 inplace=True,
             )
-
-            # Save to cache
-            self.cache.write_dataframe_to_cache(df, cache_path)
 
             return df
 
