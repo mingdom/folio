@@ -32,17 +32,20 @@ class FMPProvider(MarketDataProvider):
 
     # No longer using static period mapping - using dynamic parsing instead
 
-    def __init__(self, api_key: str):
+    def __init__(self, api_key: str, cache_dir=None, cache_ttl=None):  # noqa: ARG002
         """
         Initialize the FMPProvider.
 
         Args:
             api_key: FMP API key
+            cache_dir: Deprecated. No longer used.
+            cache_ttl: Deprecated. No longer used.
         """
         if not api_key:
             raise ValueError("API key is required for FMP provider")
 
         self.api_key = api_key
+        # cache_dir and cache_ttl parameters are kept for backward compatibility but are no longer used
 
     def try_get_beta_from_provider(self, ticker: str) -> float | None:
         """

@@ -20,7 +20,6 @@ Features:
 """
 
 import os
-from typing import Any
 
 import pandas as pd
 from dotenv import load_dotenv
@@ -64,8 +63,6 @@ def get_current_price(historical_data: pd.DataFrame) -> float:
 def calculate_beta_from_history(
     stock_data: pd.DataFrame,
     market_data: pd.DataFrame,
-    cache_instance: Any | None = None,  # Kept for backward compatibility
-    ticker: str | None = None,  # Kept for backward compatibility
 ) -> float | None:
     """
     Calculate beta from historical stock and market data.
@@ -143,7 +140,9 @@ class StockOracle:
     PROVIDER_FMP = "fmp"
 
     @classmethod
-    def get_instance(cls, provider_name=None, fmp_api_key=None):
+    def get_instance(
+        cls, provider_name=None, fmp_api_key=None, cache_dir=None, cache_ttl=None
+    ):
         """
         Get the singleton instance of StockOracle.
 
@@ -152,6 +151,8 @@ class StockOracle:
                            If None, will use the DATA_SOURCE environment variable or default to "yfinance"
             fmp_api_key: API key for FMP provider (required if provider_name is "fmp")
                          If None, will use the FMP_API_KEY environment variable
+            cache_dir: Deprecated. No longer used.
+            cache_ttl: Deprecated. No longer used.
 
         Returns:
             The singleton StockOracle instance
@@ -173,17 +174,23 @@ class StockOracle:
             cls._instance = cls(
                 provider_name=provider_name,
                 fmp_api_key=fmp_api_key,
+                cache_dir=cache_dir,
+                cache_ttl=cache_ttl,
             )
 
         return cls._instance
 
-    def __init__(self, provider_name="yfinance", fmp_api_key=None):
+    def __init__(
+        self, provider_name="yfinance", fmp_api_key=None, cache_dir=None, cache_ttl=None
+    ):
         """
         Initialize the StockOracle.
 
         Args:
             provider_name: Name of the market data provider to use ("yfinance" or "fmp")
             fmp_api_key: API key for FMP provider (required if provider_name is "fmp")
+            cache_dir: Deprecated. No longer used.
+            cache_ttl: Deprecated. No longer used.
 
         Note:
             This should not be called directly. Use StockOracle.get_instance() instead.
@@ -208,9 +215,11 @@ class StockOracle:
 
         # Initialize the appropriate provider
         if provider_name == self.PROVIDER_YFINANCE:
-            self.provider = YFinanceProvider()
+            self.provider = YFinanceProvider(cache_dir=cache_dir, cache_ttl=cache_ttl)
         elif provider_name == self.PROVIDER_FMP:
-            self.provider = FMPProvider(api_key=fmp_api_key)
+            self.provider = FMPProvider(
+                api_key=fmp_api_key, cache_dir=cache_dir, cache_ttl=cache_ttl
+            )
 
         # Store provider name for reference
         self.provider_name = provider_name

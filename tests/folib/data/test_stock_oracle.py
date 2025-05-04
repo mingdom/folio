@@ -12,7 +12,6 @@ The tests use mocking to avoid actual API calls to external services.
 
 import os
 import sys
-import tempfile
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
@@ -26,23 +25,22 @@ from src.folib.data.stock import StockOracle
 class TestStockOracleProviders:
     """Test the provider selection functionality of StockOracle."""
 
+    # This fixture is no longer needed since we removed caching
+    # but we'll keep it for now to minimize changes to the tests
     @pytest.fixture
     def temp_cache_dir(self):
-        """Create a temporary directory for cache files."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            yield temp_dir
+        """This fixture is kept for backward compatibility but is no longer used."""
+        yield None
 
-    def test_provider_selection_yfinance(self, temp_cache_dir):
+    def test_provider_selection_yfinance(self):
         """Test that YFinance provider is selected when explicitly specified."""
         # Patch the environment variables to ensure they don't affect the test
         with patch.dict(os.environ, {"DATA_SOURCE": "", "FMP_API_KEY": ""}, clear=True):
             # Reset the singleton first
             StockOracle._instance = None
 
-            # Create oracle with temp cache dir and explicit provider
-            oracle = StockOracle.get_instance(
-                provider_name="yfinance", cache_dir=temp_cache_dir
-            )
+            # Create oracle with explicit provider
+            oracle = StockOracle.get_instance(provider_name="yfinance")
 
             # Verify the provider
             assert oracle.provider_name == "yfinance"
@@ -51,15 +49,13 @@ class TestStockOracleProviders:
         # Reset the singleton for other tests
         StockOracle._instance = None
 
-    def test_provider_selection_fmp(self, temp_cache_dir):
+    def test_provider_selection_fmp(self):
         """Test that FMP provider is selected when specified."""
         # Reset the singleton first
         StockOracle._instance = None
 
-        # Create oracle with temp cache dir
-        oracle = StockOracle.get_instance(
-            provider_name="fmp", fmp_api_key="test_key", cache_dir=temp_cache_dir
-        )
+        # Create oracle
+        oracle = StockOracle.get_instance(provider_name="fmp", fmp_api_key="test_key")
 
         # Verify the provider
         assert oracle.provider_name == "fmp"
@@ -68,7 +64,7 @@ class TestStockOracleProviders:
         # Reset the singleton for other tests
         StockOracle._instance = None
 
-    def test_provider_selection_from_env(self, temp_cache_dir):
+    def test_provider_selection_from_env(self):
         """Test that provider is selected from environment variables."""
         # Reset the singleton first
         StockOracle._instance = None
@@ -77,8 +73,8 @@ class TestStockOracleProviders:
         with patch.dict(
             os.environ, {"DATA_SOURCE": "fmp", "FMP_API_KEY": "test_key"}, clear=True
         ):
-            # Create oracle with temp cache dir
-            oracle = StockOracle.get_instance(cache_dir=temp_cache_dir)
+            # Create oracle
+            oracle = StockOracle.get_instance()
 
             # Verify the provider
             assert oracle.provider_name == "fmp"
@@ -87,16 +83,16 @@ class TestStockOracleProviders:
         # Reset the singleton for other tests
         StockOracle._instance = None
 
-    def test_provider_selection_invalid(self, temp_cache_dir):
+    def test_provider_selection_invalid(self):
         """Test that invalid provider selection raises ValueError."""
         # Try to create oracle with invalid provider
         with pytest.raises(ValueError, match="Unknown provider"):
-            StockOracle.get_instance(provider_name="invalid", cache_dir=temp_cache_dir)
+            StockOracle.get_instance(provider_name="invalid")
 
         # Reset the singleton for other tests
         StockOracle._instance = None
 
-    def test_fmp_provider_without_api_key(self, temp_cache_dir):
+    def test_fmp_provider_without_api_key(self):
         """Test that FMP provider without API key raises ValueError."""
         # Reset the singleton first
         StockOracle._instance = None
@@ -107,27 +103,25 @@ class TestStockOracleProviders:
             with pytest.raises(
                 ValueError, match="API key is required for FMP provider"
             ):
-                StockOracle.get_instance(provider_name="fmp", cache_dir=temp_cache_dir)
+                StockOracle.get_instance(provider_name="fmp")
 
         # Reset the singleton for other tests
         StockOracle._instance = None
 
-    def test_provider_interface_consistency(self, temp_cache_dir):
+    def test_provider_interface_consistency(self):
         """Test that both providers implement the same interface methods."""
         # Reset the singleton first
         StockOracle._instance = None
 
         # Create YFinance oracle
-        yf_oracle = StockOracle.get_instance(
-            provider_name="yfinance", cache_dir=temp_cache_dir
-        )
+        yf_oracle = StockOracle.get_instance(provider_name="yfinance")
 
         # Reset the singleton
         StockOracle._instance = None
 
         # Create FMP oracle
         fmp_oracle = StockOracle.get_instance(
-            provider_name="fmp", fmp_api_key="test_key", cache_dir=temp_cache_dir
+            provider_name="fmp", fmp_api_key="test_key"
         )
 
         # Get the provider instances
@@ -154,15 +148,13 @@ class TestStockOracleProviders:
         # Reset the singleton for other tests
         StockOracle._instance = None
 
-    def test_switching_providers(self, temp_cache_dir):
+    def test_switching_providers(self):
         """Test that we can switch between providers."""
         # Reset the singleton first
         StockOracle._instance = None
 
         # Create YFinance oracle
-        yf_oracle = StockOracle.get_instance(
-            provider_name="yfinance", cache_dir=temp_cache_dir
-        )
+        yf_oracle = StockOracle.get_instance(provider_name="yfinance")
         assert yf_oracle.provider_name == "yfinance"
 
         # Reset the singleton
@@ -170,7 +162,7 @@ class TestStockOracleProviders:
 
         # Create FMP oracle
         fmp_oracle = StockOracle.get_instance(
-            provider_name="fmp", fmp_api_key="test_key", cache_dir=temp_cache_dir
+            provider_name="fmp", fmp_api_key="test_key"
         )
         assert fmp_oracle.provider_name == "fmp"
 
@@ -238,9 +230,8 @@ class TestYFinanceProvider:
 
     @pytest.fixture
     def provider(self):
-        """Create a YFinanceProvider instance with a temporary cache directory."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            yield YFinanceProvider(cache_dir=temp_dir)
+        """Create a YFinanceProvider instance."""
+        yield YFinanceProvider()
 
     def test_get_historical_data_validates_ticker(self, provider):
         """Test that get_historical_data validates the ticker symbol."""
@@ -305,9 +296,8 @@ class TestFMPProvider:
 
     @pytest.fixture
     def provider(self):
-        """Create a FMPProvider instance with a temporary cache directory."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            yield FMPProvider(api_key="test_key", cache_dir=temp_dir)
+        """Create a FMPProvider instance."""
+        yield FMPProvider(api_key="test_key")
 
     def test_get_historical_data_validates_ticker(self, provider):
         """Test that get_historical_data validates the ticker symbol."""

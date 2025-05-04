@@ -16,7 +16,7 @@ class TestFMPProviderParsing:
     def setup_method(self):
         """Set up test fixtures."""
         # Create a provider instance with a mock API key
-        self.provider = FMPProvider(api_key="test_key", cache_dir=None)
+        self.provider = FMPProvider(api_key="test_key")
 
     def test_period_parsing_days(self):
         """Test parsing period strings with days."""

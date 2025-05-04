@@ -27,10 +27,15 @@ class YFinanceProvider(MarketDataProvider):
     # Default market index for beta calculations
     market_index = "SPY"
 
-    def __init__(self):
+    def __init__(self, cache_dir=None, cache_ttl=None):
         """
         Initialize the YFinanceProvider.
+
+        Args:
+            cache_dir: Deprecated. No longer used.
+            cache_ttl: Deprecated. No longer used.
         """
+        # These parameters are kept for backward compatibility but are no longer used
         pass
 
     def try_get_beta_from_provider(self, ticker: str) -> float | None:
