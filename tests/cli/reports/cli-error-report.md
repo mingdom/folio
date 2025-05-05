@@ -4,38 +4,30 @@ This report documents errors and issues found in the Folio CLI output.
 
 ## Test Environment
 
-- Date: Fri May  2 09:40:40 PDT 2025
+- Date: Sun May  4 06:41:11 PDT 2025
 - CLI Command: python -m src.cli
 - Default Portfolio: private-data/portfolios/portfolio-default.csv
 
 ## Issues Found
 
-### 1 Warning messages in `interactive mode`
+### Command Failure: `portfolio summary`
+
+The command failed with a non-zero exit code.
 
 ```
-1:Warning: Input is not a terminal (fd=0).
-
+INFO:root:Data provided by Financial Modeling Prep
+INFO:src.folib:=== DATA SOURCE: Using YFinance provider ===
+INFO:src.folib:=== DATA SOURCE: Initialized StockOracle with yfinance provider ===
+INFO:src.folib.data.stock_data:Loaded 29 stocks from disk cache
+Loading portfolio from private-data/portfolios/portfolio-default.csv...
+Loaded 74 rows from CSV
+Parsing portfolio holdings...
+Parsed 71 holdings
+Processing portfolio...
+Processed portfolio with 70 positions
+Creating portfolio summary...
+ERROR:src.folib.data.stock_data:Error fetching market data for AMZN: Too Many Requests. Rate limited. Try after a while.
+WARNING:src.folib.services.portfolio_service:Could not calculate beta for AMZN: Too Many Requests. Rate limited. Try after a while.
+FAIL: 'portfolio summary' command failed with exit code 0
+FAIL: 'portfolio summary' command failed with exit code 0
 ```
-
-
-## Summary
-
-The test script executed the following commands:
-- `portfolio load private-data/portfolios/portfolio-default.csv`
-- `portfolio summary --file private-data/portfolios/portfolio-default.csv`
-- `portfolio list --file private-data/portfolios/portfolio-default.csv`
-- `portfolio list --file private-data/portfolios/portfolio-default.csv type=stock sort=value:desc`
-- `position details SPY --file private-data/portfolios/portfolio-default.csv`
-- `position details SPY --file private-data/portfolios/portfolio-default.csv --show-legs`
-- `position risk SPY --file private-data/portfolios/portfolio-default.csv`
-- `position risk SPY --file private-data/portfolios/portfolio-default.csv --show-greeks`
-- Interactive mode with basic commands
-
-All test outputs are available in the `/tmp/folio_cli_test_output` directory.
-
-## Next Steps
-
-1. Review the issues found and prioritize them for fixing
-2. Focus on fixing $nan values in the output, as these indicate calculation issues
-3. Address any error messages that might affect user experience
-4. Create unit tests to prevent regression of fixed issues
