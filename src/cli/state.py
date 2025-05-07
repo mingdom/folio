@@ -30,6 +30,9 @@ class State:
     # User preferences
     preferences: dict[str, Any] = field(default_factory=dict)
 
+    # Price update preference
+    update_prices: bool = False
+
     def clear(self):
         """Clear the state."""
         self.loaded_portfolio_path = None
@@ -37,6 +40,7 @@ class State:
         self.portfolio = None
         self.portfolio_summary = None
         self.command_history = []
+        self.update_prices = False  # Reset price update preference to default
 
     def add_to_history(self, command: str):
         """Add a command to the history."""

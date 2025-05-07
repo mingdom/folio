@@ -32,11 +32,14 @@ console = Console()
 @portfolio_app.command("load")
 def portfolio_load_cmd(
     file_path: str = typer.Argument(..., help="Path to the portfolio CSV file"),
+    update_prices: bool = typer.Option(
+        False, "--update-prices", help="Update prices from market data"
+    ),
 ):
     """Load portfolio data from a CSV file."""
     try:
         # Load the portfolio
-        load_portfolio(file_path)
+        load_portfolio(file_path, update_prices=update_prices)
 
         # Print success message
         console.print(f"[green]Successfully loaded portfolio from {file_path}[/green]")
@@ -51,20 +54,23 @@ def portfolio_summary_cmd(
     file_path: str | None = typer.Option(
         None, "--file", "-f", help="Path to the portfolio CSV file"
     ),
+    update_prices: bool = typer.Option(
+        False, "--update-prices", help="Update prices from market data"
+    ),
 ):
     """Display high-level portfolio metrics."""
     try:
         # Load the portfolio
-        result = load_portfolio(file_path)
+        result = load_portfolio(file_path, update_prices=update_prices)
         portfolio = result["portfolio"]
 
         # Create portfolio summary
         console.print("Creating portfolio summary...")
-        summary = create_portfolio_summary(portfolio)
+        summary = create_portfolio_summary(portfolio, update_prices=update_prices)
 
         # Calculate portfolio exposures
         console.print("Calculating portfolio exposures...")
-        exposures = get_portfolio_exposures(portfolio)
+        exposures = get_portfolio_exposures(portfolio, update_prices=update_prices)
 
         # Display portfolio summary
         console.print("\n")
@@ -100,6 +106,9 @@ def portfolio_list_cmd(
         None, "--file", "-f", help="Path to the portfolio CSV file"
     ),
     filter_args: list[str] = filter_args_arg,
+    update_prices: bool = typer.Option(
+        False, "--update-prices", help="Update prices from market data"
+    ),
 ):
     """
     List positions with filtering and sorting.
@@ -112,7 +121,7 @@ def portfolio_list_cmd(
     """
     try:
         # Load the portfolio
-        result = load_portfolio(file_path)
+        result = load_portfolio(file_path, update_prices=update_prices)
         portfolio = result["portfolio"]
 
         # Get all positions
@@ -182,29 +191,41 @@ def portfolio_load(state, args):
     """Load portfolio data from a CSV file (interactive mode)."""
     if not args:
         console.print("[red]Error:[/red] Missing file path")
-        console.print("Usage: portfolio load <FILE_PATH>")
+        console.print("Usage: portfolio load <FILE_PATH> [--update-prices]")
         return
 
     file_path = args[0]
+    update_prices = "--update-prices" in args
 
     try:
         # Load the portfolio
-        result = load_portfolio(file_path)
+        result = load_portfolio(file_path, update_prices=update_prices)
 
         # Update state
         state.loaded_portfolio_path = Path(file_path)
         state.portfolio_df = result["df"]
         state.portfolio = result["portfolio"]
-        state.portfolio_summary = create_portfolio_summary(result["portfolio"])
+        state.portfolio_summary = create_portfolio_summary(
+            result["portfolio"], update_prices=update_prices
+        )
+        state.update_prices = (
+            update_prices  # Store the update_prices preference in state
+        )
 
         # Print success message
         console.print(f"[green]Successfully loaded portfolio from {file_path}[/green]")
+        if update_prices:
+            console.print("[yellow]Note:[/yellow] Price updates are enabled")
+        else:
+            console.print(
+                "[yellow]Note:[/yellow] Price updates are disabled (using CSV prices)"
+            )
 
     except Exception as e:
         console.print(f"[red]Error loading portfolio:[/red] {e!s}")
 
 
-def portfolio_summary(state, args):  # noqa: ARG001
+def portfolio_summary(state, args):
     """Display high-level portfolio metrics (interactive mode)."""
     # Check if portfolio is loaded
     if not state.has_portfolio():
@@ -212,13 +233,22 @@ def portfolio_summary(state, args):  # noqa: ARG001
         console.print("Use 'portfolio load <FILE_PATH>' to load a portfolio")
         return
 
+    # Check if update_prices flag is provided
+    update_prices = (
+        "--update-prices" in args if args else getattr(state, "update_prices", False)
+    )
+
     try:
         # Create portfolio summary if not already created
         if state.portfolio_summary is None:
-            state.portfolio_summary = create_portfolio_summary(state.portfolio)
+            state.portfolio_summary = create_portfolio_summary(
+                state.portfolio, update_prices=update_prices
+            )
 
         # Calculate portfolio exposures
-        exposures = get_portfolio_exposures(state.portfolio)
+        exposures = get_portfolio_exposures(
+            state.portfolio, update_prices=update_prices
+        )
 
         # Display portfolio summary
         console.print("\n")

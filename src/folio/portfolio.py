@@ -290,6 +290,13 @@ def process_portfolio_data(
                 symbol, beta=None, description=description
             )
 
+            # Check if this is an option symbol or has option-related terms
+            is_option = (
+                "CALL" in row["Description"].upper()
+                or "PUT" in row["Description"].upper()
+                or symbol.strip().startswith("-")
+            )
+
             # Process price
             if pd.isna(row["Last Price"]) or row["Last Price"] in ("--", ""):
                 if is_known_cash:
@@ -300,16 +307,24 @@ def process_portfolio_data(
                     logger.debug(
                         f"Row {index}: Cash-like position {symbol} missing price. Using defaults."
                     )
-                else:
-                    # Try to fetch the current price for non-cash positions with missing price
+                elif update_prices or is_option:
+                    # Fetch price if update_prices is True OR this is an option (we always need option underlying prices)
                     try:
                         price = stockdata.get_price(symbol)
                         logger.info(f"Row {index}: Updated price for {symbol}: {price}")
                     except Exception as e:
-                        logger.warning(
-                            f"Row {index}: Error fetching price for {symbol}: {e}. Skipping."
+                        error_msg = (
+                            f"Row {index}: Error fetching price for {symbol}: {e}"
                         )
-                        continue
+                        logger.error(error_msg)
+                        # Fail fast - especially important for options
+                        raise ValueError(error_msg) from e
+                else:
+                    # Skip positions with missing prices when update_prices is False and not an option
+                    logger.warning(
+                        f"Row {index}: Missing price for {symbol} and price updates disabled. Skipping."
+                    )
+                    continue
             else:
                 price = clean_currency_value(row["Last Price"])
                 if price < 0:
@@ -317,8 +332,8 @@ def process_portfolio_data(
                         f"Row {index}: {symbol} has negative price ({price}). Skipping."
                     )
                     continue
-                elif price == 0:
-                    # Try to fetch the current price if the price is zero
+                elif price == 0 and (update_prices or is_option):
+                    # Fetch price if it's zero AND (update_prices is True OR this is an option)
                     try:
                         logger.debug(
                             f"Row {index}: {symbol} has zero price. Attempting to fetch current price."
@@ -326,9 +341,12 @@ def process_portfolio_data(
                         price = stockdata.get_price(symbol)
                         logger.info(f"Row {index}: Updated price for {symbol}: {price}")
                     except Exception as e:
-                        logger.warning(
-                            f"Row {index}: Error fetching price for {symbol}: {e}. Calculations may be affected."
+                        error_msg = (
+                            f"Row {index}: Error fetching price for {symbol}: {e}"
                         )
+                        logger.error(error_msg)
+                        # Fail fast - especially important for options
+                        raise ValueError(error_msg) from e
 
             # Calculate position value
             cleaned_current_value = clean_currency_value(row["Current Value"])
@@ -840,10 +858,8 @@ def process_portfolio_data(
             )
             return [], empty_summary, []
 
-    # Update prices if requested
-    if update_prices:
-        logger.debug("Updating prices in portfolio groups...")
-        groups = update_all_prices(groups)
+    # We no longer update all prices here - this is handled during initial processing
+    # The update_prices flag controls whether we fetch prices for positions with missing or zero prices
 
     # Calculate portfolio summary using the final list of groups
     logger.debug("Calculating final portfolio summary...")

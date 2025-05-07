@@ -64,9 +64,7 @@ logger = logging.getLogger(__name__)
 
 def process_portfolio(
     holdings: list[PortfolioHolding],
-    # update_prices parameter is reserved for future implementation
-    # where we'll update prices from market data
-    update_prices: bool = True,  # noqa: ARG001
+    update_prices: bool = False,
 ) -> Portfolio:
     """
     Process raw portfolio holdings into a structured portfolio.
@@ -256,7 +254,7 @@ def process_portfolio(
     positions.extend(cash_positions)
     positions.extend(unknown_positions)
 
-    # Create and return the portfolio
+    # Create the portfolio
     portfolio = Portfolio(
         positions=positions,
         pending_activity_value=pending_activity_value,
@@ -265,6 +263,11 @@ def process_portfolio(
     logger.debug(
         f"Portfolio processing complete: {len(positions)} positions ({len(cash_positions)} cash, {len(unknown_positions)} unknown)"
     )
+
+    # Note: The update_prices parameter is passed through to the portfolio service
+    # but doesn't directly affect the portfolio creation process.
+    # It will be used by downstream functions that calculate exposures and summaries.
+
     return portfolio
 
 
@@ -272,7 +275,9 @@ def process_portfolio(
 # Use group_positions_by_ticker() instead.
 
 
-def create_portfolio_summary(portfolio: Portfolio) -> PortfolioSummary:
+def create_portfolio_summary(
+    portfolio: Portfolio, update_prices: bool = True
+) -> PortfolioSummary:
     """
     Create a summary of portfolio metrics including values and exposures.
 
@@ -284,6 +289,7 @@ def create_portfolio_summary(portfolio: Portfolio) -> PortfolioSummary:
 
     Args:
         portfolio: The portfolio to summarize
+        update_prices: Whether to fetch current prices from market data
 
     Returns:
         PortfolioSummary: A data object containing all summary metrics
@@ -291,7 +297,7 @@ def create_portfolio_summary(portfolio: Portfolio) -> PortfolioSummary:
     logger.debug("Creating portfolio summary")
 
     # Calculate position values by type
-    position_values = _calculate_position_values(portfolio)
+    position_values = _calculate_position_values(portfolio, update_prices=update_prices)
 
     # Calculate total portfolio value
     total_value = _calculate_total_value(
@@ -299,7 +305,7 @@ def create_portfolio_summary(portfolio: Portfolio) -> PortfolioSummary:
     )
 
     # Calculate portfolio exposures
-    exposures = get_portfolio_exposures(portfolio)
+    exposures = get_portfolio_exposures(portfolio, update_prices=update_prices)
 
     # Calculate net exposure percentage
     net_exposure_pct = _calculate_net_exposure_percentage(
@@ -327,12 +333,15 @@ def create_portfolio_summary(portfolio: Portfolio) -> PortfolioSummary:
     return summary
 
 
-def _calculate_position_values(portfolio: Portfolio) -> dict:
+def _calculate_position_values(
+    portfolio: Portfolio, update_prices: bool = True
+) -> dict:
     """
     Calculate value breakdowns for different position types.
 
     Args:
         portfolio: The portfolio to analyze
+        update_prices: Whether to fetch current prices from market data
 
     Returns:
         Dictionary containing value breakdowns by position type
@@ -356,7 +365,9 @@ def _calculate_position_values(portfolio: Portfolio) -> dict:
         if position.position_type == "stock":
             _process_stock_position(position, position_value, position_values)
         elif position.position_type == "option":
-            _process_option_position(position, position_value, position_values)
+            _process_option_position(
+                position, position_value, position_values, update_prices=update_prices
+            )
         elif position.position_type == "cash":
             position_values["cash_value"] += position_value
         else:  # unknown
@@ -429,7 +440,10 @@ def _process_stock_position(
 
 
 def _process_option_position(
-    position: Position, position_value: float, position_values: dict
+    position: Position,
+    position_value: float,
+    position_values: dict,
+    update_prices: bool = True,
 ) -> None:
     """
     Process an option position and update the position values dictionary.
@@ -438,9 +452,12 @@ def _process_option_position(
         position: The option position to process
         position_value: The position's market value
         position_values: Dictionary to update with the position's values
+        update_prices: Whether to fetch current prices from market data
     """
     # Get underlying price and beta
-    underlying_price, beta = _get_option_market_data(position)
+    underlying_price, beta = _get_option_market_data(
+        position, update_prices=update_prices
+    )
 
     # Calculate option exposures
     delta = calculate_option_delta(
@@ -491,24 +508,35 @@ def _process_option_position(
             )
 
 
-def _get_option_market_data(position: Position) -> tuple[float, float]:
+def _get_option_market_data(
+    position: Position, update_prices: bool = True
+) -> tuple[float, float]:
     """
     Get market data (underlying price and beta) for an option position.
 
     Args:
         position: The option position
+        update_prices: Whether to fetch current prices from market data
 
     Returns:
         Tuple of (underlying_price, beta)
     """
+    # Always try to get the underlying price for options
+    # This is necessary for accurate exposure calculations
     try:
+        # First try to get the price from the market data
         underlying_price = stockdata.get_price(position.ticker)
-        beta = stockdata.get_beta(position.ticker)
+        # Only get beta if we're doing full price updates
+        beta = stockdata.get_beta(position.ticker) if update_prices else 1.0
+        if update_prices is False and beta == 1.0:
+            logger.warning(
+                f"Using default beta of 1.0 for {position.ticker} as price updates are disabled"
+            )
     except Exception as e:
-        logger.warning(f"Could not get market data for {position.ticker}: {e}")
-        # Fallback to using strike as proxy for underlying price
-        underlying_price = position.strike
-        beta = 1.0  # Use beta of 1.0 as fallback
+        # Fail fast - we need the underlying price for option calculations
+        error_msg = f"Could not get underlying price for option {position.ticker}: {e}"
+        logger.error(error_msg)
+        raise ValueError(error_msg) from e
 
     return underlying_price, beta
 
@@ -591,7 +619,7 @@ def _calculate_net_exposure_percentage(
     return (net_market_exposure / total_value) if total_value > 0 else 0.0
 
 
-def get_portfolio_exposures(portfolio: Portfolio) -> dict:
+def get_portfolio_exposures(portfolio: Portfolio, update_prices: bool = True) -> dict:
     """
     Calculate exposure metrics for a portfolio.
 
@@ -606,6 +634,7 @@ def get_portfolio_exposures(portfolio: Portfolio) -> dict:
 
     Args:
         portfolio: The portfolio to analyze
+        update_prices: Whether to fetch current prices from market data
 
     Returns:
         Dictionary with exposure metrics
@@ -676,13 +705,21 @@ def get_portfolio_exposures(portfolio: Portfolio) -> dict:
     for position in portfolio.option_positions:
         # Get underlying price and beta
         try:
+            # Always get the underlying price for options
             underlying_price = stockdata.get_price(position.ticker)
-            beta = stockdata.get_beta(position.ticker)
+            # Only get beta if we're doing full price updates
+            beta = stockdata.get_beta(position.ticker) if update_prices else 1.0
+            if update_prices is False and beta == 1.0:
+                logger.warning(
+                    f"Using default beta of 1.0 for {position.ticker} as price updates are disabled"
+                )
         except Exception as e:
-            logger.warning(f"Could not get market data for {position.ticker}: {e}")
-            # Fallback to using strike as proxy for underlying price
-            underlying_price = position.strike
-            beta = 1.0  # Use beta of 1.0 as fallback
+            # Fail fast - we need the underlying price for option calculations
+            error_msg = (
+                f"Could not get underlying price for option {position.ticker}: {e}"
+            )
+            logger.error(error_msg)
+            raise ValueError(error_msg) from e
 
         # Calculate option exposures using the calculation modules with fallback
         delta = calculate_option_delta(
