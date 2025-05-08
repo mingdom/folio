@@ -34,7 +34,9 @@ def cache_clear_cmd(
 
         # Clear the cache
         if backup:
-            console.print("[yellow]Creating backup of cache before clearing...[/yellow]")
+            console.print(
+                "[yellow]Creating backup of cache before clearing...[/yellow]"
+            )
         else:
             console.print("[yellow]Clearing cache without backup...[/yellow]")
 
@@ -42,7 +44,9 @@ def cache_clear_cmd(
 
         # Print success message
         if backup:
-            console.print("[green]Cache cleared successfully with backup created[/green]")
+            console.print(
+                "[green]Cache cleared successfully with backup created[/green]"
+            )
         else:
             console.print("[green]Cache cleared successfully[/green]")
 
@@ -82,7 +86,9 @@ def cache_clear(state, args):  # noqa: ARG001
 
         # Clear the cache
         if backup:
-            console.print("[yellow]Creating backup of cache before clearing...[/yellow]")
+            console.print(
+                "[yellow]Creating backup of cache before clearing...[/yellow]"
+            )
         else:
             console.print("[yellow]Clearing cache without backup...[/yellow]")
 
@@ -90,7 +96,9 @@ def cache_clear(state, args):  # noqa: ARG001
 
         # Print success message
         if backup:
-            console.print("[green]Cache cleared successfully with backup created[/green]")
+            console.print(
+                "[green]Cache cleared successfully with backup created[/green]"
+            )
         else:
             console.print("[green]Cache cleared successfully[/green]")
 

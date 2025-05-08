@@ -63,17 +63,6 @@ def cached(
 
         @functools.wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> R:
-            # Check if skip_cache is in kwargs and is True
-            skip_cache = kwargs.pop("skip_cache", False)
-            if skip_cache:
-                # Get the relevant argument for logging (skip self if it's a method)
-                arg_str = _get_log_arg_str(args)
-                logger.debug(
-                    f"Skipping cache for {func_name}{arg_str} (--no-cache flag)"
-                )
-                _cache_stats[func_name]["misses"] += 1
-                return func(*args, **kwargs)
-
             # Get cache directory
             cache_directory = cache_dir or get_cache_dir()
             os.makedirs(cache_directory, exist_ok=True)

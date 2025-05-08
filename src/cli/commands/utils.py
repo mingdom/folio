@@ -10,6 +10,7 @@ from typing import Any
 from rich.console import Console
 
 from src.folib.data.loader import load_portfolio_from_csv, parse_portfolio_holdings
+from src.folib.data.market_data import MarketDataProvider
 from src.folib.services.portfolio_service import process_portfolio
 
 # Create console for rich output
@@ -82,8 +83,6 @@ def load_portfolio(
 
     # Handle cache clearing if requested
     if no_cache:
-        from src.folib.data.market_data import MarketDataProvider
-
         console.print("[yellow]Clearing cache to force fresh data...[/yellow]")
         market_data = MarketDataProvider()
         market_data.clear_all_cache(backup=True)

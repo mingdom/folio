@@ -52,14 +52,11 @@ class MarketDataProvider:
         return f"MarketDataProvider(api_key='{self.api_key[:4]}...')"
 
     @cached(ttl=PROFILE_TTL, key_prefix="profile")
-    def _fetch_profile(
-        self, ticker: str, skip_cache: bool = False
-    ) -> dict[str, Any] | None:
+    def _fetch_profile(self, ticker: str) -> dict[str, Any] | None:
         """Fetch company profile data for a ticker.
 
         Args:
             ticker: Stock ticker symbol.
-            skip_cache: If True, bypass the cache and fetch fresh data.
 
         Returns:
             Company profile data dictionary or None if not found or error occurred.
@@ -93,24 +90,22 @@ class MarketDataProvider:
         return self._session_cache[ticker_upper].get("profile")
 
     @cached(ttl=PRICE_TTL, key_prefix="price")
-    def get_price(self, ticker: str, skip_cache: bool = False) -> float | None:
+    def get_price(self, ticker: str) -> float | None:
         """Get the current price for a stock ticker.
 
         Args:
             ticker: Stock ticker symbol.
-            skip_cache: If True, bypass the cache and fetch fresh data.
 
         Returns:
             Current stock price as float or None if not available.
         """
         ticker_upper = ticker.upper()
         if (
-            not skip_cache
-            and ticker_upper in self._session_cache
+            ticker_upper in self._session_cache
             and self._session_cache[ticker_upper].get("price") is not None
         ):
             return self._session_cache[ticker_upper]["price"]
-        profile = self._fetch_profile(ticker, skip_cache=skip_cache)
+        profile = self._fetch_profile(ticker)
         price = profile.get("price") if profile else None
         if price is not None:
             try:
@@ -121,24 +116,22 @@ class MarketDataProvider:
         return None
 
     @cached(ttl=BETA_TTL, key_prefix="beta")
-    def get_beta(self, ticker: str, skip_cache: bool = False) -> float | None:
+    def get_beta(self, ticker: str) -> float | None:
         """Get the beta value for a stock ticker.
 
         Args:
             ticker: Stock ticker symbol.
-            skip_cache: If True, bypass the cache and fetch fresh data.
 
         Returns:
             Beta value as float or None if not available.
         """
         ticker_upper = ticker.upper()
         if (
-            not skip_cache
-            and ticker_upper in self._session_cache
+            ticker_upper in self._session_cache
             and self._session_cache[ticker_upper].get("beta") is not None
         ):
             return self._session_cache[ticker_upper]["beta"]
-        profile = self._fetch_profile(ticker, skip_cache=skip_cache)
+        profile = self._fetch_profile(ticker)
         beta = profile.get("beta") if profile else None
         if beta is not None:
             try:
@@ -175,20 +168,19 @@ class MarketDataProvider:
         log_cache_stats(aggregate=aggregate)
 
     def get_data_with_cache_option(
-        self, ticker: str, skip_cache: bool = False
+        self, ticker: str
     ) -> tuple[float | None, float | None]:
         """
-        Get price and beta data for a ticker with option to skip cache.
+        Get price and beta data for a ticker.
 
         Args:
             ticker: Stock ticker symbol
-            skip_cache: If True, bypass the cache and fetch fresh data
 
         Returns:
             Tuple of (price, beta)
         """
-        price = self.get_price(ticker, skip_cache=skip_cache)
-        beta = self.get_beta(ticker, skip_cache=skip_cache)
+        price = self.get_price(ticker)
+        beta = self.get_beta(ticker)
         return price, beta
 
 
