@@ -577,11 +577,14 @@ def process_portfolio(
                 "No unpaired options found - using raw CSV prices for all positions"
             )
 
-    # Create and return the portfolio
+    # Create the portfolio
     portfolio = Portfolio(
         positions=positions,
         pending_activity_value=pending_activity_value,
     )
+
+    # Log cache statistics after loading the portfolio
+    market_data_provider.log_cache_statistics()
 
     logger.debug(
         f"Portfolio processing complete: {len(positions)} positions ({len(cash_positions)} cash, {len(unknown_positions)} unknown)"

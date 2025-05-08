@@ -6,6 +6,7 @@ with external API calls mocked to prevent network requests.
 """
 
 import os
+import tempfile
 from unittest.mock import patch
 
 import pytest
@@ -74,10 +75,11 @@ class TestMarketDataProvider:
         """Test profile fetching with API error."""
         # Mock API error
         with patch("fmpsdk.company_profile", side_effect=Exception("API Error")):
-            profile = self.provider._fetch_profile("AAPL")
+            # The function should now raise the exception
+            with pytest.raises(Exception, match="API Error"):
+                self.provider._fetch_profile("AAPL")
 
-            # Verify the result is None and cache reflects that
-            assert profile is None
+            # Verify the session cache was updated before the exception was raised
             assert self.provider._session_cache["AAPL"]["profile"] is None
 
     def test_fetch_profile_cache_hit(self):
@@ -205,3 +207,73 @@ class TestMarketDataProvider:
 
         # Verify cache is empty
         assert self.provider._session_cache == {}
+
+    def test_clear_all_cache(self):
+        """Test clearing both in-session and disk cache."""
+        # Populate session cache
+        self.provider._session_cache["AAPL"] = {
+            "profile": {"symbol": "AAPL", "price": 150.0, "beta": 1.2},
+            "price": 150.0,
+            "beta": 1.2,
+        }
+
+        # Mock the clear_disk_cache function
+        with patch(
+            "src.folib.data.market_data.clear_disk_cache"
+        ) as mock_clear_disk_cache:
+            # Clear all caches
+            self.provider.clear_all_cache()
+
+            # Verify session cache is empty
+            assert self.provider._session_cache == {}
+
+            # Verify disk cache was cleared
+            mock_clear_disk_cache.assert_called_once()
+
+    def test_log_cache_statistics(self, caplog):
+        """Test logging cache statistics."""
+        # Mock the log_cache_stats function
+        with patch(
+            "src.folib.data.market_data.log_cache_stats"
+        ) as mock_log_cache_stats:
+            # Log cache statistics
+            self.provider.log_cache_statistics()
+
+            # Verify log_cache_stats was called
+            mock_log_cache_stats.assert_called_once()
+
+    def test_persistent_cache_integration(self):
+        """Test integration with persistent cache."""
+        # Create a temporary directory for cache
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Mock the get_cache_dir function to return our temp directory
+            with patch("src.folib.data.cache.get_cache_dir", return_value=temp_dir):
+                # Mock response data
+                mock_profile = {
+                    "symbol": "AAPL",
+                    "price": 150.0,
+                    "beta": 1.2,
+                }
+
+                # First call should miss cache and call the API
+                with patch(
+                    "fmpsdk.company_profile", return_value=[mock_profile]
+                ) as mock_api:
+                    price = self.provider.get_price("AAPL")
+                    assert price == 150.0
+                    mock_api.assert_called_once()
+
+                # Second call should hit cache and not call the API
+                with patch("fmpsdk.company_profile") as mock_api:
+                    price = self.provider.get_price("AAPL")
+                    assert price == 150.0
+                    mock_api.assert_not_called()
+
+                # Clear the session cache but keep the disk cache
+                self.provider.clear_session_cache()
+
+                # Third call should hit disk cache and not call the API
+                with patch("fmpsdk.company_profile") as mock_api:
+                    price = self.provider.get_price("AAPL")
+                    assert price == 150.0
+                    mock_api.assert_not_called()

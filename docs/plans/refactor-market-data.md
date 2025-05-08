@@ -1,7 +1,7 @@
 # Refactoring Plan: Market Data Access (v1 Draft)
 
 **Date:** 2025-05-08
-**Author:** Gemini Pro
+**Author:** Auggie
 
 **Goal:** Consolidate market data fetching to a single, simple interface using FMP by default, supporting `get_price` and `get_beta`, with in-session storage and extensibility for future caching.
 

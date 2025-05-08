@@ -2,7 +2,7 @@
 Market data provider for financial data.
 
 This module provides a unified interface for fetching market data from FMP API.
-It includes in-session caching to minimize redundant API calls.
+It includes both in-session and persistent caching to minimize redundant API calls.
 """
 
 import logging
@@ -11,14 +11,22 @@ from typing import Any
 
 import fmpsdk
 
+from src.folib.data.cache import cached, log_cache_stats
+from src.folib.data.cache import clear_cache as clear_disk_cache
+
 logger = logging.getLogger(__name__)
+
+# Cache TTLs in seconds
+PRICE_TTL = 3600  # 1 hour
+BETA_TTL = 604800  # 1 week (7 days)
+PROFILE_TTL = 2592000  # 1 month (30 days)
 
 
 class MarketDataProvider:
     """Primary interface for accessing market data.
 
     Uses Financial Modeling Prep (FMP) API to fetch stock price and beta data.
-    Implements in-session caching to minimize redundant API calls.
+    Implements both in-session and persistent caching to minimize redundant API calls.
     """
 
     def __init__(self, api_key: str | None = None):
@@ -36,6 +44,15 @@ class MarketDataProvider:
         # In-session cache: {ticker: {price: value, beta: value, profile: raw_data}}
         self._session_cache: dict[str, dict[str, Any]] = {}
 
+    def __str__(self) -> str:
+        """Return a string representation of the market data provider."""
+        return "MarketDataProvider"
+
+    def __repr__(self) -> str:
+        """Return a string representation of the market data provider."""
+        return f"MarketDataProvider(api_key='{self.api_key[:4]}...')"
+
+    @cached(ttl=PROFILE_TTL, key_prefix="profile")
     def _fetch_profile(self, ticker: str) -> dict[str, Any] | None:
         """Fetch company profile data for a ticker.
 
@@ -70,9 +87,10 @@ class MarketDataProvider:
             except Exception as e:
                 logger.error(f"Error fetching FMP profile for {ticker_upper}: {e}")
                 self._session_cache.setdefault(ticker_upper, {})["profile"] = None
-                return None
+                raise
         return self._session_cache[ticker_upper].get("profile")
 
+    @cached(ttl=PRICE_TTL, key_prefix="price")
     def get_price(self, ticker: str) -> float | None:
         """Get the current price for a stock ticker.
 
@@ -98,6 +116,7 @@ class MarketDataProvider:
                 return None
         return None
 
+    @cached(ttl=BETA_TTL, key_prefix="beta")
     def get_beta(self, ticker: str) -> float | None:
         """Get the beta value for a stock ticker.
 
@@ -127,6 +146,16 @@ class MarketDataProvider:
         """Clear the in-session cache."""
         self._session_cache.clear()
         logger.info("In-session market data cache cleared.")
+
+    def clear_all_cache(self) -> None:
+        """Clear both in-session and disk cache."""
+        self.clear_session_cache()
+        clear_disk_cache()
+        logger.info("All caches cleared (in-session and disk).")
+
+    def log_cache_statistics(self) -> None:
+        """Log cache hit/miss statistics."""
+        log_cache_stats()
 
 
 # Default instance (requires FMP_API_KEY env var)
