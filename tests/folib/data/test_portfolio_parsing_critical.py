@@ -72,41 +72,6 @@ def test_option_positions_parsing(test_portfolio_path):
     # Get the actual option positions from the processed portfolio
     actual_option_positions = portfolio.option_positions
     actual_option_count = len(actual_option_positions)
-    [pos.ticker for pos in actual_option_positions]
-
-    # Print detailed diagnostics
-
-    # Get the option symbols that are missing
-    missing_options = []
-    for symbol in option_symbols:
-        row = df[df["Symbol"] == symbol].iloc[0]
-        description = row["Description"]
-        match = re.search(r"^([A-Z]+)", description)
-        if not match:
-            continue
-
-        underlying_ticker = match.group(1)
-
-        # Check if this option is in the portfolio
-        found = False
-        for pos in actual_option_positions:
-            if pos.ticker == underlying_ticker:
-                found = True
-                break
-
-        if not found:
-            missing_options.append((symbol, underlying_ticker, description))
-
-    # Print the missing options
-    if missing_options:
-        for symbol, _ticker, _desc in missing_options[:10]:  # Show first 10
-            pass
-        if len(missing_options) > 10:
-            pass
-
-    # Print the options that were successfully parsed
-    for pos in actual_option_positions:
-        pass
 
     # Verify the counts match
     assert actual_option_count == expected_option_count, (
