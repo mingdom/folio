@@ -86,9 +86,6 @@ def load_portfolio(
         f"Processed portfolio with [bold]{len(portfolio.positions)}[/bold] positions"
     )
 
-    # Display portfolio path prominently
-    console.print(f"\n[bold blue]PORTFOLIO:[/bold blue] [bold]{path}[/bold]")
-
     return {
         "df": df,
         "holdings": holdings,

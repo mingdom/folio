@@ -196,9 +196,6 @@ def start_interactive_shell():
         try:
             portfolio_load(state=state, args=[str(default_portfolio_path)])
             console.print("[green]Loaded default portfolio[/green]")
-            console.print(
-                f"[bold blue]PORTFOLIO:[/bold blue] [bold]{default_portfolio_path}[/bold]"
-            )
 
             # Display portfolio summary by default
             console.print("\n[bold]Portfolio Summary:[/bold]")
