@@ -255,7 +255,7 @@ def main():
 
     # Try to load default portfolio
     try:
-        load_portfolio("private-data/portfolio-private.csv", state)
+        load_portfolio("private-data/portfolios/portfolio-default.csv", state)
     except Exception as e:
         console.print(f"[yellow]Could not load default portfolio: {e}[/yellow]")
         console.print("[yellow]Use 'load <path>' to load a portfolio.[/yellow]")

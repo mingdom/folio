@@ -1,0 +1,138 @@
+"""
+Market data provider for financial data.
+
+This module provides a unified interface for fetching market data from FMP API.
+It includes in-session caching to minimize redundant API calls.
+"""
+
+import logging
+import os
+from typing import Any
+
+import fmpsdk
+
+logger = logging.getLogger(__name__)
+
+
+class MarketDataProvider:
+    """Primary interface for accessing market data.
+
+    Uses Financial Modeling Prep (FMP) API to fetch stock price and beta data.
+    Implements in-session caching to minimize redundant API calls.
+    """
+
+    def __init__(self, api_key: str | None = None):
+        """Initialize the market data provider.
+
+        Args:
+            api_key: FMP API key. If None, will attempt to read from FMP_API_KEY environment variable.
+
+        Raises:
+            ValueError: If no API key is provided and FMP_API_KEY environment variable is not set.
+        """
+        self.api_key = api_key or os.environ.get("FMP_API_KEY")
+        if not self.api_key:
+            raise ValueError("FMP_API_KEY is required.")
+        # In-session cache: {ticker: {price: value, beta: value, profile: raw_data}}
+        self._session_cache: dict[str, dict[str, Any]] = {}
+
+    def _fetch_profile(self, ticker: str) -> dict[str, Any] | None:
+        """Fetch company profile data for a ticker.
+
+        Args:
+            ticker: Stock ticker symbol.
+
+        Returns:
+            Company profile data dictionary or None if not found or error occurred.
+        """
+        ticker_upper = ticker.upper()
+        if (
+            ticker_upper not in self._session_cache
+            or "profile" not in self._session_cache[ticker_upper]
+        ):
+            logger.debug(f"Fetching FMP profile for {ticker_upper}")
+            try:
+                profile_data = fmpsdk.company_profile(
+                    apikey=self.api_key, symbol=ticker_upper
+                )
+                if profile_data:
+                    profile = profile_data[0]
+                    self._session_cache.setdefault(ticker_upper, {})["profile"] = (
+                        profile
+                    )
+                    self._session_cache[ticker_upper]["price"] = profile.get("price")
+                    self._session_cache[ticker_upper]["beta"] = profile.get("beta")
+                    return profile
+                else:
+                    logger.warning(f"No profile data found for {ticker_upper}")
+                    self._session_cache.setdefault(ticker_upper, {})["profile"] = None
+                    return None
+            except Exception as e:
+                logger.error(f"Error fetching FMP profile for {ticker_upper}: {e}")
+                self._session_cache.setdefault(ticker_upper, {})["profile"] = None
+                return None
+        return self._session_cache[ticker_upper].get("profile")
+
+    def get_price(self, ticker: str) -> float | None:
+        """Get the current price for a stock ticker.
+
+        Args:
+            ticker: Stock ticker symbol.
+
+        Returns:
+            Current stock price as float or None if not available.
+        """
+        ticker_upper = ticker.upper()
+        if (
+            ticker_upper in self._session_cache
+            and self._session_cache[ticker_upper].get("price") is not None
+        ):
+            return self._session_cache[ticker_upper]["price"]
+        profile = self._fetch_profile(ticker)
+        price = profile.get("price") if profile else None
+        if price is not None:
+            try:
+                return float(price)
+            except (ValueError, TypeError):
+                logger.error(f"Invalid price value for {ticker_upper}: {price}")
+                return None
+        return None
+
+    def get_beta(self, ticker: str) -> float | None:
+        """Get the beta value for a stock ticker.
+
+        Args:
+            ticker: Stock ticker symbol.
+
+        Returns:
+            Beta value as float or None if not available.
+        """
+        ticker_upper = ticker.upper()
+        if (
+            ticker_upper in self._session_cache
+            and self._session_cache[ticker_upper].get("beta") is not None
+        ):
+            return self._session_cache[ticker_upper]["beta"]
+        profile = self._fetch_profile(ticker)
+        beta = profile.get("beta") if profile else None
+        if beta is not None:
+            try:
+                return float(beta)
+            except (ValueError, TypeError):
+                logger.error(f"Invalid beta value for {ticker_upper}: {beta}")
+                return None
+        return None
+
+    def clear_session_cache(self) -> None:
+        """Clear the in-session cache."""
+        self._session_cache.clear()
+        logger.info("In-session market data cache cleared.")
+
+
+# Default instance (requires FMP_API_KEY env var)
+try:
+    market_data_provider = MarketDataProvider()
+    logger.info("Default MarketDataProvider initialized successfully")
+except ValueError as e:
+    logger.error(f"Failed to initialize default MarketDataProvider: {e}")
+    market_data_provider = None

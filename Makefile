@@ -177,44 +177,6 @@ cli:
 	@LOG_LEVEL=$(if $(level),$(level),INFO) \
 	$(POETRY) run python -m src.cli
 
-simulate:
-	@echo "Running portfolio simulation with simulator_v2..."
-	@if ! command -v $(POETRY) &> /dev/null; then \
-		echo "Poetry not found. Please run 'make env' first."; \
-		exit 1; \
-	fi
-	@LOG_LEVEL=$(if $(level),$(level),INFO) \
-	if [ -n "$(portfolio)" ]; then \
-		$(POETRY) run python -m src.focli.commands.sim $(portfolio) --min-spy-change -0.1 --max-spy-change 0.1 --steps 5 $(if $(ticker),--ticker $(ticker),) $(if $(detailed),--detailed,) $(if $(type),--position-type $(type),); \
-	elif [ -f "@private-data/private-portfolio.csv" ]; then \
-		$(POETRY) run python -m src.focli.commands.sim @private-data/private-portfolio.csv --min-spy-change -0.1 --max-spy-change 0.1 --steps 5 $(if $(ticker),--ticker $(ticker),) $(if $(detailed),--detailed,) $(if $(type),--position-type $(type),); \
-	elif [ -f "private-data/portfolio-private.csv" ]; then \
-		$(POETRY) run python -m src.focli.commands.sim private-data/portfolio-private.csv --min-spy-change -0.1 --max-spy-change 0.1 --steps 5 $(if $(ticker),--ticker $(ticker),) $(if $(detailed),--detailed,) $(if $(type),--position-type $(type),); \
-	else \
-		echo "Error: Portfolio file not found. Please specify a file path:"; \
-		echo "  make simulate portfolio=path/to/your/portfolio.csv"; \
-		exit 1; \
-	fi
-
-analyze:
-	@echo "Analyzing position contributions to portfolio performance..."
-	@if ! command -v $(POETRY) &> /dev/null; then \
-		echo "Poetry not found. Please run 'make env' first."; \
-		exit 1; \
-	fi
-	@LOG_LEVEL=$(if $(level),$(level),INFO) \
-	if [ -n "$(portfolio)" ]; then \
-		$(POETRY) run python -m src.focli.commands.analyze $(portfolio) --min-spy-change -0.2 --max-spy-change 0.2 --steps 21 $(if $(focus_spy),--focus-spy $(focus_spy),) $(if $(top_n),--top-n $(top_n),); \
-	elif [ -f "@private-data/private-portfolio.csv" ]; then \
-		$(POETRY) run python -m src.focli.commands.analyze @private-data/private-portfolio.csv --min-spy-change -0.2 --max-spy-change 0.2 --steps 21 $(if $(focus_spy),--focus-spy $(focus_spy),) $(if $(top_n),--top-n $(top_n),); \
-	elif [ -f "private-data/portfolio-private.csv" ]; then \
-		$(POETRY) run python -m src.focli.commands.analyze private-data/portfolio-private.csv --min-spy-change -0.2 --max-spy-change 0.2 --steps 21 $(if $(focus_spy),--focus-spy $(focus_spy),) $(if $(top_n),--top-n $(top_n),); \
-	else \
-		echo "Error: Portfolio file not found. Please specify a file path:"; \
-		echo "  make analyze portfolio=path/to/your/portfolio.csv"; \
-		exit 1; \
-	fi
-
 # Alias for simulate
 sim: simulate
 

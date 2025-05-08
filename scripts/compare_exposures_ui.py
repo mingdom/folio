@@ -32,7 +32,7 @@ def load_portfolio_data(csv_path):
 def compare_exposures():
     """Compare summary card exposures with position details exposures."""
     # Try to load the private portfolio data first
-    private_csv_path = "private-data/portfolio-private.csv"
+    private_csv_path = "private-data/portfolios/portfolio-default.csv"
     sample_csv_path = "sample-data/sample-portfolio.csv"
 
     if os.path.exists(private_csv_path):
@@ -156,17 +156,11 @@ def compare_exposures():
     # Determine if the summary card values match the UI values
     if abs(summary_net_exposure - total_ui_market_value) < 0.01:
         pass
-    else:
-        pass
 
     if abs(summary_beta_adjusted_net_exposure - total_ui_beta_adjusted_exposure) < 0.01:
         pass
-    else:
-        pass
 
     if abs(summary_options_exposure - total_ui_delta_exposure) < 0.01:
-        pass
-    else:
         pass
 
 

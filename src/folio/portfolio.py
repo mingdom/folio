@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 
 import pandas as pd
 
-from src.folib.data.stock import stockdata
+from src.folib.data.market_data import market_data_provider
 
 from .calculations import calculate_beta_adjusted_exposure, calculate_net_exposure
 from .cash_detection import is_cash_or_short_term
@@ -308,7 +308,7 @@ def process_portfolio_data(
                 else:
                     # Try to fetch the current price for non-cash positions with missing price
                     try:
-                        price = stockdata.get_price(symbol)
+                        price = market_data_provider.get_price(symbol)
                         logger.info(f"Row {index}: Updated price for {symbol}: {price}")
                     except Exception as e:
                         logger.warning(
@@ -328,7 +328,7 @@ def process_portfolio_data(
                         logger.debug(
                             f"Row {index}: {symbol} has zero price. Attempting to fetch current price."
                         )
-                        price = stockdata.get_price(symbol)
+                        price = market_data_provider.get_price(symbol)
                         logger.info(f"Row {index}: Updated price for {symbol}: {price}")
                     except Exception as e:
                         logger.warning(
@@ -658,7 +658,7 @@ def process_portfolio_data(
             # Get the latest price for the underlying
             try:
                 # Try to fetch the latest price
-                underlying_price = stockdata.get_price(underlying)
+                underlying_price = market_data_provider.get_price(underlying)
                 if underlying_price <= 0:
                     # If we get an invalid price, we can't process the options
                     logger.error(f"Invalid price for {underlying}: {underlying_price}")
@@ -1079,7 +1079,7 @@ def update_portfolio_prices(
     for ticker in tickers:
         try:
             # Get the current price
-            latest_prices[ticker] = stockdata.get_price(ticker)
+            latest_prices[ticker] = market_data_provider.get_price(ticker)
             logger.debug(f"Updated price for {ticker}: {latest_prices[ticker]}")
         except Exception as e:
             logger.error(f"Error fetching price for {ticker}: {e!s}")
@@ -1162,7 +1162,7 @@ def update_zero_price_positions(
     for ticker in zero_price_tickers:
         try:
             # Get the current price
-            new_price = stockdata.get_price(ticker)
+            new_price = market_data_provider.get_price(ticker)
             logger.info(f"Fetched price for {ticker}: {new_price}")
 
             # Update the price in all matching groups
@@ -1234,7 +1234,7 @@ def update_all_prices(
     for ticker in tickers_to_update:
         try:
             # Get the current price
-            new_price = stockdata.get_price(ticker)
+            new_price = market_data_provider.get_price(ticker)
             logger.debug(f"Fetched price for {ticker}: {new_price}")
 
             # Update the price in all matching groups

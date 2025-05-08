@@ -9,7 +9,7 @@ pricing and valuation.
 import datetime
 from typing import Any
 
-from src.folib.data.stock import stockdata
+from src.folib.data.market_data import market_data_provider
 
 from .data_model import OptionPosition, PortfolioGroup, StockPosition
 from .logger import logger
@@ -522,7 +522,7 @@ def simulate_portfolio(
         # Simulate each position group
         for group in filtered_groups:
             try:
-                stock_price = stockdata.get_price(group.ticker)
+                stock_price = market_data_provider.get_price(group.ticker)
                 group_result = simulate_position_group(
                     group, spy_change, stock_price, type_filter
                 )

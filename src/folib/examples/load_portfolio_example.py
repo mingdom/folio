@@ -14,7 +14,7 @@ Usage:
     python src/folib/examples/load_portfolio_example_v2.py [csv_file]
 
 If no CSV file is specified, the script uses the default portfolio file
-at 'private-data/portfolio-private.csv'.
+at 'private-data/portfolios/portfolio-default.csv'.
 """
 
 import argparse
@@ -68,7 +68,7 @@ def main():
     parser.add_argument(
         "csv_file",
         nargs="?",
-        default="private-data/portfolio-private.csv",
+        default="private-data/portfolios/portfolio-default.csv",
         help="Path to the portfolio CSV file",
     )
     args = parser.parse_args()

@@ -9,7 +9,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from src.folib.data.stock import stockdata
+from src.folib.data.market_data import market_data_provider
 from src.folib.services.portfolio_service import group_positions_by_ticker
 from src.folib.services.position_service import analyze_position
 
@@ -163,7 +163,7 @@ def position_risk_cmd(
         position_analyses = []
         for position in positions:
             try:
-                analysis = analyze_position(position, stockdata)
+                analysis = analyze_position(position, market_data_provider)
                 position_analyses.append(analysis)
             except Exception as e:
                 console.print(
@@ -360,7 +360,7 @@ def position_risk(state, args):
         position_analyses = []
         for position in positions:
             try:
-                analysis = analyze_position(position, stockdata)
+                analysis = analyze_position(position, market_data_provider)
                 position_analyses.append(analysis)
             except Exception as e:
                 console.print(

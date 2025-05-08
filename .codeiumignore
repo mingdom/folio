@@ -1,0 +1,4 @@
+!private-data/**
+!.refs
+!.refs/**
+!.env

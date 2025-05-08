@@ -174,7 +174,7 @@ class PortfolioHolding:
     It only includes the core fields needed for position analysis, excluding any
     private or irrelevant information.
 
-    The source CSV format (portfolio-private.csv) contains these columns:
+    The source CSV format contains these columns:
     - Symbol: The ticker symbol of the security
     - Description: Text description of the security
     - Quantity: Number of shares or contracts
