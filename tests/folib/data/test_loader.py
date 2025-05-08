@@ -266,8 +266,8 @@ class TestParsePortfolioHoldings:
             "Cost Basis Total": [""],
         })
 
-        # Mock the is_cash_like method to return True
-        with patch("src.folib.data.stock.stockdata.is_cash_like", return_value=True):
+        # Mock the is_cash_or_short_term function to return True
+        with patch("src.folio.cash_detection.is_cash_or_short_term", return_value=True):
             # Parse the holdings
             holdings = parse_portfolio_holdings(df)
             assert len(holdings) == 1

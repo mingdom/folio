@@ -41,6 +41,8 @@ from datetime import date
 
 import pandas as pd
 
+from src.folio.cash_detection import is_cash_or_short_term
+
 from ..calculations.exposure import (
     calculate_beta_adjusted_exposure,
     calculate_option_exposure,
@@ -49,7 +51,6 @@ from ..calculations.exposure import (
 from ..calculations.options import calculate_option_delta, categorize_option_by_delta
 from ..data.loader import clean_currency_value
 from ..data.market_data import market_data_provider
-from ..data.stock_data import default_stock_service
 from ..domain import (
     CashPosition,
     OptionPosition,
@@ -105,7 +106,7 @@ def _categorize_holdings(
             continue
 
         # Check for cash-like positions
-        if default_stock_service.is_cash_like(holding.symbol, holding.description):
+        if is_cash_or_short_term(holding.symbol, description=holding.description):
             cash_position = CashPosition(
                 ticker=holding.symbol,
                 quantity=holding.quantity,
@@ -115,9 +116,7 @@ def _categorize_holdings(
             cash_positions.append(cash_position)
             logger.debug(f"Identified cash-like position: {holding.symbol}")
         # Check for option positions or stock positions
-        elif _is_option_holding(holding) or default_stock_service.is_valid_stock_symbol(
-            holding.symbol
-        ):
+        elif _is_option_holding(holding) or re.match(r"^[A-Z]{1,5}$", holding.symbol):
             non_cash_holdings.append(holding)
             logger.debug(
                 f"Identified {'option' if _is_option_holding(holding) else 'stock'} position: {holding.symbol}"
@@ -727,8 +726,8 @@ def _process_stock_position(
         position_values: Dictionary to update with the position's values
     """
     # Skip cash-like positions (e.g., money market funds)
-    if default_stock_service.is_cash_like(
-        position.ticker, getattr(position, "description", "")
+    if is_cash_or_short_term(
+        position.ticker, description=getattr(position, "description", "")
     ):
         position_values["cash_value"] += position_value
         logger.debug(f"Categorized as cash-like: {position.ticker}")
@@ -826,8 +825,8 @@ def _get_option_market_data(position: Position) -> tuple[float, float]:
         Tuple of (underlying_price, beta)
     """
     try:
-        underlying_price = default_stock_service.load_market_data(position.ticker).price
-        beta = default_stock_service.load_market_data(position.ticker).beta
+        underlying_price = market_data_provider.get_price(position.ticker)
+        beta = market_data_provider.get_beta(position.ticker) or 1.0
     except Exception as e:
         logger.warning(f"Could not get market data for {position.ticker}: {e}")
         # Fallback to using strike as proxy for underlying price
@@ -848,7 +847,7 @@ def _get_position_beta(ticker: str) -> float:
         Beta value, or 1.0 if beta cannot be retrieved
     """
     try:
-        return default_stock_service.load_market_data(ticker).beta or 1.0
+        return market_data_provider.get_beta(ticker) or 1.0
     except Exception as e:
         logger.warning(f"Could not calculate beta for {ticker}: {e}")
         return 1.0  # Use beta of 1.0 as fallback
@@ -960,8 +959,8 @@ def get_portfolio_exposures(portfolio: Portfolio) -> dict:
     # Process stock positions
     for position in portfolio.stock_positions:
         # Skip cash-like positions (e.g., money market funds)
-        if default_stock_service.is_cash_like(
-            position.ticker, getattr(position, "description", "")
+        if is_cash_or_short_term(
+            position.ticker, description=getattr(position, "description", "")
         ):
             logger.debug(
                 f"Skipping cash-like position {position.ticker} in exposure calculation"
@@ -973,7 +972,7 @@ def get_portfolio_exposures(portfolio: Portfolio) -> dict:
 
         # Get beta for exposure calculation
         try:
-            beta = default_stock_service.load_market_data(position.ticker).beta or 1.0
+            beta = market_data_provider.get_beta(position.ticker) or 1.0
         except Exception as e:
             logger.warning(f"Could not calculate beta for {position.ticker}: {e}")
             beta = 1.0  # Use beta of 1.0 as fallback
@@ -992,9 +991,8 @@ def get_portfolio_exposures(portfolio: Portfolio) -> dict:
     for position in portfolio.option_positions:
         # Get underlying price and beta
         try:
-            stock_data = default_stock_service.load_market_data(position.ticker)
-            underlying_price = stock_data.price
-            beta = stock_data.beta or 1.0
+            underlying_price = market_data_provider.get_price(position.ticker)
+            beta = market_data_provider.get_beta(position.ticker) or 1.0
         except Exception as e:
             logger.warning(f"Could not get market data for {position.ticker}: {e}")
             # Fallback to using strike as proxy for underlying price

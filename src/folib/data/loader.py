@@ -25,7 +25,8 @@ from typing import Any
 
 import pandas as pd
 
-from ..data.stock import stockdata
+from src.folio.cash_detection import is_cash_or_short_term
+
 from ..domain import PortfolioHolding
 
 # Set up logging
@@ -89,7 +90,7 @@ def load_portfolio_from_csv(file_path: str) -> pd.DataFrame:
     This function reads the portfolio CSV file and returns it as a pandas DataFrame.
     It handles basic file I/O errors and ensures the CSV has the expected format.
 
-    The expected CSV format is based on portfolio-private.csv with columns:
+    The expected CSV format is based on portfolio-default.csv with columns:
     Symbol, Description, Quantity, Last Price, Current Value, Cost Basis Total, etc.
 
     Args:
@@ -241,7 +242,7 @@ def parse_portfolio_holdings(df: pd.DataFrame) -> list[PortfolioHolding]:
                 value = 0.0
 
             # Special handling for cash-like positions
-            is_cash_like = stockdata.is_cash_like(symbol, description)
+            is_cash_like = is_cash_or_short_term(symbol, description=description)
 
             # For cash-like positions, ensure we have valid quantity and price
             if is_cash_like:

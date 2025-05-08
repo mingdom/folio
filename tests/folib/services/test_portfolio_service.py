@@ -69,21 +69,16 @@ def sample_portfolio():
 class TestCreatePortfolioSummary:
     """Tests for the create_portfolio_summary function."""
 
-    @patch("src.folib.services.portfolio_service.default_stock_service")
+    @patch("src.folib.services.portfolio_service.market_data_provider")
     @patch("src.folib.services.portfolio_service.calculate_option_delta")
     def test_create_portfolio_summary_with_stock_and_option(
-        self, mock_calculate_delta, mock_stock_service, sample_portfolio
+        self, mock_calculate_delta, mock_market_data, sample_portfolio
     ):
         """Test creating a portfolio summary with stock and option positions."""
         # Arrange
-        # Create a mock StockData object
-        mock_stock_data = MagicMock()
-        mock_stock_data.price = 150.0
-        mock_stock_data.beta = 1.2
-
-        # Configure the mock service
-        mock_stock_service.load_market_data.return_value = mock_stock_data
-        mock_stock_service.is_cash_like.return_value = False
+        # Configure the mock market data provider
+        mock_market_data.get_price.return_value = 150.0
+        mock_market_data.get_beta.return_value = 1.2
         mock_calculate_delta.return_value = 0.6
 
         # Act
@@ -103,7 +98,8 @@ class TestCreatePortfolioSummary:
         assert summary.beta_adjusted_exposure != 0
 
         # Verify the exposure calculations were called correctly
-        mock_stock_service.load_market_data.assert_called_with("AAPL")
+        mock_market_data.get_price.assert_called_with("AAPL")
+        mock_market_data.get_beta.assert_called_with("AAPL")
         # The function is called at least once for option exposure calculation
         assert mock_calculate_delta.call_count >= 1
 
@@ -111,20 +107,16 @@ class TestCreatePortfolioSummary:
 class TestGetPortfolioExposures:
     """Tests for the get_portfolio_exposures function."""
 
-    @patch("src.folib.services.portfolio_service.default_stock_service")
+    @patch("src.folib.services.portfolio_service.market_data_provider")
     @patch("src.folib.services.portfolio_service.calculate_option_delta")
     def test_get_portfolio_exposures(
-        self, mock_calculate_delta, mock_stock_service, sample_portfolio
+        self, mock_calculate_delta, mock_market_data, sample_portfolio
     ):
         """Test calculating portfolio exposures."""
         # Arrange
-        # Create a mock StockData object
-        mock_stock_data = MagicMock()
-        mock_stock_data.price = 150.0
-        mock_stock_data.beta = 1.2
-
-        # Configure the mock service
-        mock_stock_service.load_market_data.return_value = mock_stock_data
+        # Configure the mock market data provider
+        mock_market_data.get_price.return_value = 150.0
+        mock_market_data.get_beta.return_value = 1.2
         mock_calculate_delta.return_value = 0.6
 
         # Act
@@ -138,19 +130,19 @@ class TestGetPortfolioExposures:
         assert "beta_adjusted_exposure" in exposures
 
         # Verify the exposure calculations were called correctly
-        mock_stock_service.load_market_data.assert_called_with("AAPL")
+        mock_market_data.get_price.assert_called_with("AAPL")
+        mock_market_data.get_beta.assert_called_with("AAPL")
         mock_calculate_delta.assert_called_once()
 
 
 class TestProcessPortfolio:
     """Tests for the process_portfolio function."""
 
-    @patch("src.folib.services.portfolio_service.default_stock_service")
-    def test_process_portfolio_with_stock_and_option(self, mock_stock_service):
+    @patch("src.folib.services.portfolio_service.is_cash_or_short_term")
+    def test_process_portfolio_with_stock_and_option(self, mock_is_cash_or_short_term):
         """Test processing portfolio holdings into a structured portfolio."""
         # Arrange
-        mock_stock_service.is_valid_stock_symbol.return_value = True
-        mock_stock_service.is_cash_like.return_value = False
+        mock_is_cash_or_short_term.return_value = False
 
         holdings = [
             PortfolioHolding(
