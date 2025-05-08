@@ -147,3 +147,8 @@ exclude = [
 
 [tool.ruff.lint.isort]
 known-first-party = ["src"]
+
+[tool.pytest.ini_options]
+markers = [
+    "critical: marks tests that verify critical functionality",
+]
