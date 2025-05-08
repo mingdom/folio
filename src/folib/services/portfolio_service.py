@@ -224,6 +224,12 @@ def _parse_option_position(holding: PortfolioHolding) -> OptionPosition | None:
     """
     try:
         description = holding.description
+        symbol = holding.symbol.strip()  # Strip leading/trailing whitespace
+
+        # Add debug logging to understand the issue
+        logger.debug(
+            f"Parsing option position with symbol: '{symbol}' and description: '{description}'"
+        )
 
         # Try to extract data from the description (e.g., "AMZN MAY 16 2025 $190 CALL")
         match = re.search(
@@ -271,14 +277,19 @@ def _parse_option_position(holding: PortfolioHolding) -> OptionPosition | None:
                 price=holding.price,
                 cost_basis=holding.cost_basis_total,
             )
+            logger.debug(
+                f"Successfully parsed option position for {ticker} {option_type} {strike}"
+            )
             return option_position
         else:
             logger.warning(
-                f"Could not parse option data from description: {description}"
+                f"Could not parse option data from description: '{description}' (symbol: '{symbol}')"
             )
             return None
     except Exception as e:
-        logger.warning(f"Error parsing option position: {e}")
+        logger.warning(
+            f"Error parsing option position for symbol '{holding.symbol}': {e}"
+        )
         return None
 
 
@@ -371,6 +382,48 @@ def _synchronize_option_underlying_prices(positions: list[Position]) -> list[Pos
         )
 
     return updated_positions
+
+
+def _update_unpaired_options_in_portfolio(positions: list[Position]) -> list[Position]:
+    """
+    Update prices for unpaired options in the portfolio.
+
+    This function:
+    1. Identifies options without matching stock positions
+    2. Updates their prices from market data
+    3. Returns a new positions list with updated unpaired options
+
+    Args:
+        positions: List of all positions
+
+    Returns:
+        Updated list of positions with new prices for unpaired options
+    """
+    # Identify options that don't have matching stock positions
+    unpaired_options = _identify_unpaired_options(positions)
+
+    if not unpaired_options:
+        logger.info(
+            "No unpaired options found - using raw CSV prices for all positions"
+        )
+        return positions
+
+    logger.info(f"Found {len(unpaired_options)} unpaired options to update")
+    updated_options = _update_unpaired_option_prices(unpaired_options)
+
+    # Keep track of which options are unpaired by ticker
+    unpaired_tickers = {option.ticker for option in unpaired_options}
+
+    # Remove only the unpaired options, keeping the paired ones
+    filtered_positions = [
+        pos
+        for pos in positions
+        if not (isinstance(pos, OptionPosition) and pos.ticker in unpaired_tickers)
+    ]
+
+    # Add back the updated unpaired options
+    filtered_positions.extend(updated_options)
+    return filtered_positions
 
 
 def _update_unpaired_option_prices(
@@ -557,25 +610,14 @@ def process_portfolio(
     # Synchronize option underlying prices with paired stocks
     _synchronize_option_underlying_prices(positions)
 
-    # Handle price updates based on the update_prices flag
+    # By default, update only unpaired options
+    logger.info("Using raw CSV prices first, updating only unpaired option prices")
+    positions = _update_unpaired_options_in_portfolio(positions)
+
+    # If update_prices flag is set, update all positions
     if update_prices:
         logger.info("Updating prices for all positions from market data")
         positions = _update_all_prices(positions)
-    else:
-        logger.info("Using raw CSV prices first, updating only unpaired option prices")
-        # Only update prices for unpaired options
-        unpaired_options = _identify_unpaired_options(positions)
-        if unpaired_options:
-            logger.info(f"Found {len(unpaired_options)} unpaired options to update")
-            updated_options = _update_unpaired_option_prices(unpaired_options)
-            positions = [
-                pos for pos in positions if not isinstance(pos, OptionPosition)
-            ]
-            positions.extend(updated_options)
-        else:
-            logger.info(
-                "No unpaired options found - using raw CSV prices for all positions"
-            )
 
     # Create the portfolio
     portfolio = Portfolio(
