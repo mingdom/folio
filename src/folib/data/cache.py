@@ -8,6 +8,7 @@ It supports persistent caching with configurable TTLs and fallback to expired ca
 import functools
 import logging
 import os
+import shutil
 import time
 from collections.abc import Callable
 from typing import Any, TypeVar, cast
@@ -62,6 +63,17 @@ def cached(
 
         @functools.wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> R:
+            # Check if skip_cache is in kwargs and is True
+            skip_cache = kwargs.pop("skip_cache", False)
+            if skip_cache:
+                # Get the relevant argument for logging (skip self if it's a method)
+                arg_str = _get_log_arg_str(args)
+                logger.debug(
+                    f"Skipping cache for {func_name}{arg_str} (--no-cache flag)"
+                )
+                _cache_stats[func_name]["misses"] += 1
+                return func(*args, **kwargs)
+
             # Get cache directory
             cache_directory = cache_dir or get_cache_dir()
             os.makedirs(cache_directory, exist_ok=True)
@@ -183,8 +195,14 @@ def get_cache_stats() -> dict[str, dict[str, int]]:
     return _cache_stats
 
 
-def log_cache_stats() -> None:
-    """Log cache statistics at INFO level."""
+def log_cache_stats(aggregate: bool = True) -> None:
+    """
+    Log cache statistics at INFO level.
+
+    Args:
+        aggregate: If True, log all statistics in a single message.
+                  If False, log overall statistics and detailed statistics separately.
+    """
     # Calculate overall statistics
     total_hits = sum(stats["hits"] for stats in _cache_stats.values())
     total_misses = sum(stats["misses"] for stats in _cache_stats.values())
@@ -192,28 +210,81 @@ def log_cache_stats() -> None:
     total_requests = total_hits + total_misses
     overall_hit_rate = (total_hits / total_requests) * 100 if total_requests > 0 else 0
 
-    # Log overall statistics
-    logger.info(
-        f"Cache overall hit rate: {overall_hit_rate:.1f}% "
-        f"(hits: {total_hits}, misses: {total_misses}, fallbacks: {total_fallbacks}, "
-        f"total requests: {total_requests})"
-    )
+    if aggregate:
+        # Build a single aggregated message with all statistics
+        message_parts = [
+            f"Cache hit rate: {overall_hit_rate:.1f}% (hits: {total_hits}, misses: {total_misses}, fallbacks: {total_fallbacks})"
+        ]
 
-    # Log detailed statistics for each function
-    for func_name, stats in _cache_stats.items():
-        total = stats["hits"] + stats["misses"]
-        hit_rate = (stats["hits"] / total) * 100 if total > 0 else 0
+        # Add per-function statistics
+        for func_name, stats in _cache_stats.items():
+            total = stats["hits"] + stats["misses"]
+            if total > 0:  # Only include functions with activity
+                hit_rate = (stats["hits"] / total) * 100 if total > 0 else 0
+                func_display = func_name.replace("_", " ").strip()
+                message_parts.append(
+                    f"  {func_display}: {hit_rate:.1f}% (hits: {stats['hits']}, misses: {stats['misses']})"
+                )
+
+        # Log the aggregated message
+        logger.info("\n".join(message_parts))
+    else:
+        # Log overall statistics
         logger.info(
-            f"Cache stats for {func_name}: "
-            f"hit rate: {hit_rate:.1f}% "
-            f"(hits: {stats['hits']}, misses: {stats['misses']}, fallbacks: {stats['fallbacks']})"
+            f"Cache overall hit rate: {overall_hit_rate:.1f}% "
+            f"(hits: {total_hits}, misses: {total_misses}, fallbacks: {total_fallbacks}, "
+            f"total requests: {total_requests})"
         )
 
+        # Log detailed statistics for each function
+        for func_name, stats in _cache_stats.items():
+            total = stats["hits"] + stats["misses"]
+            hit_rate = (stats["hits"] / total) * 100 if total > 0 else 0
+            logger.info(
+                f"Cache stats for {func_name}: "
+                f"hit rate: {hit_rate:.1f}% "
+                f"(hits: {stats['hits']}, misses: {stats['misses']}, fallbacks: {stats['fallbacks']})"
+            )
 
-def clear_cache(cache_dir: str | None = None) -> None:
-    """Clear the entire cache."""
+
+def clear_cache(cache_dir: str | None = None, backup: bool = False) -> None:
+    """
+    Clear the entire cache.
+
+    Args:
+        cache_dir: Directory containing the cache. If None, uses the default cache directory.
+        backup: If True, backs up the cache to a backup directory before clearing it.
+    """
     cache_directory = cache_dir or get_cache_dir()
+
     if os.path.exists(cache_directory):
+        if backup:
+            # Create backup directory
+            backup_dir = os.path.join(cache_directory, "backup")
+            backup_timestamp = time.strftime("%Y%m%d_%H%M%S")
+            backup_path = os.path.join(backup_dir, f"cache_backup_{backup_timestamp}")
+
+            # Ensure backup directory exists
+            os.makedirs(backup_dir, exist_ok=True)
+
+            # Copy cache files to backup directory
+            try:
+                # Copy all files except the backup directory itself
+                for item in os.listdir(cache_directory):
+                    if item != "backup":
+                        src_path = os.path.join(cache_directory, item)
+                        dst_path = os.path.join(backup_path, item)
+                        if os.path.isdir(src_path):
+                            shutil.copytree(src_path, dst_path)
+                        else:
+                            # Ensure parent directory exists
+                            os.makedirs(os.path.dirname(dst_path), exist_ok=True)
+                            shutil.copy2(src_path, dst_path)
+                logger.info(f"Cache backed up to {backup_path}")
+            except Exception as e:
+                logger.warning(f"Failed to backup cache: {e}")
+
+        # Clear the cache
         with Cache(cache_directory) as cache:
             cache.clear()
         logger.info(f"Cache cleared from {cache_directory}")

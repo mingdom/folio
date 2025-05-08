@@ -21,6 +21,7 @@ from rich.console import Console
 from src.folib.logger import logger
 
 from . import __version__
+from .commands.cache import cache_app
 from .commands.portfolio import portfolio_app
 from .commands.position import position_app
 from .shell import start_interactive_shell
@@ -33,6 +34,7 @@ app = typer.Typer(
 )
 
 # Add subcommands
+app.add_typer(cache_app, name="cache")
 app.add_typer(portfolio_app, name="portfolio")
 app.add_typer(position_app, name="position")
 

@@ -44,13 +44,15 @@ def resolve_portfolio_path(file_path: str | None = None) -> Path:
 
 
 def load_portfolio(
-    file_path: str | None = None, update_prices: bool = False
+    file_path: str | None = None, update_prices: bool = False, no_cache: bool = False
 ) -> dict[str, Any]:
     """
     Load a portfolio from a CSV file.
 
     Args:
         file_path: Path to the portfolio file, or None to use the default
+        update_prices: Whether to update all prices from market data
+        no_cache: Whether to clear the cache before loading (forces fresh data)
 
     Returns:
         Dictionary containing:
@@ -77,6 +79,15 @@ def load_portfolio(
 
     # Process the portfolio
     console.print("Processing portfolio...")
+
+    # Handle cache clearing if requested
+    if no_cache:
+        from src.folib.data.market_data import MarketDataProvider
+
+        console.print("[yellow]Clearing cache to force fresh data...[/yellow]")
+        market_data = MarketDataProvider()
+        market_data.clear_all_cache(backup=True)
+
     if update_prices:
         console.print(
             "[yellow]Updating all prices from market data (this may use significant API quota)[/yellow]"

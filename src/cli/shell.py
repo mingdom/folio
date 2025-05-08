@@ -14,6 +14,7 @@ from prompt_toolkit.completion import WordCompleter
 from prompt_toolkit.history import FileHistory
 from rich.console import Console
 
+from .commands.cache import cache_clear, cache_status
 from .commands.portfolio import portfolio_list, portfolio_load, portfolio_summary
 from .commands.position import position_details, position_risk
 from .state import State
@@ -26,6 +27,10 @@ state = State()
 
 # Define commands available in the interactive shell
 COMMANDS = {
+    "cache": {
+        "clear": cache_clear,
+        "status": cache_status,
+    },
     "portfolio": {
         "load": portfolio_load,
         "summary": portfolio_summary,
@@ -83,8 +88,22 @@ def process_command(command: str) -> bool:
         show_help(parts[1] if len(parts) > 1 else None)
         return True
 
+    # Handle cache commands
+    if cmd == "cache":
+        if len(parts) > 1 and parts[1] in COMMANDS["cache"]:
+            # Call the appropriate command function
+            subcmd = parts[1]
+            args = parts[2:]
+            try:
+                COMMANDS["cache"][subcmd](state=state, args=args)
+            except Exception as e:
+                console.print(f"[red]Error:[/red] {e!s}")
+        else:
+            # Show help for the command
+            show_help("cache")
+
     # Handle portfolio commands
-    if cmd == "portfolio":
+    elif cmd == "portfolio":
         if len(parts) > 1 and parts[1] in COMMANDS["portfolio"]:
             # Call the appropriate command function
             subcmd = parts[1]
@@ -133,6 +152,12 @@ def show_help(command: str | None = None):
     if command is None:
         console.print("[bold]Available commands:[/bold]")
         console.print(
+            "  cache clear [--no-backup]   - Clear the data cache to force fresh data fetching"
+        )
+        console.print(
+            "  cache status                - Show cache statistics and status"
+        )
+        console.print(
             "  portfolio load <FILE_PATH>  - Load portfolio data from a CSV file"
         )
         console.print(
@@ -149,6 +174,14 @@ def show_help(command: str | None = None):
         )
         console.print("  help [COMMAND]              - Display help information")
         console.print("  exit                        - Exit the interactive shell")
+    elif command == "cache":
+        console.print("[bold]Cache commands:[/bold]")
+        console.print(
+            "  cache clear [--no-backup]   - Clear the data cache to force fresh data fetching"
+        )
+        console.print(
+            "  cache status                - Show cache statistics and status"
+        )
     elif command == "portfolio":
         console.print("[bold]Portfolio commands:[/bold]")
         console.print(

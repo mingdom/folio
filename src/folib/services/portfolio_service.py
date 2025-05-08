@@ -375,12 +375,14 @@ def _synchronize_option_underlying_prices(positions: list[Position]) -> list[Pos
 
 def _update_unpaired_option_prices(
     unpaired_options: list[OptionPosition],
+    no_cache: bool = False,
 ) -> list[OptionPosition]:
     """
     Update underlying prices for unpaired options from market data.
 
     Args:
         unpaired_options: List of unpaired option positions
+        no_cache: Whether to bypass the cache when fetching market data
 
     Returns:
         List of updated option positions with new underlying prices
@@ -422,12 +424,15 @@ def _update_unpaired_option_prices(
     return updated_options
 
 
-def _update_all_prices(positions: list[Position]) -> list[Position]:
+def _update_all_prices(
+    positions: list[Position], no_cache: bool = False
+) -> list[Position]:
     """
     Update prices for all positions from market data.
 
     Args:
         positions: List of all positions
+        no_cache: Whether to bypass the cache when fetching market data
 
     Returns:
         List of updated positions with new prices
@@ -442,7 +447,9 @@ def _update_all_prices(positions: list[Position]) -> list[Position]:
     for position in positions:
         try:
             if isinstance(position, StockPosition):
-                current_price = market_data_provider.get_price(position.ticker)
+                current_price = market_data_provider.get_price(
+                    position.ticker, skip_cache=no_cache
+                )
                 if current_price is not None and current_price > 0:
                     updated_position = StockPosition(
                         ticker=position.ticker,
@@ -459,7 +466,9 @@ def _update_all_prices(positions: list[Position]) -> list[Position]:
                     updated_positions.append(position)
             elif isinstance(position, OptionPosition):
                 # Use the option's ticker as the underlying symbol
-                underlying_price = market_data_provider.get_price(position.ticker)
+                underlying_price = market_data_provider.get_price(
+                    position.ticker, skip_cache=no_cache
+                )
                 if underlying_price is not None and underlying_price > 0:
                     # Create a new option position with the correct parameters
                     updated_position = OptionPosition(
@@ -501,6 +510,10 @@ def process_portfolio(
     # Default is False to minimize API calls
     # When False, uses raw CSV prices first and only updates prices for unpaired options
     update_prices: bool = False,
+    # Controls whether to bypass the cache when fetching market data
+    # Default is False to use the cache
+    # When True, always fetches fresh data from the API
+    no_cache: bool = False,
 ) -> Portfolio:
     """
     Process raw portfolio holdings into a structured portfolio.
@@ -525,6 +538,8 @@ def process_portfolio(
         update_prices: Whether to update prices from market data (default: False)
                       When False, only updates prices for unpaired options
                       to ensure accurate exposure calculations.
+        no_cache: Whether to bypass the cache when fetching market data (default: False)
+                 When True, always fetches fresh data from the API.
 
     Returns:
         Portfolio: Structured portfolio with categorized positions and groups

@@ -11,8 +11,7 @@ from typing import Any
 
 import fmpsdk
 
-from src.folib.data.cache import cached, log_cache_stats
-from src.folib.data.cache import clear_cache as clear_disk_cache
+from src.folib.data.cache import cached, clear_cache, log_cache_stats
 
 logger = logging.getLogger(__name__)
 
@@ -53,11 +52,14 @@ class MarketDataProvider:
         return f"MarketDataProvider(api_key='{self.api_key[:4]}...')"
 
     @cached(ttl=PROFILE_TTL, key_prefix="profile")
-    def _fetch_profile(self, ticker: str) -> dict[str, Any] | None:
+    def _fetch_profile(
+        self, ticker: str, skip_cache: bool = False
+    ) -> dict[str, Any] | None:
         """Fetch company profile data for a ticker.
 
         Args:
             ticker: Stock ticker symbol.
+            skip_cache: If True, bypass the cache and fetch fresh data.
 
         Returns:
             Company profile data dictionary or None if not found or error occurred.
@@ -91,22 +93,24 @@ class MarketDataProvider:
         return self._session_cache[ticker_upper].get("profile")
 
     @cached(ttl=PRICE_TTL, key_prefix="price")
-    def get_price(self, ticker: str) -> float | None:
+    def get_price(self, ticker: str, skip_cache: bool = False) -> float | None:
         """Get the current price for a stock ticker.
 
         Args:
             ticker: Stock ticker symbol.
+            skip_cache: If True, bypass the cache and fetch fresh data.
 
         Returns:
             Current stock price as float or None if not available.
         """
         ticker_upper = ticker.upper()
         if (
-            ticker_upper in self._session_cache
+            not skip_cache
+            and ticker_upper in self._session_cache
             and self._session_cache[ticker_upper].get("price") is not None
         ):
             return self._session_cache[ticker_upper]["price"]
-        profile = self._fetch_profile(ticker)
+        profile = self._fetch_profile(ticker, skip_cache=skip_cache)
         price = profile.get("price") if profile else None
         if price is not None:
             try:
@@ -117,22 +121,24 @@ class MarketDataProvider:
         return None
 
     @cached(ttl=BETA_TTL, key_prefix="beta")
-    def get_beta(self, ticker: str) -> float | None:
+    def get_beta(self, ticker: str, skip_cache: bool = False) -> float | None:
         """Get the beta value for a stock ticker.
 
         Args:
             ticker: Stock ticker symbol.
+            skip_cache: If True, bypass the cache and fetch fresh data.
 
         Returns:
             Beta value as float or None if not available.
         """
         ticker_upper = ticker.upper()
         if (
-            ticker_upper in self._session_cache
+            not skip_cache
+            and ticker_upper in self._session_cache
             and self._session_cache[ticker_upper].get("beta") is not None
         ):
             return self._session_cache[ticker_upper]["beta"]
-        profile = self._fetch_profile(ticker)
+        profile = self._fetch_profile(ticker, skip_cache=skip_cache)
         beta = profile.get("beta") if profile else None
         if beta is not None:
             try:
@@ -147,15 +153,43 @@ class MarketDataProvider:
         self._session_cache.clear()
         logger.info("In-session market data cache cleared.")
 
-    def clear_all_cache(self) -> None:
-        """Clear both in-session and disk cache."""
+    def clear_all_cache(self, backup: bool = False) -> None:
+        """
+        Clear both in-session and disk cache.
+
+        Args:
+            backup: If True, backs up the cache before clearing it.
+        """
         self.clear_session_cache()
-        clear_disk_cache()
+        clear_cache(backup=backup)
         logger.info("All caches cleared (in-session and disk).")
 
-    def log_cache_statistics(self) -> None:
-        """Log cache hit/miss statistics."""
-        log_cache_stats()
+    def log_cache_statistics(self, aggregate: bool = True) -> None:
+        """
+        Log cache hit/miss statistics.
+
+        Args:
+            aggregate: If True, log all statistics in a single message.
+                      If False, log overall statistics and detailed statistics separately.
+        """
+        log_cache_stats(aggregate=aggregate)
+
+    def get_data_with_cache_option(
+        self, ticker: str, skip_cache: bool = False
+    ) -> tuple[float | None, float | None]:
+        """
+        Get price and beta data for a ticker with option to skip cache.
+
+        Args:
+            ticker: Stock ticker symbol
+            skip_cache: If True, bypass the cache and fetch fresh data
+
+        Returns:
+            Tuple of (price, beta)
+        """
+        price = self.get_price(ticker, skip_cache=skip_cache)
+        beta = self.get_beta(ticker, skip_cache=skip_cache)
+        return price, beta
 
 
 # Default instance (requires FMP_API_KEY env var)

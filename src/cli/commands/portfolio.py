@@ -34,11 +34,14 @@ console = Console()
 @portfolio_app.command("load")
 def portfolio_load_cmd(
     file_path: str = typer.Argument(..., help="Path to the portfolio CSV file"),
+    no_cache: bool = typer.Option(
+        False, "--no-cache", help="Clear cache before loading (forces fresh data)"
+    ),
 ):
     """Load portfolio data from a CSV file."""
     try:
         # Load the portfolio
-        load_portfolio(file_path, update_prices=False)
+        load_portfolio(file_path, update_prices=False, no_cache=no_cache)
 
         # Print success message with prominent portfolio path
         console.print("[green]Successfully loaded portfolio[/green]")
@@ -54,11 +57,14 @@ def portfolio_summary_cmd(
     file_path: str | None = typer.Option(
         None, "--file", "-f", help="Path to the portfolio CSV file"
     ),
+    no_cache: bool = typer.Option(
+        False, "--no-cache", help="Clear cache before loading (forces fresh data)"
+    ),
 ):
     """Display high-level portfolio metrics."""
     try:
         # Load the portfolio
-        result = load_portfolio(file_path)
+        result = load_portfolio(file_path, no_cache=no_cache)
         portfolio = result["portfolio"]
 
         # Create portfolio summary
@@ -103,6 +109,9 @@ def portfolio_list_cmd(
         None, "--file", "-f", help="Path to the portfolio CSV file"
     ),
     filter_args: list[str] = filter_args_arg,
+    no_cache: bool = typer.Option(
+        False, "--no-cache", help="Clear cache before loading (forces fresh data)"
+    ),
 ):
     """
     List positions with filtering and sorting.
@@ -115,7 +124,7 @@ def portfolio_list_cmd(
     """
     try:
         # Load the portfolio
-        result = load_portfolio(file_path)
+        result = load_portfolio(file_path, no_cache=no_cache)
         portfolio = result["portfolio"]
 
         # Get all positions
@@ -180,14 +189,16 @@ def portfolio_load(state, args):
     """Load portfolio data from a CSV file (interactive mode)."""
     if not args:
         console.print("[red]Error:[/red] Missing file path")
-        console.print("Usage: portfolio load <FILE_PATH>")
+        console.print("Usage: portfolio load <FILE_PATH> [--no-cache]")
         return
 
+    # Parse arguments
     file_path = args[0]
+    no_cache = "--no-cache" in args
 
     try:
         # Load the portfolio
-        result = load_portfolio(file_path)
+        result = load_portfolio(file_path, no_cache=no_cache)
 
         # Update state
         state.loaded_portfolio_path = Path(file_path)
