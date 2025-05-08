@@ -9,4 +9,4 @@ A good plan should also have the following sections:
 - Assumptions: What assumptions are we making with this plan?
 - Open questions or blocking issues: What questions or issues must we resolve before we can have a solid plan to implement?
 
-Once you covered your basis. Write the full plan in `.refs/planning-markdown-docs`.
+Finally, write the full plan in `docs/plans`.

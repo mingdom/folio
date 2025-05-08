@@ -48,6 +48,7 @@ from ..calculations.exposure import (
 )
 from ..calculations.options import calculate_option_delta, categorize_option_by_delta
 from ..data.loader import clean_currency_value
+from ..data.market_data import market_data_provider
 from ..data.stock_data import default_stock_service
 from ..domain import (
     CashPosition,
@@ -64,44 +65,25 @@ from ..domain import (
 logger = logging.getLogger(__name__)
 
 
-def process_portfolio(
+def _categorize_holdings(
     holdings: list[PortfolioHolding],
-    # update_prices parameter is reserved for future implementation
-    # where we'll update prices from market data
-    update_prices: bool = True,  # noqa: ARG001
-) -> Portfolio:
+) -> tuple[list[PortfolioHolding], list[CashPosition], list[UnknownPosition], float]:
     """
-    Process raw portfolio holdings into a structured portfolio.
-
-    Processing Steps:
-    1. Identify cash-like positions (SPAXX, FMPXX, etc.)
-    2. Identify unknown/invalid positions
-    3. Process pending activity entries
-       - Handles multiple CSV formats
-       - Checks various columns for pending activity value
-       - Validates only one pending activity entry exists
-    4. Group related positions (stocks with their options)
-    5. Create portfolio object with all positions
-
-    CSV Structure Handling:
-    - Supports varying column structures in input CSVs
-    - Handles pending activity values in different columns
-    - Processes cash positions with special symbols
+    Categorize holdings into different types and extract pending activity.
 
     Args:
-        holdings: List of portfolio holdings from parse_portfolio_holdings()
-        update_prices: Whether to update prices from market data (default: True)
-                      Reserved for future implementation.
+        holdings: List of portfolio holdings
 
     Returns:
-        Portfolio: Structured portfolio with categorized positions and groups
+        Tuple containing:
+        - non_cash_holdings: List of stock and option holdings
+        - cash_positions: List of cash positions
+        - unknown_positions: List of unknown positions
+        - pending_activity_value: Value of pending activity
 
     Raises:
         ValueError: If multiple pending activity entries are found
     """
-    logger.debug("Processing portfolio with %d holdings", len(holdings))
-
-    # Separate different types of holdings
     non_cash_holdings = []
     cash_positions = []
     unknown_positions = []
@@ -124,7 +106,6 @@ def process_portfolio(
 
         # Check for cash-like positions
         if default_stock_service.is_cash_like(holding.symbol, holding.description):
-            # Convert to CashPosition for cash-like holdings
             cash_position = CashPosition(
                 ticker=holding.symbol,
                 quantity=holding.quantity,
@@ -133,23 +114,16 @@ def process_portfolio(
             )
             cash_positions.append(cash_position)
             logger.debug(f"Identified cash-like position: {holding.symbol}")
-        # Check for option positions - look for option-related terms in description
-        elif (
-            "CALL" in holding.description.upper()
-            or "PUT" in holding.description.upper()
-            or holding.symbol.strip().startswith(
-                "-"
-            )  # Fidelity option symbols start with hyphen
+        # Check for option positions or stock positions
+        elif _is_option_holding(holding) or default_stock_service.is_valid_stock_symbol(
+            holding.symbol
         ):
-            # Options will be processed later
             non_cash_holdings.append(holding)
-            logger.debug(f"Identified option position: {holding.symbol}")
-        elif default_stock_service.is_valid_stock_symbol(holding.symbol):
-            logger.debug(f"Identified stock position: {holding.symbol}")
-            non_cash_holdings.append(holding)
-        # Check for unknown/invalid positions
+            logger.debug(
+                f"Identified {'option' if _is_option_holding(holding) else 'stock'} position: {holding.symbol}"
+            )
+        # Unknown/invalid positions
         else:
-            # Convert to UnknownPosition
             unknown_position = UnknownPosition(
                 ticker=holding.symbol,
                 quantity=holding.quantity,
@@ -160,99 +134,449 @@ def process_portfolio(
             unknown_positions.append(unknown_position)
             logger.debug(f"Identified unknown position: {holding.symbol}")
 
-    # Process non-cash, non-unknown holdings directly
-    positions = []
+    return non_cash_holdings, cash_positions, unknown_positions, pending_activity_value
 
-    # Process stock positions
+
+def _is_option_holding(holding: PortfolioHolding) -> bool:
+    """
+    Check if a holding represents an option position.
+
+    Args:
+        holding: Portfolio holding to check
+
+    Returns:
+        True if the holding is an option, False otherwise
+    """
+    return (
+        "CALL" in holding.description.upper()
+        or "PUT" in holding.description.upper()
+        or holding.symbol.strip().startswith(
+            "-"
+        )  # Fidelity option symbols start with hyphen
+    )
+
+
+def _create_stock_positions(
+    non_cash_holdings: list[PortfolioHolding],
+) -> list[StockPosition]:
+    """
+    Create stock positions from non-cash holdings.
+
+    Args:
+        non_cash_holdings: List of non-cash holdings
+
+    Returns:
+        List of stock positions
+    """
+    stock_positions = []
+
     for holding in non_cash_holdings:
-        # Check if this is a stock (not an option)
-        if (
-            "CALL" not in holding.description.upper()
-            and "PUT" not in holding.description.upper()
-            and not holding.symbol.strip().startswith("-")
-        ):
-            # Create stock position
+        if not _is_option_holding(holding):
             stock_position = StockPosition(
                 ticker=holding.symbol,
                 quantity=holding.quantity,
                 price=holding.price,
                 cost_basis=holding.cost_basis_total,
             )
-            positions.append(stock_position)
+            stock_positions.append(stock_position)
             logger.debug(f"Created stock position for {holding.symbol}")
 
-    # Process option positions
+    return stock_positions
+
+
+def _create_option_positions(
+    non_cash_holdings: list[PortfolioHolding],
+) -> list[OptionPosition]:
+    """
+    Create option positions from non-cash holdings.
+
+    Args:
+        non_cash_holdings: List of non-cash holdings
+
+    Returns:
+        List of option positions
+    """
+    option_positions = []
+
     for holding in non_cash_holdings:
-        # Check if this is an option
-        if (
-            "CALL" in holding.description.upper()
-            or "PUT" in holding.description.upper()
-            or holding.symbol.strip().startswith("-")
-        ):
+        if _is_option_holding(holding):
             try:
-                # Extract option data from description
-                description = holding.description
-
-                # Try to extract data from the description (e.g., "AMZN MAY 16 2025 $190 CALL")
-                match = re.search(
-                    r"([A-Z]+)\s+(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\s+(\d{1,2})\s+(\d{4})\s+\$(\d+(?:\.\d+)?)\s+(CALL|PUT)",
-                    description,
-                    re.IGNORECASE,
-                )
-
-                if match:
-                    ticker = match.group(1)
-                    month_str = match.group(2).upper()
-                    day = int(match.group(3))
-                    year = int(match.group(4))
-                    strike = float(match.group(5))
-                    option_type = match.group(6).upper()
-                    quantity = holding.quantity
-
-                    # Convert month string to month number
-                    month_map = {
-                        "JAN": 1,
-                        "FEB": 2,
-                        "MAR": 3,
-                        "APR": 4,
-                        "MAY": 5,
-                        "JUN": 6,
-                        "JUL": 7,
-                        "AUG": 8,
-                        "SEP": 9,
-                        "OCT": 10,
-                        "NOV": 11,
-                        "DEC": 12,
-                    }
-                    month = month_map[month_str]
-
-                    # Create expiry date
-                    expiry = date(year, month, day)
-
-                    # Create option position
-                    option_position = OptionPosition(
-                        ticker=ticker,
-                        quantity=quantity,
-                        strike=strike,
-                        expiry=expiry,
-                        option_type=option_type,
-                        price=holding.price,
-                        cost_basis=holding.cost_basis_total,
-                    )
-                    positions.append(option_position)
+                option_position = _parse_option_position(holding)
+                if option_position:
+                    option_positions.append(option_position)
                     logger.debug(f"Created option position for {holding.symbol}")
-                else:
-                    logger.warning(
-                        f"Could not parse option data from description: {description}"
-                    )
             except Exception as e:
                 logger.warning(
                     f"Could not create option position for {holding.symbol}: {e}"
                 )
 
+    return option_positions
+
+
+def _parse_option_position(holding: PortfolioHolding) -> OptionPosition | None:
+    """
+    Parse option data from a holding description and create an OptionPosition.
+
+    Args:
+        holding: Portfolio holding with option data
+
+    Returns:
+        OptionPosition object or None if parsing fails
+    """
+    try:
+        description = holding.description
+
+        # Try to extract data from the description (e.g., "AMZN MAY 16 2025 $190 CALL")
+        match = re.search(
+            r"([A-Z]+)\s+(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\s+(\d{1,2})\s+(\d{4})\s+\$(\d+(?:\.\d+)?)\s+(CALL|PUT)",
+            description,
+            re.IGNORECASE,
+        )
+
+        if match:
+            ticker = match.group(1)
+            month_str = match.group(2).upper()
+            day = int(match.group(3))
+            year = int(match.group(4))
+            strike = float(match.group(5))
+            option_type = match.group(6).upper()
+            quantity = holding.quantity
+
+            # Convert month string to month number
+            month_map = {
+                "JAN": 1,
+                "FEB": 2,
+                "MAR": 3,
+                "APR": 4,
+                "MAY": 5,
+                "JUN": 6,
+                "JUL": 7,
+                "AUG": 8,
+                "SEP": 9,
+                "OCT": 10,
+                "NOV": 11,
+                "DEC": 12,
+            }
+            month = month_map[month_str]
+
+            # Create expiry date
+            expiry = date(year, month, day)
+
+            # Create option position
+            option_position = OptionPosition(
+                ticker=ticker,
+                quantity=quantity,
+                strike=strike,
+                expiry=expiry,
+                option_type=option_type,
+                price=holding.price,
+                cost_basis=holding.cost_basis_total,
+            )
+            return option_position
+        else:
+            logger.warning(
+                f"Could not parse option data from description: {description}"
+            )
+            return None
+    except Exception as e:
+        logger.warning(f"Error parsing option position: {e}")
+        return None
+
+
+def _identify_unpaired_options(positions: list[Position]) -> list[OptionPosition]:
+    """
+    Identify options that don't have a matching stock position.
+
+    Args:
+        positions: List of all positions
+
+    Returns:
+        List of unpaired option positions
+    """
+    # Create a set of all stock tickers
+    stock_tickers = {
+        position.ticker for position in positions if position.position_type == "stock"
+    }
+
+    # Find options without matching stock positions
+    unpaired_options = [
+        position
+        for position in positions
+        if position.position_type == "option" and position.ticker not in stock_tickers
+    ]
+
+    if unpaired_options:
+        logger.debug(f"Found {len(unpaired_options)} unpaired options")
+
+    return unpaired_options
+
+
+def _synchronize_option_underlying_prices(positions: list[Position]) -> list[Position]:
+    """
+    Ensure options use the same underlying price as their paired stocks.
+
+    For each option, if there's a matching stock position (same ticker),
+    create a new option position with the underlying_price set to match the stock's price.
+
+    Args:
+        positions: List of all positions
+
+    Returns:
+        Updated list of positions with synchronized underlying prices
+    """
+    # Create a dictionary of stock tickers to prices
+    stock_prices = {}
+    for position in positions:
+        if position.position_type == "stock":
+            stock_position = position  # type: StockPosition
+            stock_prices[stock_position.ticker] = stock_position.price
+
+    # Create a new list for the updated positions
+    updated_positions = []
+    paired_count = 0
+
+    # Process each position
+    for position in positions:
+        if position.position_type == "option":
+            option_position = position  # type: OptionPosition
+            if option_position.ticker in stock_prices:
+                # Create a new option position with the updated underlying price
+                updated_position = OptionPosition(
+                    ticker=option_position.ticker,
+                    quantity=option_position.quantity,
+                    price=option_position.price,
+                    strike=option_position.strike,
+                    expiry=option_position.expiry,
+                    option_type=option_position.option_type,
+                    cost_basis=option_position.cost_basis,
+                    raw_data=option_position.raw_data,
+                )
+                # Set the underlying price using the stock price
+                object.__setattr__(
+                    updated_position,
+                    "underlying_price",
+                    stock_prices[option_position.ticker],
+                )
+                updated_positions.append(updated_position)
+                paired_count += 1
+            else:
+                # Keep the original position
+                updated_positions.append(position)
+        else:
+            # Keep non-option positions as is
+            updated_positions.append(position)
+
+    if paired_count > 0:
+        logger.debug(
+            f"Synchronized underlying prices for {paired_count} paired options"
+        )
+
+    return updated_positions
+
+
+def _update_unpaired_option_prices(
+    unpaired_options: list[OptionPosition],
+) -> list[OptionPosition]:
+    """
+    Update underlying prices for unpaired options from market data.
+
+    Args:
+        unpaired_options: List of unpaired option positions
+
+    Returns:
+        List of updated option positions with new underlying prices
+
+    Note:
+        This function only updates the underlying price for unpaired options,
+        keeping the original option price as it represents the premium paid.
+    """
+    updated_options = []
+    for option in unpaired_options:
+        try:
+            # Use the option's ticker as the underlying symbol
+            underlying_price = market_data_provider.get_price(option.ticker)
+            if underlying_price is not None and underlying_price > 0:
+                # Create a new option position with the correct parameters
+                updated_option = OptionPosition(
+                    ticker=option.ticker,
+                    quantity=option.quantity,
+                    price=option.price,  # Keep original price for options
+                    cost_basis=option.cost_basis,
+                    strike=option.strike,
+                    expiry=option.expiry,
+                    option_type=option.option_type,
+                    raw_data=getattr(option, "raw_data", None),
+                )
+                # Set the underlying_price attribute
+                object.__setattr__(updated_option, "underlying_price", underlying_price)
+                updated_options.append(updated_option)
+                logger.debug(
+                    f"Updated underlying price for {option.ticker} to {underlying_price}"
+                )
+            else:
+                logger.warning(f"No valid underlying price found for {option.ticker}")
+                updated_options.append(option)
+        except Exception as e:
+            logger.error(f"Error updating underlying price for {option.ticker}: {e!s}")
+            updated_options.append(option)
+
+    return updated_options
+
+
+def _update_all_prices(positions: list[Position]) -> list[Position]:
+    """
+    Update prices for all positions from market data.
+
+    Args:
+        positions: List of all positions
+
+    Returns:
+        List of updated positions with new prices
+
+    Note:
+        This function will update prices for all positions, including:
+        - Stocks: Updates current price
+        - Options: Updates underlying price
+        - Other position types: Prices remain unchanged
+    """
+    updated_positions = []
+    for position in positions:
+        try:
+            if isinstance(position, StockPosition):
+                current_price = market_data_provider.get_price(position.ticker)
+                if current_price is not None and current_price > 0:
+                    updated_position = StockPosition(
+                        ticker=position.ticker,
+                        quantity=position.quantity,
+                        price=current_price,
+                        cost_basis=position.cost_basis,
+                    )
+                    updated_positions.append(updated_position)
+                    logger.debug(
+                        f"Updated price for {position.ticker} to {current_price}"
+                    )
+                else:
+                    logger.warning(f"No valid price found for {position.ticker}")
+                    updated_positions.append(position)
+            elif isinstance(position, OptionPosition):
+                # Use the option's ticker as the underlying symbol
+                underlying_price = market_data_provider.get_price(position.ticker)
+                if underlying_price is not None and underlying_price > 0:
+                    # Create a new option position with the correct parameters
+                    updated_position = OptionPosition(
+                        ticker=position.ticker,
+                        quantity=position.quantity,
+                        price=position.price,  # Keep original price for options
+                        cost_basis=position.cost_basis,
+                        strike=position.strike,
+                        expiry=position.expiry,
+                        option_type=position.option_type,
+                        raw_data=getattr(position, "raw_data", None),
+                    )
+                    # Set the underlying_price attribute
+                    object.__setattr__(
+                        updated_position, "underlying_price", underlying_price
+                    )
+                    updated_positions.append(updated_position)
+                    logger.debug(
+                        f"Updated underlying price for {position.ticker} to {underlying_price}"
+                    )
+                else:
+                    logger.warning(
+                        f"No valid underlying price found for {position.ticker}"
+                    )
+                    updated_positions.append(position)
+            else:
+                # For other position types (cash, unknown), keep original price
+                updated_positions.append(position)
+        except Exception as e:
+            logger.error(f"Error updating price for {position.ticker}: {e!s}")
+            updated_positions.append(position)
+
+    return updated_positions
+
+
+def process_portfolio(
+    holdings: list[PortfolioHolding],
+    # Controls whether to update prices from market data
+    # Default is False to minimize API calls
+    # When False, uses raw CSV prices first and only updates prices for unpaired options
+    update_prices: bool = False,
+) -> Portfolio:
+    """
+    Process raw portfolio holdings into a structured portfolio.
+
+    Processing Steps:
+    1. Identify cash-like positions (SPAXX, FMPXX, etc.)
+    2. Identify unknown/invalid positions
+    3. Process pending activity entries
+       - Handles multiple CSV formats
+       - Checks various columns for pending activity value
+       - Validates only one pending activity entry exists
+    4. Group related positions (stocks with their options)
+    5. Create portfolio object with all positions
+
+    CSV Structure Handling:
+    - Supports varying column structures in input CSVs
+    - Handles pending activity values in different columns
+    - Processes cash positions with special symbols
+
+    Args:
+        holdings: List of portfolio holdings from parse_portfolio_holdings()
+        update_prices: Whether to update prices from market data (default: False)
+                      When False, only updates prices for unpaired options
+                      to ensure accurate exposure calculations.
+
+    Returns:
+        Portfolio: Structured portfolio with categorized positions and groups
+
+    Raises:
+        ValueError: If multiple pending activity entries are found
+    """
+    logger.debug("Processing portfolio with %d holdings", len(holdings))
+
+    # Categorize holdings into different types and extract pending activity
+    non_cash_holdings, cash_positions, unknown_positions, pending_activity_value = (
+        _categorize_holdings(holdings)
+    )
+
+    # Create positions from holdings
+    positions = []
+
+    # Process stock positions
+    stock_positions = _create_stock_positions(non_cash_holdings)
+    positions.extend(stock_positions)
+
+    # Process option positions
+    option_positions = _create_option_positions(non_cash_holdings)
+    positions.extend(option_positions)
+
     # Add cash and unknown positions
     positions.extend(cash_positions)
     positions.extend(unknown_positions)
+
+    # Synchronize option underlying prices with paired stocks
+    _synchronize_option_underlying_prices(positions)
+
+    # Handle price updates based on the update_prices flag
+    if update_prices:
+        logger.info("Updating prices for all positions from market data")
+        positions = _update_all_prices(positions)
+    else:
+        logger.info("Using raw CSV prices first, updating only unpaired option prices")
+        # Only update prices for unpaired options
+        unpaired_options = _identify_unpaired_options(positions)
+        if unpaired_options:
+            logger.info(f"Found {len(unpaired_options)} unpaired options to update")
+            updated_options = _update_unpaired_option_prices(unpaired_options)
+            positions = [
+                pos for pos in positions if not isinstance(pos, OptionPosition)
+            ]
+            positions.extend(updated_options)
+        else:
+            logger.info(
+                "No unpaired options found - using raw CSV prices for all positions"
+            )
 
     # Create and return the portfolio
     portfolio = Portfolio(

@@ -38,10 +38,11 @@ def portfolio_load_cmd(
     """Load portfolio data from a CSV file."""
     try:
         # Load the portfolio
-        load_portfolio(file_path)
+        load_portfolio(file_path, update_prices=False)
 
-        # Print success message
-        console.print(f"[green]Successfully loaded portfolio from {file_path}[/green]")
+        # Print success message with prominent portfolio path
+        console.print("[green]Successfully loaded portfolio[/green]")
+        console.print(f"[bold blue]PORTFOLIO:[/bold blue] [bold]{file_path}[/bold]")
 
     except Exception as e:
         console.print(f"[red]Error loading portfolio:[/red] {e!s}")
@@ -194,8 +195,9 @@ def portfolio_load(state, args):
         state.portfolio = result["portfolio"]
         state.portfolio_summary = create_portfolio_summary(result["portfolio"])
 
-        # Print success message
-        console.print(f"[green]Successfully loaded portfolio from {file_path}[/green]")
+        # Print success message with prominent portfolio path
+        console.print("[green]Successfully loaded portfolio[/green]")
+        console.print(f"[bold blue]PORTFOLIO:[/bold blue] [bold]{file_path}[/bold]")
 
     except Exception as e:
         console.print(f"[red]Error loading portfolio:[/red] {e!s}")

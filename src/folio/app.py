@@ -586,9 +586,10 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
                     None,
                 )
 
-            # Process portfolio data with automatic price updates
+            # Process portfolio data with price updates disabled by default
+            # Only unpaired options will have their underlying prices updated
             groups, summary, cash_like_positions = portfolio.process_portfolio_data(
-                df, update_prices=True
+                df, update_prices=False
             )
             logger.debug(
                 f"Successfully processed {len(groups)} portfolio groups and {len(cash_like_positions)} cash-like positions"

@@ -199,20 +199,26 @@ class TestStockOracleProviders:
                 # Import folio first (which will trigger import of folib)
                 # Now import folib directly to verify its state
                 import src.folib.data.stock as folib_stock
+                from src.folib.data.market_data import market_data_provider
                 from src.folio.utils import get_beta
 
                 # Verify both are using the FMP provider
                 assert folib_stock.DATA_SOURCE == "fmp"
                 assert folib_stock.stockdata.provider_name == "fmp"
 
-                # Patch the get_beta method to avoid actual API calls
+                # Verify that market_data_provider is initialized with the FMP API key
+                # The MarketDataProvider doesn't have a provider_name attribute, so we check
+                # that it's initialized with the FMP API key instead
+                assert market_data_provider.api_key == "test_key"
+
+                # Patch the market_data_provider.get_beta method to avoid actual API calls
                 with patch.object(
-                    folib_stock.stockdata, "get_beta", return_value=1.5
+                    market_data_provider, "get_beta", return_value=1.5
                 ) as mock_get_beta:
                     # Call get_beta from folio
                     beta = get_beta("AAPL")
 
-                    # Verify the mock was called, indicating folio is using the same provider
+                    # Verify the mock was called, indicating folio is using the market_data_provider
                     mock_get_beta.assert_called_once_with("AAPL")
                     assert beta == 1.5
 

@@ -43,7 +43,9 @@ def resolve_portfolio_path(file_path: str | None = None) -> Path:
     return path
 
 
-def load_portfolio(file_path: str | None = None) -> dict[str, Any]:
+def load_portfolio(
+    file_path: str | None = None, update_prices: bool = False
+) -> dict[str, Any]:
     """
     Load a portfolio from a CSV file.
 
@@ -75,10 +77,17 @@ def load_portfolio(file_path: str | None = None) -> dict[str, Any]:
 
     # Process the portfolio
     console.print("Processing portfolio...")
-    portfolio = process_portfolio(holdings)
+    if update_prices:
+        console.print(
+            "[yellow]Updating all prices from market data (this may use significant API quota)[/yellow]"
+        )
+    portfolio = process_portfolio(holdings, update_prices=update_prices)
     console.print(
         f"Processed portfolio with [bold]{len(portfolio.positions)}[/bold] positions"
     )
+
+    # Display portfolio path prominently
+    console.print(f"\n[bold blue]PORTFOLIO:[/bold blue] [bold]{path}[/bold]")
 
     return {
         "df": df,

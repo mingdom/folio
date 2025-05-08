@@ -38,7 +38,7 @@ from .validation import extract_option_data
 
 def process_portfolio_data(
     df: pd.DataFrame,
-    update_prices: bool = True,
+    update_prices: bool = False,
 ) -> tuple[list[PortfolioGroup], PortfolioSummary, list[dict]]:
     """Process portfolio data from a DataFrame into structured groups and summary.
 
@@ -63,6 +63,9 @@ def process_portfolio_data(
     Args:
         df: A pandas DataFrame containing the portfolio positions, expected to have columns like
             'Symbol', 'Description', 'Quantity', 'Current Value', 'Last Price', 'Type' (account type: Cash/Margin), etc.
+        update_prices: Whether to update prices from market data (default: False)
+                      When False, only updates prices for unpaired options to ensure
+                      accurate exposure calculations.
 
     Returns:
         A tuple containing:
