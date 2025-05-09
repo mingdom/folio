@@ -16,6 +16,7 @@ from src.folib.services.portfolio_service import (
     get_portfolio_exposures,
     sort_positions,
 )
+from src.folib.services.ticker_service import ticker_service
 
 from ..formatters import (
     create_exposures_table,
@@ -173,14 +174,13 @@ def portfolio_list_cmd(
                         calculate_beta_adjusted_exposure,
                         calculate_stock_exposure,
                     )
-                    from src.folib.data.market_data import market_data_provider
 
                     # Calculate stock exposure
                     market_exposure = calculate_stock_exposure(
                         position.quantity, position.price
                     )
-                    # Get beta for the stock
-                    beta = market_data_provider.get_beta(position.ticker) or 1.0
+                    # Get beta for the stock using the ticker service
+                    beta = ticker_service.get_beta(position.ticker)
                     # Calculate beta-adjusted exposure
                     beta_adjusted_exposure = calculate_beta_adjusted_exposure(
                         market_exposure, beta
@@ -191,18 +191,14 @@ def portfolio_list_cmd(
                         calculate_option_exposure,
                     )
                     from src.folib.calculations.options import calculate_option_delta
-                    from src.folib.data.market_data import market_data_provider
 
-                    # Get underlying price and beta
-                    try:
-                        underlying_price = market_data_provider.get_price(
-                            position.ticker
-                        )
-                        beta = market_data_provider.get_beta(position.ticker) or 1.0
-                    except Exception:
-                        # Fallback to using strike as proxy for underlying price
+                    # Get underlying price and beta using the ticker service
+                    underlying_price = ticker_service.get_price(position.ticker)
+                    beta = ticker_service.get_beta(position.ticker)
+
+                    # If price is 0, use strike as fallback
+                    if underlying_price == 0:
                         underlying_price = position.strike
-                        beta = 1.0
 
                     # Calculate delta
                     delta = calculate_option_delta(
@@ -220,10 +216,10 @@ def portfolio_list_cmd(
                         market_exposure, beta
                     )
                 else:
-                    # For cash or unknown positions, exposure is zero
-                    market_exposure = 0.0
-                    beta_adjusted_exposure = 0.0
-                    beta = 0.0  # Set beta to 0 for cash and unknown positions
+                    # For cash or unknown positions, get values from ticker service
+                    beta = ticker_service.get_beta(position.ticker)
+                    market_exposure = 0.0  # Cash has no market exposure
+                    beta_adjusted_exposure = 0.0  # Cash has no beta-adjusted exposure
 
                 # Add beta and exposure values to the position dictionary
                 pos_dict["beta"] = beta
@@ -390,14 +386,13 @@ def portfolio_list(state, args):
                         calculate_beta_adjusted_exposure,
                         calculate_stock_exposure,
                     )
-                    from src.folib.data.market_data import market_data_provider
 
                     # Calculate stock exposure
                     market_exposure = calculate_stock_exposure(
                         position.quantity, position.price
                     )
-                    # Get beta for the stock
-                    beta = market_data_provider.get_beta(position.ticker) or 1.0
+                    # Get beta for the stock using the ticker service
+                    beta = ticker_service.get_beta(position.ticker)
                     # Calculate beta-adjusted exposure
                     beta_adjusted_exposure = calculate_beta_adjusted_exposure(
                         market_exposure, beta
@@ -408,18 +403,14 @@ def portfolio_list(state, args):
                         calculate_option_exposure,
                     )
                     from src.folib.calculations.options import calculate_option_delta
-                    from src.folib.data.market_data import market_data_provider
 
-                    # Get underlying price and beta
-                    try:
-                        underlying_price = market_data_provider.get_price(
-                            position.ticker
-                        )
-                        beta = market_data_provider.get_beta(position.ticker) or 1.0
-                    except Exception:
-                        # Fallback to using strike as proxy for underlying price
+                    # Get underlying price and beta using the ticker service
+                    underlying_price = ticker_service.get_price(position.ticker)
+                    beta = ticker_service.get_beta(position.ticker)
+
+                    # If price is 0, use strike as fallback
+                    if underlying_price == 0:
                         underlying_price = position.strike
-                        beta = 1.0
 
                     # Calculate delta
                     delta = calculate_option_delta(
@@ -437,10 +428,10 @@ def portfolio_list(state, args):
                         market_exposure, beta
                     )
                 else:
-                    # For cash or unknown positions, exposure is zero
-                    market_exposure = 0.0
-                    beta_adjusted_exposure = 0.0
-                    beta = 0.0  # Set beta to 0 for cash and unknown positions
+                    # For cash or unknown positions, get values from ticker service
+                    beta = ticker_service.get_beta(position.ticker)
+                    market_exposure = 0.0  # Cash has no market exposure
+                    beta_adjusted_exposure = 0.0  # Cash has no beta-adjusted exposure
 
                 # Add beta and exposure values to the position dictionary
                 pos_dict["beta"] = beta

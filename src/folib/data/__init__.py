@@ -17,6 +17,10 @@ Module Overview:
   - FMPProvider: Implementation using the FMP API
   - Used internally by MarketDataProvider
 
+- ticker_data.py: Data structures for ticker-related data
+  - TickerData: Class representing all data associated with a ticker
+  - Key properties: is_cash_like, effective_beta, effective_price
+
 - loader.py: Portfolio loading and parsing
   - load_portfolio_from_csv: Load portfolio data from CSV files
   - parse_portfolio_holdings: Parse raw portfolio data into domain objects

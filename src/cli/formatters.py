@@ -266,11 +266,7 @@ def create_positions_table(
             format_currency(
                 market_value, round_to_dollar=True
             ),  # Round to nearest dollar
-            "0.00"
-            if position_type == "cash"
-            else (
-                f"{beta:.2f}" if isinstance(beta, (int, float)) else "1.00"
-            ),  # Format beta
+            f"{beta:.2f}" if isinstance(beta, (int, float)) else "1.00",  # Format beta
             format_currency(
                 beta_adjusted_exposure, round_to_dollar=True
             ),  # Round to nearest dollar

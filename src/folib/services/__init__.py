@@ -22,6 +22,14 @@ Module Overview:
   - get_position_value: Calculate value of a position
   - get_position_beta: Calculate beta for a position
 
+- ticker_service.py: Ticker data management
+  - TickerService: Service for accessing ticker-related data
+  - get_ticker_data: Get all data for a ticker
+  - get_price: Get the price for a ticker
+  - get_beta: Get the beta for a ticker
+  - get_company_profile: Get the company profile for a ticker
+  - ticker_service: Pre-initialized instance for convenience
+
 - simulation_service.py: Portfolio simulation
   - simulate_portfolio: Simulate portfolio performance with market changes
   - simulate_position: Simulate position performance with market changes
