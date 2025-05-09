@@ -173,8 +173,11 @@ class TestProcessPortfolio:
             ),
         ]
 
+        # Create a tuple of holdings and stock_tickers to match the new interface
+        holdings_data = (holdings, {"AAPL"})
+
         # Act
-        portfolio = process_portfolio(holdings)
+        portfolio = process_portfolio(holdings_data)
 
         # Assert
         assert isinstance(portfolio, Portfolio)

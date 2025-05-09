@@ -103,14 +103,22 @@ class TestParsePortfolioHoldings:
             "Cost Basis Total": ["$1000.00", "$1200.00"],
         })
 
-        # Parse the holdings
-        holdings = parse_portfolio_holdings(df)
+        # Parse the holdings - now returns (holdings, stock_tickers)
+        holdings_data = parse_portfolio_holdings(df)
+        holdings, stock_tickers = holdings_data
+
+        # Check the holdings list
         assert len(holdings) == 2
         assert holdings[0].symbol == "AAPL"
         assert holdings[0].quantity == 10
         assert holdings[0].price == 150.0
         assert holdings[0].value == 1500.0
         assert holdings[0].cost_basis_total == 1000.0
+
+        # Check the stock_tickers set
+        assert "AAPL" in stock_tickers
+        assert "MSFT" in stock_tickers
+        assert len(stock_tickers) == 2
 
     def test_parse_portfolio_holdings_with_empty_symbols(self):
         """Test parsing portfolio holdings with empty symbols."""
@@ -125,9 +133,11 @@ class TestParsePortfolioHoldings:
         })
 
         # Parse the holdings
-        holdings = parse_portfolio_holdings(df)
+        holdings, stock_tickers = parse_portfolio_holdings(df)
         assert len(holdings) == 1
         assert holdings[0].symbol == "AAPL"
+        assert len(stock_tickers) == 1
+        assert "AAPL" in stock_tickers
 
     def test_parse_portfolio_holdings_with_invalid_values(self):
         """Test parsing portfolio holdings with invalid values."""
@@ -142,7 +152,7 @@ class TestParsePortfolioHoldings:
         })
 
         # Parse the holdings
-        holdings = parse_portfolio_holdings(df)
+        holdings, stock_tickers = parse_portfolio_holdings(df)
         assert len(holdings) == 2
         assert holdings[0].symbol == "AAPL"
         assert holdings[0].quantity == 10
@@ -154,6 +164,11 @@ class TestParsePortfolioHoldings:
         assert holdings[1].price == 0.0
         assert holdings[1].value == 0.0
         assert holdings[1].cost_basis_total is None
+
+        # Check stock_tickers
+        assert len(stock_tickers) == 2
+        assert "AAPL" in stock_tickers
+        assert "MSFT" in stock_tickers
 
     def test_parse_portfolio_holdings_with_pending_activity(self):
         """Test parsing portfolio holdings with pending activity."""
@@ -168,13 +183,17 @@ class TestParsePortfolioHoldings:
         })
 
         # Parse the holdings
-        holdings = parse_portfolio_holdings(df)
+        holdings, stock_tickers = parse_portfolio_holdings(df)
         assert len(holdings) == 2
         assert holdings[0].symbol == "AAPL"
         assert holdings[1].symbol == "Pending Activity"
         assert holdings[1].quantity == 0
         assert holdings[1].price == 0.0
         assert holdings[1].value == 529535.51
+
+        # Check stock_tickers - pending activity should not be included
+        assert len(stock_tickers) == 1
+        assert "AAPL" in stock_tickers
 
     def test_parse_portfolio_holdings_with_fidelity_format_pending_activity(self):
         """Test parsing portfolio holdings with Fidelity-format pending activity."""
@@ -200,13 +219,17 @@ class TestParsePortfolioHoldings:
         })
 
         # Parse the holdings
-        holdings = parse_portfolio_holdings(df)
+        holdings, stock_tickers = parse_portfolio_holdings(df)
         assert len(holdings) == 2
         assert holdings[0].symbol == "AAPL"
         assert holdings[1].symbol == "Pending Activity"
         assert holdings[1].quantity == 0
         assert holdings[1].price == 0.0
         assert holdings[1].value == 529535.51
+
+        # Check stock_tickers - pending activity should not be included
+        assert len(stock_tickers) == 1
+        assert "AAPL" in stock_tickers
 
     @patch("src.folib.data.loader.logger")
     def test_parse_portfolio_holdings_with_pending_activity_logging(self, mock_logger):
@@ -222,10 +245,13 @@ class TestParsePortfolioHoldings:
         })
 
         # Parse the holdings
-        holdings = parse_portfolio_holdings(df)
+        holdings, stock_tickers = parse_portfolio_holdings(df)
         assert len(holdings) == 1
         assert holdings[0].symbol == "Pending Activity"
         assert holdings[0].value == 529535.51
+
+        # Check stock_tickers - should be empty since there are no stocks
+        assert len(stock_tickers) == 0
 
         # Check that the correct log messages were generated
         mock_logger.debug.assert_any_call("Row 0: Identified pending activity row")
@@ -246,12 +272,15 @@ class TestParsePortfolioHoldings:
         })
 
         # Parse the holdings
-        holdings = parse_portfolio_holdings(df)
+        holdings, stock_tickers = parse_portfolio_holdings(df)
         assert len(holdings) == 1
         assert holdings[0].symbol == "SPAXX"  # ** should be removed
         assert holdings[0].quantity == 1.0  # Should be set to 1.0 for cash positions
         assert holdings[0].price == 51151.25  # Should be calculated from value/quantity
         assert holdings[0].value == 51151.25
+
+        # Check stock_tickers - cash positions should not be included
+        assert len(stock_tickers) == 0
 
     @patch("src.folib.data.loader.logger")
     def test_parse_portfolio_holdings_with_special_symbols_logging(self, mock_logger):
@@ -269,9 +298,12 @@ class TestParsePortfolioHoldings:
         # Mock the is_cash_or_short_term function to return True
         with patch("src.folio.cash_detection.is_cash_or_short_term", return_value=True):
             # Parse the holdings
-            holdings = parse_portfolio_holdings(df)
+            holdings, stock_tickers = parse_portfolio_holdings(df)
             assert len(holdings) == 1
             assert holdings[0].symbol == "SPAXX"  # ** should be removed
+
+            # Check stock_tickers - cash positions should not be included
+            assert len(stock_tickers) == 0
 
             # Check that the correct log messages were generated
             mock_logger.debug.assert_any_call(
