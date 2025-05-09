@@ -80,7 +80,7 @@ class MarketDataProvider:
                     self._session_cache[ticker_upper]["beta"] = profile.get("beta")
                     return profile
                 else:
-                    logger.warning(f"No profile data found for {ticker_upper}")
+                    logger.debug(f"No profile data found for {ticker_upper}")
                     self._session_cache.setdefault(ticker_upper, {})["profile"] = None
                     return None
             except Exception as e:

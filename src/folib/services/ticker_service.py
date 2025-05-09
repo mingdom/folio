@@ -32,9 +32,6 @@ class TickerService:
             minutes=15
         )  # Cache prices for 15 minutes
         self._beta_cache_duration = timedelta(days=1)  # Cache beta values for 1 day
-        self._profile_cache_duration = timedelta(
-            days=7
-        )  # Cache company profiles for 7 days
 
     def get_ticker_data(self, ticker: str) -> TickerData:
         """
@@ -185,11 +182,7 @@ class TickerService:
             if now > beta_expiry:
                 return False
 
-        # Check if company profile is valid
-        if ticker_data.company_profile is not None:
-            profile_expiry = ticker_data.last_updated + self._profile_cache_duration
-            if now > profile_expiry:
-                return False
+        # We no longer store company profiles - YAGNI
 
         return True
 
