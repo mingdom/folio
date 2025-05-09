@@ -3,6 +3,12 @@ Ticker service for the Folib library.
 
 This module provides a service for accessing ticker-related data,
 including prices, beta values, and company profiles.
+
+Caching Strategy:
+- The ticker service is the primary caching layer for all ticker-related data
+- It uses both in-memory caching (self._ticker_data) and persistent caching (@cached decorator)
+- The market data provider no longer has its own persistent cache to avoid redundancy
+- TTLs are configured to balance data freshness with performance
 """
 
 import logging
@@ -98,11 +104,22 @@ class TickerService:
             except Exception as e:
                 logger.warning(f"Failed to prefetch data for {ticker}: {e}")
 
-    def clear_cache(self) -> None:
-        """Clear the ticker data cache."""
+    def clear_cache(self, backup: bool = False) -> None:
+        """
+        Clear both in-memory and persistent ticker data caches.
+
+        Args:
+            backup: If True, backs up the persistent cache before clearing it.
+        """
+        # Clear in-memory cache
         self._ticker_data = {}
         logger.info("Ticker data in-memory cache cleared")
-        # Note: This doesn't clear the persistent cache from the cache decorator
+
+        # Clear persistent cache
+        from ..data.cache import clear_cache as clear_persistent_cache
+
+        clear_persistent_cache(backup=backup)
+        logger.info("Ticker data persistent cache cleared")
 
     def _fetch_ticker_data(self, ticker: str) -> TickerData:
         """
