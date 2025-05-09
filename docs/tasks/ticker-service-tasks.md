@@ -28,9 +28,10 @@ This phase focuses on reducing data duplication and improving caching.
 ### Phase 2.1: Data Model Optimization
 
 - [ ] Identify all places where market data is duplicated
-- [ ] Implement property-based access in position objects that call the ticker service
-- [ ] Keep core position data in position objects, but make derived data use the ticker service
+- [ ] Refactor the service layer to use the ticker service for all market data
+- [ ] Keep domain objects pure without direct dependencies on services
 - [ ] Update all code that directly accesses market data to use the ticker service
+- [ ] Ensure proper separation of concerns between domain and service layers
 
 ### Phase 2.2: Cache Integration
 
@@ -70,21 +71,23 @@ These features have been deferred to a future phase.
 
 We have completed Phase 1 and are now planning for Phase 2. The current focus is on:
 
-1. **Data Model Optimization**: Implementing property-based access in position objects that call the ticker service
+1. **Data Model Optimization**: Refactoring the service layer to use the ticker service while maintaining clean architecture
 2. **Cache Integration**: Analyzing how to apply our cache decorator pattern to the ticker service
 
 ## Next Steps
 
-1. Begin implementing property-based access in position objects
-2. Analyze the existing cache decorator pattern and how it can be applied to the ticker service
-3. Create a detailed implementation plan for Phase 2.1
+1. Refactor the service layer to use the ticker service for all market data
+2. Ensure domain objects remain pure without direct dependencies on services
+3. Analyze the existing cache decorator pattern and how it can be applied to the ticker service
+4. Create a detailed implementation plan for Phase 2.1
 
 ## Open Questions
 
-1. Should we completely remove market data from position objects or keep it as a cache?
+1. What is the best way to provide market data to the service layer without creating tight coupling?
 2. What are the appropriate TTLs for different types of ticker data?
 3. How should we handle API rate limiting for bulk operations?
 4. Should we implement background refreshing for frequently accessed tickers?
+5. How can we ensure that the service layer remains efficient when calculating derived data?
 
 ## Success Criteria
 

@@ -50,16 +50,17 @@ For optimal performance, we should prefetch ticker data in bulk rather than fetc
 
 ### 1. Data Model Optimization
 
-We will refactor our data model to reduce duplication:
+We will refactor our data model to reduce duplication while maintaining proper separation of concerns:
 
 1. **Position Objects**:
-   - Remove redundant market data (like beta values) from position objects
-   - Add methods to access this data via the ticker service
-   - Update all code that accesses these properties to use the new methods
+   - Keep position objects focused on core position data only
+   - Do NOT add direct dependencies to the ticker service in domain objects
+   - Maintain clean architecture by keeping domain objects pure
 
-2. **Centralized Data Access**:
+2. **Service Layer Responsibility**:
    - Make the ticker service the single source of truth for all ticker-related data
-   - Update all code that directly accesses market data to use the ticker service
+   - Update the service layer (position_service, portfolio_service) to use the ticker service
+   - Use dependency injection to provide ticker data where needed
 
 ### 2. Cache Integration
 
@@ -117,9 +118,10 @@ This proposal affects:
 ### Phase 2.1: Data Model Optimization
 
 1. Identify all places where market data is duplicated
-2. Implement property-based access in position objects that call the ticker service
-3. Keep core position data in position objects, but make derived data use the ticker service
+2. Refactor the service layer to use the ticker service for all market data
+3. Keep domain objects pure without direct dependencies on services
 4. Update all code that directly accesses market data to use the ticker service
+5. Ensure proper separation of concerns between domain and service layers
 
 ### Phase 2.2: Cache Integration
 
@@ -150,8 +152,9 @@ This proposal affects:
 
 1. **Position Data Model**:
    - Core position data (ticker, quantity, price, etc.) will remain in position objects
-   - Derived data (beta, exposures) will be accessed via properties that call the ticker service
-   - This maintains clean separation while keeping essential data close to where it's used
+   - Derived data (beta, exposures) will be calculated in the service layer
+   - Domain objects will remain pure without direct dependencies on services
+   - This maintains clean architecture and proper separation of concerns
 
 2. **Caching Strategy**:
    - We'll implement a multi-level caching approach with both in-memory and persistent caches
@@ -168,10 +171,11 @@ This proposal affects:
 
 ## Open Questions
 
-1. Should we completely remove market data from position objects or keep it as a cache?
+1. What is the best way to provide market data to the service layer without creating tight coupling?
 2. What are the appropriate TTLs for different types of ticker data?
 3. How should we handle API rate limiting for bulk operations?
 4. Should we implement background refreshing for frequently accessed tickers?
+5. How can we ensure that the service layer remains efficient when calculating derived data?
 
 ## Success Criteria
 
