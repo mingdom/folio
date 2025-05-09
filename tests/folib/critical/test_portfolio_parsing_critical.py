@@ -30,11 +30,7 @@ def test_portfolio_path():
     # Get the project root directory
     project_root = Path(__file__).parent.parent.parent.parent
     portfolio_path = project_root / "tests" / "assets" / "test_portfolio.csv"
-
-    # Skip the test if the file doesn't exist
-    if not portfolio_path.exists():
-        pytest.skip(f"Test portfolio file not found at {portfolio_path}")
-
+    assert portfolio_path.exists(), f"Test portfolio file not found at {portfolio_path}"
     return portfolio_path
 
 

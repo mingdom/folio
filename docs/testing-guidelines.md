@@ -1,9 +1,4 @@
----
-description: Testing guidelines and best practices for the Folio project
-alwaysApply: true
----
-
-# Folio Testing Guidelines
+# Testing Guidelines
 
 This document outlines the testing philosophy, principles, and best practices for the Folio project. These guidelines are designed to help maintain a high-quality, maintainable test suite that provides confidence in our codebase without becoming a burden to maintain.
 
@@ -63,7 +58,6 @@ def test_calculate_portfolio_beta():
 
     # Assert: Verify the result
     assert beta == 1.2
-    mock_data_fetcher.get_beta.assert_called_once_with("AAPL")
 ```
 
 ## Test Naming
@@ -78,6 +72,229 @@ def test_portfolio():
 # ✅ Good: Clear test name
 def test_portfolio_beta_calculation_with_single_stock():
     # ...
+```
+
+## Key Guidelines
+
+### 1. Focus on Outputs, Not Internal Calls
+
+Tests should verify the outputs of functions/methods based on given inputs, not which internal methods were called.
+
+```python
+# ❌ Bad: Testing internal calls
+def test_bad_internal_calls():
+    mock_data_provider = MagicMock()
+    mock_data_provider.get_price.return_value = 150.0
+
+    portfolio_service = PortfolioService(data_provider=mock_data_provider)
+    result = portfolio_service.calculate_exposure("AAPL", 10)
+
+    # Testing implementation details
+    mock_data_provider.get_price.assert_called_once_with("AAPL")
+
+# ✅ Good: Testing outputs
+def test_good_outputs():
+    mock_data_provider = MagicMock()
+    mock_data_provider.get_price.return_value = 150.0
+
+    portfolio_service = PortfolioService(data_provider=mock_data_provider)
+    result = portfolio_service.calculate_exposure("AAPL", 10)
+
+    # Testing the result, not how it was calculated
+    assert result == 1500.0  # 10 shares * $150 per share
+```
+
+### 2. Mock at the System Boundaries
+
+Only mock external dependencies (APIs, databases, etc.), not internal components.
+
+```python
+# ❌ Bad: Mocking internal components
+def test_bad_internal_mocking():
+    # TickerService is an internal component
+    mock_ticker_service = MagicMock()
+    mock_ticker_service.get_price.return_value = 150.0
+
+    # Mocking an internal component
+    portfolio_service = PortfolioService()
+    portfolio_service.ticker_service = mock_ticker_service
+
+    result = portfolio_service.calculate_exposure("AAPL", 10)
+    assert result == 1500.0
+
+# ✅ Good: Mocking at system boundaries
+def test_good_boundary_mocking():
+    # MarketDataProvider is an external API
+    mock_market_data = MagicMock()
+    mock_market_data.get_price.return_value = 150.0
+
+    # Injecting the mock at the system boundary
+    portfolio_service = PortfolioService(market_data_provider=mock_market_data)
+
+    result = portfolio_service.calculate_exposure("AAPL", 10)
+    assert result == 1500.0
+```
+
+### 3. Test State Changes, Not Implementation
+
+Verify that the expected state changes occurred, not how they occurred.
+
+```python
+# ❌ Bad: Testing implementation details
+def test_bad_implementation_testing():
+    portfolio = Portfolio()
+
+    with patch.object(portfolio, '_update_position_price') as mock_update:
+        portfolio.add_position(StockPosition(ticker="AAPL", quantity=10))
+
+        # Testing that a specific internal method was called
+        mock_update.assert_called_once()
+
+# ✅ Good: Testing state changes
+def test_good_state_testing():
+    portfolio = Portfolio()
+
+    # Before state
+    assert len(portfolio.positions) == 0
+
+    # Action
+    portfolio.add_position(StockPosition(ticker="AAPL", quantity=10))
+
+    # After state - testing what changed, not how
+    assert len(portfolio.positions) == 1
+    assert portfolio.positions[0].ticker == "AAPL"
+    assert portfolio.positions[0].quantity == 10
+```
+
+### 4. Write Refactor-Friendly Tests
+
+Tests should survive reasonable refactoring of the implementation.
+
+```python
+# ❌ Bad: Brittle test that breaks with refactoring
+def test_brittle():
+    mock_data_provider = MagicMock()
+    mock_data_provider.get_price.return_value = 150.0
+
+    service = PortfolioService(data_provider=mock_data_provider)
+    result = service.calculate_portfolio_value([
+        {"ticker": "AAPL", "quantity": 10}
+    ])
+
+    # This will break if implementation changes to use a different method
+    mock_data_provider.get_price.assert_called_once_with("AAPL")
+
+# ✅ Good: Resilient test that survives refactoring
+def test_resilient():
+    mock_data_provider = MagicMock()
+    mock_data_provider.get_price.return_value = 150.0
+
+    service = PortfolioService(data_provider=mock_data_provider)
+    result = service.calculate_portfolio_value([
+        {"ticker": "AAPL", "quantity": 10}
+    ])
+
+    # This will pass regardless of how the value is calculated
+    assert result == 1500.0
+```
+
+## Real-World Example: Ticker Service Refactoring
+
+The following examples demonstrate how our tests should handle the refactoring from direct `market_data_provider` usage to using the `ticker_service`.
+
+### Example: Testing Portfolio Exposures
+
+```python
+# ❌ Bad: Testing implementation details
+def test_bad_get_portfolio_exposures():
+    # Setup
+    portfolio = create_test_portfolio_with_stock("AAPL", 10, 150.0)
+    mock_market_data = MagicMock()
+    mock_market_data.get_price.return_value = 150.0
+    mock_market_data.get_beta.return_value = 1.2
+
+    # Patching an internal implementation detail
+    with patch('src.folib.services.portfolio_service.market_data_provider', mock_market_data):
+        # Act
+        exposures = get_portfolio_exposures(portfolio)
+
+        # Assert implementation details
+        mock_market_data.get_price.assert_called_with("AAPL")
+        mock_market_data.get_beta.assert_called_with("AAPL")
+
+# ✅ Good: Testing behavior and results
+def test_good_get_portfolio_exposures():
+    # Setup
+    portfolio = create_test_portfolio_with_stock("AAPL", 10, 150.0)
+
+    # Create a test double for the external dependency
+    mock_market_data = MagicMock()
+    mock_market_data.get_price.return_value = 150.0
+    mock_market_data.get_beta.return_value = 1.2
+
+    # Inject the mock at the system boundary
+    # This could be through dependency injection or a test-specific factory
+    portfolio_service = create_portfolio_service_with_mock_data(mock_market_data)
+
+    # Act
+    exposures = portfolio_service.get_portfolio_exposures(portfolio)
+
+    # Assert the results, not the implementation
+    assert exposures["long_stock_exposure"] == 1500.0  # 10 shares * $150
+    assert exposures["beta_adjusted_exposure"] == 1800.0  # $1500 * 1.2 beta
+```
+
+## Common Testing Pitfalls
+
+### 1. Over-specifying Tests
+
+```python
+# ❌ Bad: Over-specified test
+def test_over_specified():
+    service = PortfolioService()
+
+    # Testing exact implementation details
+    with patch('src.folib.services.portfolio_service._calculate_beta') as mock_calc:
+        mock_calc.return_value = 1.2
+        result = service.get_portfolio_beta(portfolio)
+
+        # Testing internal implementation
+        mock_calc.assert_called_once()
+        assert result == 1.2
+```
+
+### 2. Testing Private Methods
+
+```python
+# ❌ Bad: Testing private methods
+def test_private_method():
+    service = PortfolioService()
+
+    # Directly testing a private method
+    result = service._calculate_beta(portfolio)
+
+    assert result == 1.2
+```
+
+### 3. Excessive Mocking
+
+```python
+# ❌ Bad: Excessive mocking
+def test_excessive_mocking():
+    # Mocking too many things
+    mock_portfolio = MagicMock()
+    mock_position = MagicMock()
+    mock_calculator = MagicMock()
+    mock_data_provider = MagicMock()
+    mock_logger = MagicMock()
+
+    # Test becomes hard to understand and brittle
+    service = PortfolioService(
+        data_provider=mock_data_provider,
+        calculator=mock_calculator,
+        logger=mock_logger
+    )
+    result = service.analyze_portfolio(mock_portfolio)
 ```
 
 ## What to Test
@@ -95,34 +312,6 @@ def test_portfolio_beta_calculation_with_single_stock():
 2. **Framework functionality**: Features provided by libraries or frameworks
 3. **Trivial code**: Simple getters/setters, pass-through methods
 4. **External services**: Use mocks instead
-
-## Mocking
-
-Use mocking judiciously to isolate the code under test:
-
-```python
-# ❌ Bad: Over-mocking
-def test_over_mocked():
-    # Mocking too many things makes tests brittle
-    mock_portfolio = MagicMock()
-    mock_position = MagicMock()
-    mock_calculator = MagicMock()
-    mock_logger = MagicMock()
-    # ...
-
-# ✅ Good: Focused mocking
-def test_portfolio_beta_calculation():
-    # Only mock external dependencies
-    portfolio = Portfolio()
-    portfolio.add_position(StockPosition(ticker="AAPL", quantity=10, price=150))
-
-    # Mock only the external data fetcher
-    mock_data_fetcher = MagicMock()
-    mock_data_fetcher.get_beta.return_value = 1.2
-
-    beta = portfolio.calculate_beta(data_fetcher=mock_data_fetcher)
-    assert beta == 1.2
-```
 
 ## Test Data
 
@@ -182,206 +371,6 @@ def mock_data_fetcher():
     return mock
 ```
 
-## Examples of Good vs. Bad Tests
-
-### Example 1: Testing Public vs. Private Methods
-
-```python
-class PortfolioAnalyzer:
-    def calculate_portfolio_metrics(self, portfolio):
-        """Public method that calculates portfolio metrics."""
-        total_value = self._calculate_total_value(portfolio)
-        beta = self._calculate_portfolio_beta(portfolio, total_value)
-        return {
-            "total_value": total_value,
-            "beta": beta,
-        }
-
-    def _calculate_total_value(self, portfolio):
-        """Private helper method."""
-        return sum(position.market_value for position in portfolio.positions)
-
-    def _calculate_portfolio_beta(self, portfolio, total_value):
-        """Private helper method."""
-        if total_value == 0:
-            return 0
-
-        weighted_beta_sum = sum(
-            position.market_value * position.beta
-            for position in portfolio.positions
-        )
-        return weighted_beta_sum / total_value
-
-# ❌ Bad: Testing private methods
-def test_calculate_total_value():
-    analyzer = PortfolioAnalyzer()
-    portfolio = create_test_portfolio()
-
-    # Testing a private method directly
-    value = analyzer._calculate_total_value(portfolio)
-
-    assert value == 2000
-
-# ✅ Good: Testing public interface
-def test_calculate_portfolio_metrics():
-    analyzer = PortfolioAnalyzer()
-    portfolio = create_test_portfolio()
-
-    # Testing the public method
-    metrics = analyzer.calculate_portfolio_metrics(portfolio)
-
-    assert metrics["total_value"] == 2000
-    assert metrics["beta"] == 1.1
-```
-
-### Example 2: Testing Behavior vs. Implementation
-
-```python
-class PortfolioLoader:
-    def load_portfolio(self, file_path):
-        """Loads a portfolio from a CSV file."""
-        try:
-            df = pd.read_csv(file_path)
-            return self._process_portfolio_data(df)
-        except FileNotFoundError:
-            logger.error(f"Portfolio file not found: {file_path}")
-            raise
-
-    def _process_portfolio_data(self, df):
-        # Process the data...
-        return Portfolio(positions=positions)
-
-# ❌ Bad: Testing implementation details
-def test_load_portfolio_implementation():
-    loader = PortfolioLoader()
-
-    # Mocking pandas and testing implementation details
-    with patch("pandas.read_csv") as mock_read_csv:
-        mock_df = pd.DataFrame({"ticker": ["AAPL"], "quantity": [10], "price": [150]})
-        mock_read_csv.return_value = mock_df
-
-        with patch.object(loader, "_process_portfolio_data") as mock_process:
-            mock_process.return_value = "processed_portfolio"
-
-            result = loader.load_portfolio("portfolio.csv")
-
-            mock_read_csv.assert_called_once_with("portfolio.csv")
-            mock_process.assert_called_once_with(mock_df)
-            assert result == "processed_portfolio"
-
-# ✅ Good: Testing behavior
-def test_load_portfolio_behavior():
-    loader = PortfolioLoader()
-
-    # Create a temporary CSV file for testing
-    with tempfile.NamedTemporaryFile(suffix=".csv", mode="w+") as temp_file:
-        # Write test data to the file
-        temp_file.write("ticker,quantity,price\nAAPL,10,150\n")
-        temp_file.flush()
-
-        # Test the behavior
-        portfolio = loader.load_portfolio(temp_file.name)
-
-        assert len(portfolio.positions) == 1
-        assert portfolio.positions[0].ticker == "AAPL"
-        assert portfolio.positions[0].quantity == 10
-        assert portfolio.positions[0].price == 150
-```
-
-### Example 3: Simple vs. Complex Tests
-
-```python
-# ❌ Bad: Overly complex test
-def test_complex_portfolio_analysis():
-    # Setting up a complex scenario with too many moving parts
-    portfolio = Portfolio()
-    for i in range(20):
-        portfolio.add_position(
-            StockPosition(
-                ticker=f"STOCK{i}",
-                quantity=10 * i,
-                price=100 + i * 5
-            )
-        )
-
-    # Adding options positions
-    for i in range(5):
-        portfolio.add_position(
-            OptionPosition(
-                ticker=f"STOCK{i}",
-                quantity=5,
-                strike=100,
-                expiry=date.today() + timedelta(days=30),
-                option_type="CALL",
-                price=5
-            )
-        )
-
-    # Complex setup of mocks
-    mock_data_fetcher = MagicMock()
-    mock_data_fetcher.get_beta.side_effect = lambda ticker: float(ticker[5:]) * 0.1
-    mock_data_fetcher.get_price.side_effect = lambda ticker: 100 + float(ticker[5:]) * 5
-
-    # Complex analysis with multiple steps
-    analyzer = PortfolioAnalyzer(data_fetcher=mock_data_fetcher)
-    result = analyzer.perform_complex_analysis(
-        portfolio,
-        include_options=True,
-        risk_free_rate=0.02,
-        market_return=0.08,
-        volatility=0.15
-    )
-
-    # Multiple assertions checking many different things
-    assert result["total_value"] > 0
-    assert result["beta"] > 0
-    assert result["sharpe_ratio"] > 0
-    assert result["option_delta"] > 0
-    assert result["option_gamma"] > 0
-    # ... many more assertions
-
-# ✅ Good: Simple, focused tests
-def test_portfolio_total_value_calculation():
-    portfolio = Portfolio()
-    portfolio.add_position(StockPosition(ticker="AAPL", quantity=10, price=150))
-    portfolio.add_position(StockPosition(ticker="MSFT", quantity=5, price=200))
-
-    analyzer = PortfolioAnalyzer()
-    result = analyzer.calculate_portfolio_metrics(portfolio)
-
-    assert result["total_value"] == 2500  # 10*150 + 5*200
-
-def test_portfolio_beta_calculation():
-    portfolio = Portfolio()
-    portfolio.add_position(StockPosition(ticker="AAPL", quantity=10, price=150, beta=1.2))
-    portfolio.add_position(StockPosition(ticker="MSFT", quantity=5, price=200, beta=1.0))
-
-    analyzer = PortfolioAnalyzer()
-    result = analyzer.calculate_portfolio_metrics(portfolio)
-
-    # (1500*1.2 + 1000*1.0) / 2500 = 1.12
-    assert result["beta"] == 1.12
-
-def test_option_delta_calculation():
-    portfolio = Portfolio()
-    portfolio.add_position(
-        OptionPosition(
-            ticker="AAPL",
-            quantity=1,
-            strike=150,
-            expiry=date.today() + timedelta(days=30),
-            option_type="CALL",
-            price=5,
-            delta=0.6
-        )
-    )
-
-    analyzer = PortfolioAnalyzer()
-    result = analyzer.calculate_option_exposure(portfolio)
-
-    assert result["delta_exposure"] == 60  # 1 contract * 100 shares * 0.6 delta
-```
-
 ## Testing External Dependencies
 
 For code that interacts with external services (APIs, databases, etc.):
@@ -416,30 +405,6 @@ def test_get_stock_price_integration():
     assert price == 150.0
 ```
 
-## Test Coverage
-
-Aim for high test coverage, but don't pursue 100% coverage at the expense of test quality:
-
-- Focus on testing critical business logic thoroughly
-- It's okay to have lower coverage for simple, low-risk code
-- Use coverage tools to identify untested code, not as a goal in itself
-
-## Testing Asynchronous Code
-
-For asynchronous code, ensure your tests properly await async functions:
-
-```python
-async def test_async_stock_price_fetch():
-    mock_api = AsyncMock()
-    mock_api.get_price.return_value = 150.0
-
-    stock_service = AsyncStockService(api=mock_api)
-    price = await stock_service.get_stock_price("AAPL")
-
-    assert price == 150.0
-    mock_api.get_price.assert_called_once_with("AAPL")
-```
-
 ## Testing Error Handling
 
 Test both the happy path and error cases:
@@ -467,45 +432,13 @@ def test_get_stock_price_api_error():
     assert "API rate limit exceeded" in str(excinfo.value)
 ```
 
-## Test Organization
-
-Organize tests to mirror your production code structure:
-
-```
-src/
-  folio/
-    portfolio.py
-    stock.py
-tests/
-  folio/
-    test_portfolio.py
-    test_stock.py
-```
-
-Group related tests into classes:
-
-```python
-class TestPortfolio:
-    def test_add_position(self):
-        # ...
-
-    def test_calculate_total_value(self):
-        # ...
-
-    def test_calculate_beta(self):
-        # ...
-```
-
-## Continuous Integration
-
-Run tests automatically on every pull request and merge to main:
-
-- Run unit tests on every PR
-- Run integration tests on every PR
-- Run E2E tests before merging to main
-
 ## Conclusion
 
-Following these testing guidelines will help maintain a high-quality, maintainable test suite that provides confidence in our codebase. Remember that tests are code too, and they should be held to the same quality standards as production code.
+By following these guidelines, we can create tests that:
 
-The goal is not to have the most tests, but to have the right tests that give us confidence in our code without becoming a burden to maintain.
+1. Focus on behavior, not implementation
+2. Are resilient to refactoring
+3. Provide confidence in our code
+4. Are easier to maintain
+
+Remember: The goal of testing is to verify that our code works correctly, not to verify how it works.

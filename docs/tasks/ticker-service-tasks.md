@@ -1,5 +1,5 @@
 ---
-date: 2025-05-10
+date: 2023-06-08
 title: Ticker Service Implementation Tasks
 author: Augment Agent
 ---
@@ -93,3 +93,12 @@ We have completed Phase 1 and are now planning for Phase 2. The current focus is
 3. Better performance for portfolio processing
 4. Comprehensive test coverage
 5. Cleaner, more maintainable code
+
+## References
+
+1. **Initial Proposal**: [docs/plans/ticker-service-proposal.md](../plans/ticker-service-proposal.md) - Original proposal and high-level design
+2. **Phase 2 Planning**: [docs/plans/ticker-service-phase2.md](../plans/ticker-service-phase2.md) - Detailed planning for Phase 2 implementation
+3. **Implementation**: [src/folib/services/ticker_service.py](../../src/folib/services/ticker_service.py) - Main implementation of the ticker service
+4. **Data Model**: [src/folib/data/ticker_data.py](../../src/folib/data/ticker_data.py) - TickerData class implementation
+5. **Position Service Integration**: [src/folib/services/position_service.py](../../src/folib/services/position_service.py) - Integration with position service
+6. **Testing Guidelines**: [docs/testing-guidelines.md](../testing-guidelines.md) - Guidelines for testing the ticker service
