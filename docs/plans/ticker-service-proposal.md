@@ -9,17 +9,17 @@ author: Augment Agent
 ## Implementation Status
 
 ### Summary
-We've completed the core implementation of the `TickerService` and `TickerData` classes, including in-memory caching with time-based invalidation. The CLI code has been updated to use the ticker service for beta values, which fixes the issue with inconsistent handling of cash positions.
+✅ **Phase 1 Complete!** We've implemented the core `TickerService` and `TickerData` classes with in-memory caching and time-based invalidation. Both the CLI code and portfolio service have been updated to use the ticker service for prices and beta values, which fixes the issue with inconsistent handling of cash positions.
 
-**Next steps:** Update the portfolio service to use the ticker service, add unit tests, and implement persistent caching.
+**Next steps:** See the Phase 2 planning document at `docs/plans/ticker-service-phase2.md` for details on data model optimization, persistent caching, and bulk prefetching.
 
 ### Phase 1: Core Implementation
 - [x] Create the `TickerData` class with properties for cash-like instruments
 - [x] Implement the basic `TickerService` class with in-memory caching
 - [x] Implement time-based cache invalidation
 - [x] Update CLI code to use the `TickerService` for beta values
-- [ ] Update CLI code to use the `TickerService` for prices in all locations
-- [ ] Update portfolio service to use the `TickerService`
+- [x] Update CLI code to use the `TickerService` for prices in all locations
+- [x] Update portfolio service to use the `TickerService`
 - [ ] Add unit tests for the `TickerService`
 
 ### Phase 2: Enhanced Features
@@ -38,9 +38,11 @@ We've completed the core implementation of the `TickerService` and `TickerData` 
 
 1. **Focused Implementation**: ✅ Applied YAGNI principle - Removed the `get_company_profile` method from `TickerService` as it's not needed right now.
 
-2. **CLI Integration**: We've updated the CLI to use the ticker service for beta values, but there are still places where it directly accesses the market data provider for prices.
+2. **CLI Integration**: ✅ Updated both the CLI and portfolio service to use the ticker service for prices and beta values.
 
-3. **Testing**: We need to create comprehensive tests for the ticker service, especially for edge cases like cash positions and missing data.
+3. **Testing**: We still need to create comprehensive tests for the ticker service, especially for edge cases like cash positions and missing data.
+
+4. **Data Duplication**: We need to analyze and reduce data duplication in our data model now that we have a centralized ticker service.
 
 ### Design Principles
 

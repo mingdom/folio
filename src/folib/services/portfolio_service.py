@@ -61,6 +61,7 @@ from ..domain import (
     StockPosition,
     UnknownPosition,
 )
+from ..services.ticker_service import ticker_service
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -446,8 +447,8 @@ def _update_unpaired_option_prices(
     for option in unpaired_options:
         try:
             # Use the option's ticker as the underlying symbol
-            underlying_price = market_data_provider.get_price(option.ticker)
-            if underlying_price is not None and underlying_price > 0:
+            underlying_price = ticker_service.get_price(option.ticker)
+            if underlying_price > 0:
                 # Create a new option position with the correct parameters
                 updated_option = OptionPosition(
                     ticker=option.ticker,
@@ -495,8 +496,8 @@ def _update_all_prices(positions: list[Position]) -> list[Position]:
     for position in positions:
         try:
             if isinstance(position, StockPosition):
-                current_price = market_data_provider.get_price(position.ticker)
-                if current_price is not None and current_price > 0:
+                current_price = ticker_service.get_price(position.ticker)
+                if current_price > 0:
                     updated_position = StockPosition(
                         ticker=position.ticker,
                         quantity=position.quantity,
@@ -512,8 +513,8 @@ def _update_all_prices(positions: list[Position]) -> list[Position]:
                     updated_positions.append(position)
             elif isinstance(position, OptionPosition):
                 # Use the option's ticker as the underlying symbol
-                underlying_price = market_data_provider.get_price(position.ticker)
-                if underlying_price is not None and underlying_price > 0:
+                underlying_price = ticker_service.get_price(position.ticker)
+                if underlying_price > 0:
                     # Create a new option position with the correct parameters
                     updated_position = OptionPosition(
                         ticker=position.ticker,
@@ -869,14 +870,13 @@ def _get_option_market_data(position: Position) -> tuple[float, float]:
     Returns:
         Tuple of (underlying_price, beta)
     """
-    try:
-        underlying_price = market_data_provider.get_price(position.ticker)
-        beta = market_data_provider.get_beta(position.ticker) or 1.0
-    except Exception as e:
-        logger.warning(f"Could not get market data for {position.ticker}: {e}")
-        # Fallback to using strike as proxy for underlying price
+    # Use ticker service to get price and beta
+    underlying_price = ticker_service.get_price(position.ticker)
+    beta = ticker_service.get_beta(position.ticker)
+
+    # If price is 0, use strike as fallback
+    if underlying_price == 0:
         underlying_price = position.strike
-        beta = 1.0  # Use beta of 1.0 as fallback
 
     return underlying_price, beta
 
@@ -891,11 +891,8 @@ def _get_position_beta(ticker: str) -> float:
     Returns:
         Beta value, or 1.0 if beta cannot be retrieved
     """
-    try:
-        return market_data_provider.get_beta(ticker) or 1.0
-    except Exception as e:
-        logger.warning(f"Could not calculate beta for {ticker}: {e}")
-        return 1.0  # Use beta of 1.0 as fallback
+    # Use ticker service to get beta
+    return ticker_service.get_beta(ticker)
 
 
 def _calculate_total_value(
@@ -1016,11 +1013,7 @@ def get_portfolio_exposures(portfolio: Portfolio) -> dict:
         market_exposure = calculate_stock_exposure(position.quantity, position.price)
 
         # Get beta for exposure calculation
-        try:
-            beta = market_data_provider.get_beta(position.ticker) or 1.0
-        except Exception as e:
-            logger.warning(f"Could not calculate beta for {position.ticker}: {e}")
-            beta = 1.0  # Use beta of 1.0 as fallback
+        beta = ticker_service.get_beta(position.ticker)
 
         # Calculate beta-adjusted exposure
         beta_adjusted = calculate_beta_adjusted_exposure(market_exposure, beta)
@@ -1034,15 +1027,13 @@ def get_portfolio_exposures(portfolio: Portfolio) -> dict:
 
     # Process option positions
     for position in portfolio.option_positions:
-        # Get underlying price and beta
-        try:
-            underlying_price = market_data_provider.get_price(position.ticker)
-            beta = market_data_provider.get_beta(position.ticker) or 1.0
-        except Exception as e:
-            logger.warning(f"Could not get market data for {position.ticker}: {e}")
-            # Fallback to using strike as proxy for underlying price
+        # Get underlying price and beta using ticker service
+        underlying_price = ticker_service.get_price(position.ticker)
+        beta = ticker_service.get_beta(position.ticker)
+
+        # If price is 0, use strike as fallback
+        if underlying_price == 0:
             underlying_price = position.strike
-            beta = 1.0  # Use beta of 1.0 as fallback
 
         # Calculate option exposures using the calculation modules with fallback
         delta = calculate_option_delta(
