@@ -117,30 +117,54 @@ This proposal affects:
 ### Phase 2.1: Data Model Optimization
 
 1. Identify all places where market data is duplicated
-2. Refactor position objects to use the ticker service
-3. Update all code that accesses market data to use the ticker service
-4. Add tests to verify the refactored code
+2. Implement property-based access in position objects that call the ticker service
+3. Keep core position data in position objects, but make derived data use the ticker service
+4. Update all code that directly accesses market data to use the ticker service
 
 ### Phase 2.2: Cache Integration
 
 1. Analyze the existing cache decorator pattern
-2. Apply cache decorators to key methods in the ticker service
-3. Implement cache management methods
-4. Add tests for cache behavior
+2. Implement a multi-level caching strategy:
+   - Keep a small in-memory cache for frequent lookups
+   - Use the persistent cache decorator for longer-term storage
+3. Establish clear boundaries between the two caching layers
+4. Implement cache management methods
 
-### Phase 2.3: Bulk Prefetching
+### Future Phases (Deferred)
+
+#### Phase 3.1: Bulk Prefetching
 
 1. Implement methods to analyze portfolios for unique tickers
 2. Create batch processing capabilities for API calls
 3. Add prefetching triggers in key workflows
 4. Test prefetching performance
 
-### Phase 2.4: Testing
+#### Phase 3.2: Testing
 
 1. Create unit tests for all ticker service methods
 2. Add integration tests with the portfolio service
 3. Test edge cases and error handling
 4. Measure and optimize performance
+
+## Additional Assumptions
+
+1. **Position Data Model**:
+   - Core position data (ticker, quantity, price, etc.) will remain in position objects
+   - Derived data (beta, exposures) will be accessed via properties that call the ticker service
+   - This maintains clean separation while keeping essential data close to where it's used
+
+2. **Caching Strategy**:
+   - We'll implement a multi-level caching approach with both in-memory and persistent caches
+   - The persistent cache will be the source of truth, with the in-memory cache as a performance optimization
+   - Clear cache invalidation policies will be established for both layers
+
+3. **Manual Testing**:
+   - We'll test the implementation manually through the CLI before adding automated tests
+   - This allows for adjustments based on real-world usage before locking down the implementation
+
+4. **Incremental Approach**:
+   - We'll implement and test the data model optimization and cache integration first
+   - Prefetching and comprehensive testing will be deferred to a later phase
 
 ## Open Questions
 
