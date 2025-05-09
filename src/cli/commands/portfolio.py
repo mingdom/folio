@@ -132,7 +132,7 @@ def portfolio_list_cmd(
 
         # Parse filter arguments
         filter_criteria = {}
-        sort_by = "value"
+        sort_by = "beta_adjusted_exposure"  # Default to beta-adjusted exposure
         sort_direction = "desc"
 
         if filter_args:
@@ -157,8 +157,78 @@ def portfolio_list_cmd(
 
         # Display positions
         if filtered_positions:
+            # Get portfolio exposures to access exposure data
+            get_portfolio_exposures(portfolio)
+
             # Create a list of dictionaries for the table using to_dict method
-            position_data = [p.to_dict() for p in filtered_positions]
+            position_data = []
+
+            for position in filtered_positions:
+                # Start with the basic position data
+                pos_dict = position.to_dict()
+
+                # Calculate exposure based on position type
+                if position.position_type == "stock":
+                    from src.folib.calculations.exposure import (
+                        calculate_beta_adjusted_exposure,
+                        calculate_stock_exposure,
+                    )
+                    from src.folib.data.market_data import market_data_provider
+
+                    # Calculate stock exposure
+                    market_exposure = calculate_stock_exposure(
+                        position.quantity, position.price
+                    )
+                    # Get beta for the stock
+                    beta = market_data_provider.get_beta(position.ticker) or 1.0
+                    # Calculate beta-adjusted exposure
+                    beta_adjusted_exposure = calculate_beta_adjusted_exposure(
+                        market_exposure, beta
+                    )
+                elif position.position_type == "option":
+                    from src.folib.calculations.exposure import (
+                        calculate_beta_adjusted_exposure,
+                        calculate_option_exposure,
+                    )
+                    from src.folib.calculations.options import calculate_option_delta
+                    from src.folib.data.market_data import market_data_provider
+
+                    # Get underlying price and beta
+                    try:
+                        underlying_price = market_data_provider.get_price(
+                            position.ticker
+                        )
+                        beta = market_data_provider.get_beta(position.ticker) or 1.0
+                    except Exception:
+                        # Fallback to using strike as proxy for underlying price
+                        underlying_price = position.strike
+                        beta = 1.0
+
+                    # Calculate delta
+                    delta = calculate_option_delta(
+                        option_type=position.option_type,
+                        strike=position.strike,
+                        expiry=position.expiry,
+                        underlying_price=underlying_price,
+                    )
+
+                    # Calculate exposure
+                    market_exposure = calculate_option_exposure(
+                        position.quantity, underlying_price, delta
+                    )
+                    beta_adjusted_exposure = calculate_beta_adjusted_exposure(
+                        market_exposure, beta
+                    )
+                else:
+                    # For cash or unknown positions, exposure is zero
+                    market_exposure = 0.0
+                    beta_adjusted_exposure = 0.0
+
+                # Add beta and exposure values to the position dictionary
+                pos_dict["beta"] = beta
+                pos_dict["beta_adjusted_exposure"] = beta_adjusted_exposure
+
+                position_data.append(pos_dict)
 
             # Create and display the table
             table = create_positions_table(
@@ -272,7 +342,7 @@ def portfolio_list(state, args):
 
         # Parse filter arguments
         filter_criteria = {}
-        sort_by = "value"
+        sort_by = "beta_adjusted_exposure"  # Default to beta-adjusted exposure
         sort_direction = "desc"
 
         for arg in args:
@@ -296,8 +366,78 @@ def portfolio_list(state, args):
 
         # Display positions
         if filtered_positions:
+            # Get portfolio exposures to access exposure data
+            get_portfolio_exposures(state.portfolio)
+
             # Create a list of dictionaries for the table using to_dict method
-            position_data = [p.to_dict() for p in filtered_positions]
+            position_data = []
+
+            for position in filtered_positions:
+                # Start with the basic position data
+                pos_dict = position.to_dict()
+
+                # Calculate exposure based on position type
+                if position.position_type == "stock":
+                    from src.folib.calculations.exposure import (
+                        calculate_beta_adjusted_exposure,
+                        calculate_stock_exposure,
+                    )
+                    from src.folib.data.market_data import market_data_provider
+
+                    # Calculate stock exposure
+                    market_exposure = calculate_stock_exposure(
+                        position.quantity, position.price
+                    )
+                    # Get beta for the stock
+                    beta = market_data_provider.get_beta(position.ticker) or 1.0
+                    # Calculate beta-adjusted exposure
+                    beta_adjusted_exposure = calculate_beta_adjusted_exposure(
+                        market_exposure, beta
+                    )
+                elif position.position_type == "option":
+                    from src.folib.calculations.exposure import (
+                        calculate_beta_adjusted_exposure,
+                        calculate_option_exposure,
+                    )
+                    from src.folib.calculations.options import calculate_option_delta
+                    from src.folib.data.market_data import market_data_provider
+
+                    # Get underlying price and beta
+                    try:
+                        underlying_price = market_data_provider.get_price(
+                            position.ticker
+                        )
+                        beta = market_data_provider.get_beta(position.ticker) or 1.0
+                    except Exception:
+                        # Fallback to using strike as proxy for underlying price
+                        underlying_price = position.strike
+                        beta = 1.0
+
+                    # Calculate delta
+                    delta = calculate_option_delta(
+                        option_type=position.option_type,
+                        strike=position.strike,
+                        expiry=position.expiry,
+                        underlying_price=underlying_price,
+                    )
+
+                    # Calculate exposure
+                    market_exposure = calculate_option_exposure(
+                        position.quantity, underlying_price, delta
+                    )
+                    beta_adjusted_exposure = calculate_beta_adjusted_exposure(
+                        market_exposure, beta
+                    )
+                else:
+                    # For cash or unknown positions, exposure is zero
+                    market_exposure = 0.0
+                    beta_adjusted_exposure = 0.0
+
+                # Add beta and exposure values to the position dictionary
+                pos_dict["beta"] = beta
+                pos_dict["beta_adjusted_exposure"] = beta_adjusted_exposure
+
+                position_data.append(pos_dict)
 
             # Create and display the table
             table = create_positions_table(
