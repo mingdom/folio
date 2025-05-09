@@ -10,19 +10,17 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
-from src.folib.calculations.exposure import (
-    calculate_beta_adjusted_exposure,
-    calculate_option_exposure,
-    calculate_stock_exposure,
-)
-from src.folib.calculations.options import calculate_option_delta
 from src.folib.services.portfolio_service import (
     create_portfolio_summary,
     filter_positions_by_criteria,
     get_portfolio_exposures,
     sort_positions,
 )
-from src.folib.services.ticker_service import ticker_service
+from src.folib.services.position_service import (
+    get_position_beta,
+    get_position_beta_adjusted_exposure,
+    get_position_market_exposure,
+)
 
 from ..formatters import (
     create_exposures_table,
@@ -174,47 +172,10 @@ def portfolio_list_cmd(
                 # Start with the basic position data
                 pos_dict = position.to_dict()
 
-                # Calculate exposure based on position type
-                if position.position_type == "stock":
-                    # Calculate stock exposure
-                    market_exposure = calculate_stock_exposure(
-                        position.quantity, position.price
-                    )
-                    # Get beta for the stock using the ticker service
-                    beta = ticker_service.get_beta(position.ticker)
-                    # Calculate beta-adjusted exposure
-                    beta_adjusted_exposure = calculate_beta_adjusted_exposure(
-                        market_exposure, beta
-                    )
-                elif position.position_type == "option":
-                    # Get underlying price and beta using the ticker service
-                    underlying_price = ticker_service.get_price(position.ticker)
-                    beta = ticker_service.get_beta(position.ticker)
-
-                    # If price is 0, use strike as fallback
-                    if underlying_price == 0:
-                        underlying_price = position.strike
-
-                    # Calculate delta
-                    delta = calculate_option_delta(
-                        option_type=position.option_type,
-                        strike=position.strike,
-                        expiry=position.expiry,
-                        underlying_price=underlying_price,
-                    )
-
-                    # Calculate exposure
-                    market_exposure = calculate_option_exposure(
-                        position.quantity, underlying_price, delta
-                    )
-                    beta_adjusted_exposure = calculate_beta_adjusted_exposure(
-                        market_exposure, beta
-                    )
-                else:
-                    # For cash or unknown positions, get values from ticker service
-                    beta = ticker_service.get_beta(position.ticker)
-                    market_exposure = 0.0  # Cash has no market exposure
-                    beta_adjusted_exposure = 0.0  # Cash has no beta-adjusted exposure
+                # Use the position service to calculate exposures
+                beta = get_position_beta(position)
+                get_position_market_exposure(position)
+                beta_adjusted_exposure = get_position_beta_adjusted_exposure(position)
 
                 # Add beta and exposure values to the position dictionary
                 pos_dict["beta"] = beta
@@ -283,7 +244,7 @@ def portfolio_load(state, args):
         console.print(f"[red]Error loading portfolio:[/red] {e!s}")
 
 
-def portfolio_summary(state, args):  # noqa: ARG001
+def portfolio_summary(state, _args):
     """Display high-level portfolio metrics (interactive mode)."""
     # Check if portfolio is loaded
     if not state.has_portfolio():
@@ -375,47 +336,10 @@ def portfolio_list(state, args):
                 # Start with the basic position data
                 pos_dict = position.to_dict()
 
-                # Calculate exposure based on position type
-                if position.position_type == "stock":
-                    # Calculate stock exposure
-                    market_exposure = calculate_stock_exposure(
-                        position.quantity, position.price
-                    )
-                    # Get beta for the stock using the ticker service
-                    beta = ticker_service.get_beta(position.ticker)
-                    # Calculate beta-adjusted exposure
-                    beta_adjusted_exposure = calculate_beta_adjusted_exposure(
-                        market_exposure, beta
-                    )
-                elif position.position_type == "option":
-                    # Get underlying price and beta using the ticker service
-                    underlying_price = ticker_service.get_price(position.ticker)
-                    beta = ticker_service.get_beta(position.ticker)
-
-                    # If price is 0, use strike as fallback
-                    if underlying_price == 0:
-                        underlying_price = position.strike
-
-                    # Calculate delta
-                    delta = calculate_option_delta(
-                        option_type=position.option_type,
-                        strike=position.strike,
-                        expiry=position.expiry,
-                        underlying_price=underlying_price,
-                    )
-
-                    # Calculate exposure
-                    market_exposure = calculate_option_exposure(
-                        position.quantity, underlying_price, delta
-                    )
-                    beta_adjusted_exposure = calculate_beta_adjusted_exposure(
-                        market_exposure, beta
-                    )
-                else:
-                    # For cash or unknown positions, get values from ticker service
-                    beta = ticker_service.get_beta(position.ticker)
-                    market_exposure = 0.0  # Cash has no market exposure
-                    beta_adjusted_exposure = 0.0  # Cash has no beta-adjusted exposure
+                # Use the position service to calculate exposures
+                beta = get_position_beta(position)
+                get_position_market_exposure(position)
+                beta_adjusted_exposure = get_position_beta_adjusted_exposure(position)
 
                 # Add beta and exposure values to the position dictionary
                 pos_dict["beta"] = beta

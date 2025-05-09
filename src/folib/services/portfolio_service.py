@@ -186,31 +186,77 @@ def _create_stock_positions(
 
 def _create_option_positions(
     non_cash_holdings: list[PortfolioHolding],
+    stock_tickers: set[str] | None = None,
 ) -> list[OptionPosition]:
     """
     Create option positions from non-cash holdings.
 
     Args:
         non_cash_holdings: List of non-cash holdings
+        stock_tickers: Set of stock tickers for identifying unpaired options
 
     Returns:
-        List of option positions
+        List of option positions with updated underlying prices for unpaired options
     """
     option_positions = []
+    unpaired_count = 0
 
-    for holding in non_cash_holdings:
-        if _is_option_holding(holding):
-            try:
-                option_position = _parse_option_position(holding)
-                if option_position:
-                    option_positions.append(option_position)
-                    logger.debug(f"Created option position for {holding.symbol}")
-            except Exception as e:
-                logger.warning(
-                    f"Could not create option position for {holding.symbol}: {e}"
-                )
+    # Filter for option holdings first
+    option_holdings = [h for h in non_cash_holdings if _is_option_holding(h)]
+
+    for holding in option_holdings:
+        # Try to parse the option position, continue to next holding if it fails
+        try:
+            option_position = _parse_option_position(holding)
+        except Exception as e:
+            logger.warning(
+                f"Could not create option position for {holding.symbol}: {e}"
+            )
+            continue
+
+        # Skip if parsing returned None
+        if not option_position:
+            continue
+
+        # Check if this is an unpaired option and update its price if needed
+        if stock_tickers and option_position.ticker not in stock_tickers:
+            unpaired_count += 1
+            _update_unpaired_option_price(option_position)
+
+        option_positions.append(option_position)
+        logger.debug(f"Created option position for {holding.symbol}")
+
+    if unpaired_count > 0:
+        logger.info(f"Updated {unpaired_count} unpaired options during creation")
 
     return option_positions
+
+
+def _update_unpaired_option_price(option_position: OptionPosition) -> None:
+    """
+    Update the underlying price for an unpaired option.
+
+    Args:
+        option_position: The option position to update
+    """
+    try:
+        underlying_price = ticker_service.get_price(option_position.ticker)
+        if underlying_price <= 0:
+            return
+
+        # Set the underlying_price attribute
+        object.__setattr__(
+            option_position,
+            "underlying_price",
+            underlying_price,
+        )
+        logger.debug(
+            f"Updated underlying price for unpaired option {option_position.ticker} to {underlying_price}"
+        )
+    except Exception as e:
+        logger.error(
+            f"Error updating underlying price for {option_position.ticker}: {e!s}"
+        )
 
 
 def _parse_option_position(holding: PortfolioHolding) -> OptionPosition | None:
@@ -294,32 +340,9 @@ def _parse_option_position(holding: PortfolioHolding) -> OptionPosition | None:
         return None
 
 
-def _identify_unpaired_options(positions: list[Position]) -> list[OptionPosition]:
-    """
-    Identify options that don't have a matching stock position.
-
-    Args:
-        positions: List of all positions
-
-    Returns:
-        List of unpaired option positions
-    """
-    # Create a set of all stock tickers
-    stock_tickers = {
-        position.ticker for position in positions if position.position_type == "stock"
-    }
-
-    # Find options without matching stock positions
-    unpaired_options = [
-        position
-        for position in positions
-        if position.position_type == "option" and position.ticker not in stock_tickers
-    ]
-
-    if unpaired_options:
-        logger.debug(f"Found {len(unpaired_options)} unpaired options")
-
-    return unpaired_options
+# The _identify_unpaired_options function has been removed as part of the refactoring
+# to identify unpaired options during initial parsing.
+# This functionality is now handled in the _create_option_positions function.
 
 
 def _synchronize_option_underlying_prices(positions: list[Position]) -> list[Position]:
@@ -385,95 +408,9 @@ def _synchronize_option_underlying_prices(positions: list[Position]) -> list[Pos
     return updated_positions
 
 
-def _update_unpaired_options_in_portfolio(positions: list[Position]) -> list[Position]:
-    """
-    Update prices for unpaired options in the portfolio.
-
-    This function:
-    1. Identifies options without matching stock positions
-    2. Updates their prices from market data
-    3. Returns a new positions list with updated unpaired options
-
-    Args:
-        positions: List of all positions
-
-    Returns:
-        Updated list of positions with new prices for unpaired options
-    """
-    # Identify options that don't have matching stock positions
-    unpaired_options = _identify_unpaired_options(positions)
-
-    if not unpaired_options:
-        logger.info(
-            "No unpaired options found - using raw CSV prices for all positions"
-        )
-        return positions
-
-    logger.info(f"Found {len(unpaired_options)} unpaired options to update")
-    updated_options = _update_unpaired_option_prices(unpaired_options)
-
-    # Keep track of which options are unpaired by ticker
-    unpaired_tickers = {option.ticker for option in unpaired_options}
-
-    # Remove only the unpaired options, keeping the paired ones
-    filtered_positions = [
-        pos
-        for pos in positions
-        if not (isinstance(pos, OptionPosition) and pos.ticker in unpaired_tickers)
-    ]
-
-    # Add back the updated unpaired options
-    filtered_positions.extend(updated_options)
-    return filtered_positions
-
-
-def _update_unpaired_option_prices(
-    unpaired_options: list[OptionPosition],
-) -> list[OptionPosition]:
-    """
-    Update underlying prices for unpaired options from market data.
-
-    Args:
-        unpaired_options: List of unpaired option positions
-
-    Returns:
-        List of updated option positions with new underlying prices
-
-    Note:
-        This function only updates the underlying price for unpaired options,
-        keeping the original option price as it represents the premium paid.
-    """
-    updated_options = []
-    for option in unpaired_options:
-        try:
-            # Use the option's ticker as the underlying symbol
-            underlying_price = ticker_service.get_price(option.ticker)
-            if underlying_price > 0:
-                # Create a new option position with the correct parameters
-                updated_option = OptionPosition(
-                    ticker=option.ticker,
-                    quantity=option.quantity,
-                    price=option.price,  # Keep original price for options
-                    cost_basis=option.cost_basis,
-                    strike=option.strike,
-                    expiry=option.expiry,
-                    option_type=option.option_type,
-                    raw_data=getattr(option, "raw_data", None),
-                )
-                # Set the underlying_price attribute
-                object.__setattr__(updated_option, "underlying_price", underlying_price)
-                updated_options.append(updated_option)
-                logger.debug(
-                    f"Updated underlying price for {option.ticker} to {underlying_price}"
-                )
-            else:
-                logger.warning(f"No valid underlying price found for {option.ticker}")
-                updated_options.append(option)
-        except Exception as e:
-            logger.error(f"Error updating underlying price for {option.ticker}: {e!s}")
-            updated_options.append(option)
-
-    return updated_options
+# The _update_unpaired_options_in_portfolio and _update_unpaired_option_prices functions
+# have been removed as part of the refactoring to identify unpaired options during initial parsing.
+# This functionality is now handled in the _create_option_positions function.
 
 
 def _update_all_prices(positions: list[Position]) -> list[Position]:
@@ -496,6 +433,7 @@ def _update_all_prices(positions: list[Position]) -> list[Position]:
     for position in positions:
         try:
             if isinstance(position, StockPosition):
+                # Use the ticker service to get the current price
                 current_price = ticker_service.get_price(position.ticker)
                 if current_price > 0:
                     updated_position = StockPosition(
@@ -503,6 +441,7 @@ def _update_all_prices(positions: list[Position]) -> list[Position]:
                         quantity=position.quantity,
                         price=current_price,
                         cost_basis=position.cost_basis,
+                        raw_data=position.raw_data,
                     )
                     updated_positions.append(updated_position)
                     logger.debug(
@@ -512,7 +451,7 @@ def _update_all_prices(positions: list[Position]) -> list[Position]:
                     logger.warning(f"No valid price found for {position.ticker}")
                     updated_positions.append(position)
             elif isinstance(position, OptionPosition):
-                # Use the option's ticker as the underlying symbol
+                # Use the ticker service to get the current price
                 underlying_price = ticker_service.get_price(position.ticker)
                 if underlying_price > 0:
                     # Create a new option position with the correct parameters
@@ -550,7 +489,7 @@ def _update_all_prices(positions: list[Position]) -> list[Position]:
 
 
 def process_portfolio(
-    holdings: list[PortfolioHolding],
+    holdings_data: tuple[list[PortfolioHolding], set[str]],
     # Controls whether to update prices from market data
     # Default is False to minimize API calls
     # When False, uses raw CSV prices first and only updates prices for unpaired options
@@ -575,7 +514,9 @@ def process_portfolio(
     - Processes cash positions with special symbols
 
     Args:
-        holdings: List of portfolio holdings from parse_portfolio_holdings()
+        holdings_data: Tuple containing:
+                      - List of portfolio holdings from parse_portfolio_holdings()
+                      - Set of stock tickers for option pairing
         update_prices: Whether to update prices from market data (default: False)
                       When False, only updates prices for unpaired options
                       to ensure accurate exposure calculations.
@@ -586,6 +527,9 @@ def process_portfolio(
     Raises:
         ValueError: If multiple pending activity entries are found
     """
+    # Unpack the holdings data
+    holdings, stock_tickers = holdings_data
+
     logger.debug("Processing portfolio with %d holdings", len(holdings))
 
     # Categorize holdings into different types and extract pending activity
@@ -600,8 +544,8 @@ def process_portfolio(
     stock_positions = _create_stock_positions(non_cash_holdings)
     positions.extend(stock_positions)
 
-    # Process option positions
-    option_positions = _create_option_positions(non_cash_holdings)
+    # Process option positions with stock tickers for unpaired option identification
+    option_positions = _create_option_positions(non_cash_holdings, stock_tickers)
     positions.extend(option_positions)
 
     # Add cash and unknown positions
@@ -611,9 +555,8 @@ def process_portfolio(
     # Synchronize option underlying prices with paired stocks
     _synchronize_option_underlying_prices(positions)
 
-    # By default, update only unpaired options
-    logger.info("Using raw CSV prices first, updating only unpaired option prices")
-    positions = _update_unpaired_options_in_portfolio(positions)
+    # We no longer need to update unpaired options separately as they're updated during creation
+    logger.info("Using raw CSV prices with unpaired options updated during creation")
 
     # If update_prices flag is set, update all positions
     if update_prices:

@@ -75,8 +75,10 @@ def load_portfolio(
 
     # Parse portfolio holdings
     console.print("Parsing portfolio holdings...")
-    holdings = parse_portfolio_holdings(df)
-    console.print(f"Parsed [bold]{len(holdings)}[/bold] holdings")
+    holdings, stock_tickers = parse_portfolio_holdings(df)
+    console.print(
+        f"Parsed [bold]{len(holdings)}[/bold] holdings with [bold]{len(stock_tickers)}[/bold] stock tickers"
+    )
 
     # Process the portfolio
     console.print("Processing portfolio...")
@@ -91,7 +93,9 @@ def load_portfolio(
         console.print(
             "[yellow]Updating all prices from market data (this may use significant API quota)[/yellow]"
         )
-    portfolio = process_portfolio(holdings, update_prices=update_prices)
+    portfolio = process_portfolio(
+        (holdings, stock_tickers), update_prices=update_prices
+    )
     console.print(
         f"Processed portfolio with [bold]{len(portfolio.positions)}[/bold] positions"
     )
@@ -99,5 +103,6 @@ def load_portfolio(
     return {
         "df": df,
         "holdings": holdings,
+        "stock_tickers": stock_tickers,
         "portfolio": portfolio,
     }

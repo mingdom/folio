@@ -8,6 +8,7 @@ including prices, beta values, and company profiles.
 import logging
 from datetime import datetime, timedelta
 
+from ..data.cache import cached
 from ..data.market_data import MarketDataProvider, market_data_provider
 from ..data.ticker_data import TickerData
 
@@ -33,6 +34,7 @@ class TickerService:
         )  # Cache prices for 15 minutes
         self._beta_cache_duration = timedelta(days=1)  # Cache beta values for 1 day
 
+    @cached(ttl=900, key_prefix="ticker_data")  # 15 minutes TTL
     def get_ticker_data(self, ticker: str) -> TickerData:
         """
         Get data for a ticker, fetching if necessary.
@@ -45,7 +47,7 @@ class TickerService:
         """
         ticker = ticker.upper()  # Normalize ticker to uppercase
 
-        # Check if we already have data for this ticker
+        # Check if we already have data for this ticker in memory
         if ticker in self._ticker_data:
             # Check if the data is still valid
             ticker_data = self._ticker_data[ticker]
@@ -55,6 +57,7 @@ class TickerService:
         # Fetch new data
         return self._fetch_ticker_data(ticker)
 
+    @cached(ttl=900, key_prefix="ticker_price")  # 15 minutes TTL
     def get_price(self, ticker: str) -> float:
         """
         Get the price for a ticker.
@@ -68,6 +71,7 @@ class TickerService:
         ticker_data = self.get_ticker_data(ticker)
         return ticker_data.effective_price
 
+    @cached(ttl=86400, key_prefix="ticker_beta")  # 24 hours TTL
     def get_beta(self, ticker: str) -> float:
         """
         Get the beta for a ticker.
@@ -97,7 +101,8 @@ class TickerService:
     def clear_cache(self) -> None:
         """Clear the ticker data cache."""
         self._ticker_data = {}
-        logger.info("Ticker data cache cleared")
+        logger.info("Ticker data in-memory cache cleared")
+        # Note: This doesn't clear the persistent cache from the cache decorator
 
     def _fetch_ticker_data(self, ticker: str) -> TickerData:
         """

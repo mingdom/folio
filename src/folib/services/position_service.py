@@ -54,7 +54,7 @@ def analyze_position(
 
     Args:
         position: The position to analyze
-        market_data: Market data provider
+        market_data: Market data provider for volatility data
 
     Returns:
         Dictionary containing:
@@ -64,13 +64,21 @@ def analyze_position(
         - P&L metrics
     """
     if isinstance(position, StockPosition):
-        return analyze_stock_position(position, market_data)
+        return analyze_stock_position(position)
     else:
         return analyze_option_position(position, market_data)
 
 
 def analyze_stock_position(position: StockPosition) -> dict:
-    """Analyze a stock position."""
+    """
+    Analyze a stock position.
+
+    Args:
+        position: The stock position to analyze
+
+    Returns:
+        Dictionary with analysis results
+    """
     # Use the ticker service to get the price and beta
     current_price = ticker_service.get_price(position.ticker)
     beta = ticker_service.get_beta(position.ticker)
@@ -96,7 +104,16 @@ def analyze_option_position(
     position: OptionPosition,
     market_data: MarketData,
 ) -> dict:
-    """Analyze an option position."""
+    """
+    Analyze an option position.
+
+    Args:
+        position: The option position to analyze
+        market_data: Market data provider for volatility data
+
+    Returns:
+        Dictionary with analysis results
+    """
     # Use the ticker service to get the price and beta
     underlying_price = ticker_service.get_price(position.ticker)
     beta = ticker_service.get_beta(position.ticker)
