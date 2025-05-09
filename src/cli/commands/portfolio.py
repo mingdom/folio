@@ -152,7 +152,7 @@ def portfolio_list_cmd(
         # Apply filters using the filter_positions_by_criteria function
         filtered_positions = filter_positions_by_criteria(positions, filter_criteria)
 
-        # Sort positions using the sort_positions function
+        # Use standard sorting for all fields
         filtered_positions = sort_positions(filtered_positions, sort_by, sort_direction)
 
         # Display positions
@@ -223,12 +223,20 @@ def portfolio_list_cmd(
                     # For cash or unknown positions, exposure is zero
                     market_exposure = 0.0
                     beta_adjusted_exposure = 0.0
+                    beta = 0.0  # Set beta to 0 for cash and unknown positions
 
                 # Add beta and exposure values to the position dictionary
                 pos_dict["beta"] = beta
                 pos_dict["beta_adjusted_exposure"] = beta_adjusted_exposure
 
                 position_data.append(pos_dict)
+
+            # Sort position data by beta-adjusted exposure if that's the sort criteria
+            if sort_by.lower() == "beta_adjusted_exposure":
+                position_data.sort(
+                    key=lambda x: x["beta_adjusted_exposure"],
+                    reverse=(sort_direction.lower() == "desc"),
+                )
 
             # Create and display the table
             table = create_positions_table(
@@ -361,7 +369,7 @@ def portfolio_list(state, args):
         # Apply filters using the filter_positions_by_criteria function
         filtered_positions = filter_positions_by_criteria(positions, filter_criteria)
 
-        # Sort positions using the sort_positions function
+        # Use standard sorting for all fields
         filtered_positions = sort_positions(filtered_positions, sort_by, sort_direction)
 
         # Display positions
@@ -432,12 +440,20 @@ def portfolio_list(state, args):
                     # For cash or unknown positions, exposure is zero
                     market_exposure = 0.0
                     beta_adjusted_exposure = 0.0
+                    beta = 0.0  # Set beta to 0 for cash and unknown positions
 
                 # Add beta and exposure values to the position dictionary
                 pos_dict["beta"] = beta
                 pos_dict["beta_adjusted_exposure"] = beta_adjusted_exposure
 
                 position_data.append(pos_dict)
+
+            # Sort position data by beta-adjusted exposure if that's the sort criteria
+            if sort_by.lower() == "beta_adjusted_exposure":
+                position_data.sort(
+                    key=lambda x: x["beta_adjusted_exposure"],
+                    reverse=(sort_direction.lower() == "desc"),
+                )
 
             # Create and display the table
             table = create_positions_table(
