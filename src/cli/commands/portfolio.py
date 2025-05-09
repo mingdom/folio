@@ -10,6 +10,12 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
+from src.folib.calculations.exposure import (
+    calculate_beta_adjusted_exposure,
+    calculate_option_exposure,
+    calculate_stock_exposure,
+)
+from src.folib.calculations.options import calculate_option_delta
 from src.folib.services.portfolio_service import (
     create_portfolio_summary,
     filter_positions_by_criteria,
@@ -170,11 +176,6 @@ def portfolio_list_cmd(
 
                 # Calculate exposure based on position type
                 if position.position_type == "stock":
-                    from src.folib.calculations.exposure import (
-                        calculate_beta_adjusted_exposure,
-                        calculate_stock_exposure,
-                    )
-
                     # Calculate stock exposure
                     market_exposure = calculate_stock_exposure(
                         position.quantity, position.price
@@ -186,12 +187,6 @@ def portfolio_list_cmd(
                         market_exposure, beta
                     )
                 elif position.position_type == "option":
-                    from src.folib.calculations.exposure import (
-                        calculate_beta_adjusted_exposure,
-                        calculate_option_exposure,
-                    )
-                    from src.folib.calculations.options import calculate_option_delta
-
                     # Get underlying price and beta using the ticker service
                     underlying_price = ticker_service.get_price(position.ticker)
                     beta = ticker_service.get_beta(position.ticker)
@@ -382,11 +377,6 @@ def portfolio_list(state, args):
 
                 # Calculate exposure based on position type
                 if position.position_type == "stock":
-                    from src.folib.calculations.exposure import (
-                        calculate_beta_adjusted_exposure,
-                        calculate_stock_exposure,
-                    )
-
                     # Calculate stock exposure
                     market_exposure = calculate_stock_exposure(
                         position.quantity, position.price
@@ -398,12 +388,6 @@ def portfolio_list(state, args):
                         market_exposure, beta
                     )
                 elif position.position_type == "option":
-                    from src.folib.calculations.exposure import (
-                        calculate_beta_adjusted_exposure,
-                        calculate_option_exposure,
-                    )
-                    from src.folib.calculations.options import calculate_option_delta
-
                     # Get underlying price and beta using the ticker service
                     underlying_price = ticker_service.get_price(position.ticker)
                     beta = ticker_service.get_beta(position.ticker)

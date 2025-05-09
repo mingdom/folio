@@ -80,6 +80,7 @@ def test_get_company_profile(ticker_service):
 
 def test_prefetch_tickers(ticker_service, mock_market_data_provider):
     """Test prefetching multiple tickers."""
+
     # Set up different responses for different tickers
     def get_price_side_effect(ticker):
         if ticker == "AAPL":
