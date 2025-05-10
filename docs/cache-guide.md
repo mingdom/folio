@@ -155,7 +155,7 @@ class DataService:
 
 ### Cache Management
 
-The cache module provides several functions for managing the cache:
+The cache module provides several functions for managing the cache programmatically:
 
 ```python
 from src.folib.data.cache import clear_cache, log_cache_stats
@@ -171,6 +171,16 @@ log_cache_stats()
 
 # Log detailed statistics
 log_cache_stats(aggregate=False)
+```
+
+You can also clear the cache when loading a portfolio by using the `--no-cache` option:
+
+```bash
+# CLI command
+python -m src.cli portfolio load path/to/portfolio.csv --no-cache
+
+# Interactive shell
+folio> portfolio load path/to/portfolio.csv --no-cache
 ```
 
 ## Cache Statistics
