@@ -13,7 +13,7 @@ from typing import Literal
 # Import QuantLib and suppress SWIG-related DeprecationWarnings
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore", category=DeprecationWarning)
-    import QuantLib as ql  # noqa: N813
+    import QuantLib as ql
 
 # Configure logger
 logger = logging.getLogger(__name__)

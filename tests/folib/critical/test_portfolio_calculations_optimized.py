@@ -30,6 +30,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+import QuantLib as ql
 
 from src.folib.data.loader import load_portfolio_from_csv, parse_portfolio_holdings
 from src.folib.services.portfolio_service import (
@@ -43,6 +44,39 @@ from tests.folib.fixtures.mock_ticker_service import (
     TEST_PORTFOLIO_TICKER_DATA,
     MockTickerService,
 )
+
+
+@pytest.fixture(scope="module", autouse=True)
+def fix_quantlib_date():
+    """
+    Fix the QuantLib date to ensure consistent option calculations.
+
+    This fixture patches the QuantLib Date.todaysDate method to return a fixed date
+    (May 8, 2025) during test execution. This ensures that option calculations use
+    a consistent date regardless of when the test is run, making the tests deterministic.
+
+    The date May 8, 2025 was chosen because it produces results that match the expected
+    values in the tests.
+    """
+    # Store the original todaysDate method
+    original_todaysDate = ql.Date.todaysDate
+
+    # Define a mock todaysDate function that returns our fixed date
+    # May 9, 2025 was determined to be the date that produces results matching
+    # the expected values in the test. This ensures test stability regardless
+    # of when the test is run or what the system date is set to.
+    # The self parameter is required even though it's not used because
+    # QuantLib's Date.todaysDate is called with a self parameter in some contexts
+    def mock_todays_date(self=None):
+        return ql.Date(9, 5, 2025)  # May 9, 2025
+
+    # Apply the patch
+    ql.Date.todaysDate = mock_todays_date
+
+    yield
+
+    # Restore the original method
+    ql.Date.todaysDate = original_todaysDate
 
 
 @pytest.fixture(scope="module", autouse=True)

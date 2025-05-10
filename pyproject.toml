@@ -102,6 +102,7 @@ ignore = [
     "E501",  # line too long - let's handle line length more flexibly for data science code
     "N803",  # argument name should be lowercase - common in ML to use X, y
     "N806",  # variable name should be lowercase - common in ML to use X_train, y_test
+    "N813",  # camelcase module imported as lowercase - common for libraries like QuantLib
     "PLR0913",  # too many arguments - common in ML functions with many parameters
     "PLR0912",  # too many branches - common in ML data processing and training loops
     "PLR0915",  # too many statements - common in ML training and evaluation functions
@@ -144,7 +145,7 @@ exclude = [
 "src/stockdata.py" = ["PLC0415"]
 "src/yfinance.py" = ["PLC0415"]
 "src/folio/**/*.py" = ["PLC0415"]
-"tests/**/*.py" = ["PLC0415"]
+"tests/**/*.py" = ["PLC0415", "ARG001"]  # Ignore unused function arguments in tests
 
 [tool.ruff.lint.isort]
 known-first-party = ["src"]
@@ -152,4 +153,8 @@ known-first-party = ["src"]
 [tool.pytest.ini_options]
 markers = [
     "critical: marks tests that verify critical functionality",
+]
+# Filter out QuantLib SWIG binding warnings
+filterwarnings = [
+    "ignore::DeprecationWarning:importlib._bootstrap:488",
 ]

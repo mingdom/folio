@@ -32,7 +32,7 @@ with warnings.catch_warnings():
         category=DeprecationWarning,
         message="builtin type swigvarlink has no __module__ attribute",
     )
-    import QuantLib as ql  # noqa: N813
+    import QuantLib as ql
 
 from dataclasses import dataclass
 
