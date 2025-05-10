@@ -167,7 +167,12 @@ def _create_cache_key(func: Callable, prefix: str, args: tuple, kwargs: dict) ->
     if prefix:
         key_parts.insert(0, prefix)
 
-    # Add positional arguments
+    # Skip the first argument (self) if there are arguments
+    # This assumes the decorated function is a method
+    if args:
+        args = args[1:]  # Skip the first argument (self)
+
+    # Add remaining positional arguments
     for arg in args:
         key_parts.append(str(arg))
 
@@ -176,7 +181,9 @@ def _create_cache_key(func: Callable, prefix: str, args: tuple, kwargs: dict) ->
         key_parts.append(f"{k}={v}")
 
     # Join with underscore and return
-    return "_".join(key_parts)
+    cache_key = "_".join(key_parts)
+    logger.debug(f"Created cache key: {cache_key}")
+    return cache_key
 
 
 def get_cache_stats() -> dict[str, dict[str, int]]:
