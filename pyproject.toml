@@ -20,6 +20,7 @@ dash-bootstrap-templates = ">=1.1.1"
 gunicorn = ">=21.2.0"
 google-generativeai = ">=0.3.0"
 diskcache = ">=5.6.3"  # For persistent caching of market data
+cachetools = ">=5.3.3"  # For improved in-memory caching with better method support
 
 # The dev group includes both development tools (linting, testing)
 # and CLI tools (focli interactive shell)

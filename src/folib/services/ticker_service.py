@@ -9,6 +9,7 @@ Caching Strategy:
 - It uses both in-memory caching (self._ticker_data) and persistent caching (@cached decorator)
 - The market data provider no longer has its own persistent cache to avoid redundancy
 - TTLs are configured to balance data freshness with performance
+- Uses cachetools for improved method caching with better key generation
 """
 
 import logging

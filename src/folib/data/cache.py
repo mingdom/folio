@@ -1,8 +1,10 @@
 """
-Caching utilities for data providers.
+Enhanced caching utilities using cachetools.
 
-This module provides decorators and utilities for caching data from external sources.
-It supports persistent caching with configurable TTLs and fallback to expired cache.
+This module provides decorators and utilities for caching data from external sources,
+using the cachetools library for improved in-memory caching with better method support.
+It maintains compatibility with the existing cache.py module while providing better
+handling of method caching and key generation.
 """
 
 import functools
@@ -13,13 +15,14 @@ import time
 from collections.abc import Callable
 from typing import Any, TypeVar, cast
 
+from cachetools import TTLCache
 from diskcache import Cache
-
-logger = logging.getLogger(__name__)
 
 # Type variables for better type hinting
 T = TypeVar("T")
 R = TypeVar("R")
+
+logger = logging.getLogger(__name__)
 
 # Cache statistics
 _cache_stats: dict[str, dict[str, int]] = {}
@@ -36,24 +39,84 @@ def get_cache_dir() -> str:
     )
 
 
+def _make_key(prefix: str) -> Callable:
+    """Create a key function that properly handles method calls.
+
+    Args:
+        prefix: Prefix to add to the key
+
+    Returns:
+        A key function that can be used with cachetools
+    """
+
+    def key_func(*args, **kwargs) -> str:
+        """Generate a cache key from function arguments.
+
+        For methods, the first argument (self) is skipped.
+        For regular functions, all arguments are included.
+        """
+        # Skip the first argument if it's a method call (self)
+        if (
+            args
+            and hasattr(args[0], "__class__")
+            and not isinstance(args[0], (str, int, float, bool, tuple, list, dict))
+        ):
+            # This is likely a method call, skip the first argument (self)
+            key_args = args[1:]
+        else:
+            # Regular function call, use all arguments
+            key_args = args
+
+        # Create key parts
+        key_parts = [prefix] if prefix else []
+
+        # Add arguments
+        for arg in key_args:
+            # Special case for ticker symbols - normalize to uppercase
+            if isinstance(arg, str) and len(arg) < 10:  # Likely a ticker symbol
+                key_parts.append(arg.upper())
+            else:
+                key_parts.append(str(arg))
+
+        # Add keyword arguments
+        for k, v in sorted(kwargs.items()):
+            key_parts.append(f"{k}={v}")
+
+        # Join with underscore and return
+        key = "_".join(key_parts)
+        logger.debug(f"Created cache key: {key}")
+        return key
+
+    return key_func
+
+
 def cached(
     ttl: int = 3600,  # Default: 1 hour
     key_prefix: str = "",
     cache_dir: str | None = None,
     use_expired_on_error: bool = True,
+    maxsize: int = 128,  # Default cache size
 ) -> Callable[[Callable[..., R]], Callable[..., R]]:
     """
-    Decorator for caching function results to disk.
+    Decorator for caching function results using cachetools with disk persistence.
+
+    This combines cachetools' in-memory caching with diskcache for persistence.
 
     Args:
         ttl: Time-to-live in seconds
         key_prefix: Prefix for cache keys
         cache_dir: Directory to store cache files
         use_expired_on_error: Whether to use expired cache on error
+        maxsize: Maximum size of the in-memory cache
 
     Returns:
         Decorated function
     """
+    # Create the memory cache
+    memory_cache = TTLCache(maxsize=maxsize, ttl=ttl)
+
+    # Create the key function
+    key_func = _make_key(key_prefix)
 
     def decorator(func: Callable[..., R]) -> Callable[..., R]:
         # Initialize cache statistics for this function
@@ -67,123 +130,70 @@ def cached(
             cache_directory = cache_dir or get_cache_dir()
             os.makedirs(cache_directory, exist_ok=True)
 
-            # Create cache key
-            cache_key = _create_cache_key(func, key_prefix, args, kwargs)
+            # Generate the cache key
+            cache_key = key_func(*args, **kwargs)
 
-            # Initialize cache
-            with Cache(cache_directory) as cache:
-                # Try to get from cache
-                cache_item = cache.get(cache_key)
-                current_time = time.time()
+            # Try to get from memory cache first
+            try:
+                result = memory_cache[cache_key]
+                logger.debug(f"Memory cache hit for {func_name}")
+                _cache_stats[func_name]["hits"] += 1
+                return result
+            except KeyError:
+                # Not in memory cache, try disk cache
+                with Cache(cache_directory) as disk_cache:
+                    # Try to get from disk cache
+                    cache_item = disk_cache.get(cache_key)
+                    current_time = time.time()
 
-                if cache_item is not None:
-                    value, timestamp = cache_item
-
-                    # Check if cache is still valid
-                    if current_time - timestamp <= ttl:
-                        # Get the relevant argument for logging (skip self if it's a method)
-                        arg_str = _get_log_arg_str(args)
-                        logger.debug(f"Cache hit for {func_name}{arg_str}")
-                        _cache_stats[func_name]["hits"] += 1
-                        return cast(R, value)
-
-                    # Cache is expired
-                    cache_age_hours = (current_time - timestamp) / 3600
-                    # Get the relevant argument for logging (skip self if it's a method)
-                    arg_str = _get_log_arg_str(args)
-                    logger.debug(
-                        f"Cache expired for {func_name}{arg_str} (age: {cache_age_hours:.2f} hours)"
-                    )
-
-                # Cache miss or expired
-                # Get the relevant argument for logging (skip self if it's a method)
-                arg_str = _get_log_arg_str(args)
-                logger.debug(f"Cache miss for {func_name}{arg_str}")
-                _cache_stats[func_name]["misses"] += 1
-
-                try:
-                    # Call the original function
-                    result = func(*args, **kwargs)
-
-                    # Store in cache
-                    cache.set(cache_key, (result, current_time))
-
-                    return result
-                except Exception as e:
-                    # If we have expired cache and use_expired_on_error is True
-                    if cache_item is not None and use_expired_on_error:
+                    if cache_item is not None:
                         value, timestamp = cache_item
-                        cache_age_hours = (current_time - timestamp) / 3600
-                        # Get the relevant argument for logging (skip self if it's a method)
-                        arg_str = _get_log_arg_str(args)
-                        logger.warning(
-                            f"Error calling {func_name}{arg_str}, using expired cache as fallback. "
-                            f"Cache age: {cache_age_hours:.2f} hours. Error: {e}"
-                        )
-                        _cache_stats[func_name]["fallbacks"] += 1
-                        return cast(R, value)
 
-                    # Re-raise the exception
-                    raise
+                        # Check if cache is still valid
+                        if current_time - timestamp <= ttl:
+                            # Valid cache, store in memory for next time
+                            memory_cache[cache_key] = value
+                            logger.debug(f"Disk cache hit for {func_name}")
+                            _cache_stats[func_name]["hits"] += 1
+                            return cast(R, value)
+
+                        # Cache is expired
+                        cache_age_hours = (current_time - timestamp) / 3600
+                        logger.debug(
+                            f"Cache expired for {func_name} (age: {cache_age_hours:.2f} hours)"
+                        )
+
+                    # Cache miss or expired
+                    logger.debug(f"Cache miss for {func_name}")
+                    _cache_stats[func_name]["misses"] += 1
+
+                    try:
+                        # Call the original function
+                        result = func(*args, **kwargs)
+
+                        # Store in both caches
+                        memory_cache[cache_key] = result
+                        disk_cache.set(cache_key, (result, current_time))
+
+                        return result
+                    except Exception as e:
+                        # If we have expired cache and use_expired_on_error is True
+                        if cache_item is not None and use_expired_on_error:
+                            value, timestamp = cache_item
+                            cache_age_hours = (current_time - timestamp) / 3600
+                            logger.warning(
+                                f"Error calling {func_name}, using expired cache as fallback. "
+                                f"Cache age: {cache_age_hours:.2f} hours. Error: {e}"
+                            )
+                            _cache_stats[func_name]["fallbacks"] += 1
+                            return cast(R, value)
+
+                        # Re-raise the exception
+                        raise
 
         return wrapper
 
     return decorator
-
-
-def _get_log_arg_str(args: tuple) -> str:
-    """
-    Get a string representation of the relevant argument for logging.
-
-    For methods, skip the 'self' parameter and use the first actual argument.
-    For functions, use the first argument if available.
-
-    Args:
-        args: Tuple of positional arguments
-
-    Returns:
-        String representation of the relevant argument for logging
-    """
-    if not args:
-        return ""
-
-    # If the first argument is likely a 'self' parameter (has __class__ attribute)
-    if hasattr(args[0], "__class__"):
-        # If there's a second argument, use that instead
-        if len(args) > 1:
-            return f"({args[1]})"
-        return ""
-
-    # Otherwise, use the first argument
-    return f"({args[0]})"
-
-
-def _create_cache_key(func: Callable, prefix: str, args: tuple, kwargs: dict) -> str:
-    """Create a cache key from function name and arguments."""
-    # Start with function name
-    key_parts = [func.__module__, func.__name__]
-
-    # Add prefix if provided
-    if prefix:
-        key_parts.insert(0, prefix)
-
-    # Skip the first argument (self) if there are arguments
-    # This assumes the decorated function is a method
-    if args:
-        args = args[1:]  # Skip the first argument (self)
-
-    # Add remaining positional arguments
-    for arg in args:
-        key_parts.append(str(arg))
-
-    # Add keyword arguments (sorted for consistency)
-    for k, v in sorted(kwargs.items()):
-        key_parts.append(f"{k}={v}")
-
-    # Join with underscore and return
-    cache_key = "_".join(key_parts)
-    logger.debug(f"Created cache key: {cache_key}")
-    return cache_key
 
 
 def get_cache_stats() -> dict[str, dict[str, int]]:
