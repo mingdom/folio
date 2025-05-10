@@ -65,5 +65,14 @@ def test_portfolio(test_portfolio_holdings, patched_ticker_service):
 
     This fixture uses the patched_ticker_service to ensure consistent
     and deterministic test results.
+
+    Args:
+        test_portfolio_holdings: The portfolio holdings to process
+        patched_ticker_service: Not used directly, but required to ensure the ticker
+                               service is patched before processing the portfolio.
     """
+    # We need to explicitly use patched_ticker_service to satisfy the linter
+    # This is a common pattern in pytest - the fixture is needed for its side effects
+    assert patched_ticker_service is not None, "Ticker service must be patched"
+
     return process_portfolio(test_portfolio_holdings)

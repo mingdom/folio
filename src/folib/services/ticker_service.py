@@ -15,6 +15,7 @@ import logging
 from datetime import datetime, timedelta
 
 from ..data.cache import cached
+from ..data.cache import clear_cache as clear_persistent_cache
 from ..data.market_data import MarketDataProvider, market_data_provider
 from ..data.ticker_data import TickerData
 
@@ -116,8 +117,6 @@ class TickerService:
         logger.info("Ticker data in-memory cache cleared")
 
         # Clear persistent cache
-        from ..data.cache import clear_cache as clear_persistent_cache
-
         clear_persistent_cache(backup=backup)
         logger.info("Ticker data persistent cache cleared")
 
