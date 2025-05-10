@@ -11,6 +11,7 @@ from rich.console import Console
 
 from src.folib.data.loader import load_portfolio_from_csv, parse_portfolio_holdings
 from src.folib.services.portfolio_service import process_portfolio
+from src.folib.services.ticker_service import ticker_service
 
 # Create console for rich output
 console = Console()
@@ -43,12 +44,16 @@ def resolve_portfolio_path(file_path: str | None = None) -> Path:
     return path
 
 
-def load_portfolio(file_path: str | None = None) -> dict[str, Any]:
+def load_portfolio(
+    file_path: str | None = None, update_prices: bool = False, no_cache: bool = False
+) -> dict[str, Any]:
     """
     Load a portfolio from a CSV file.
 
     Args:
         file_path: Path to the portfolio file, or None to use the default
+        update_prices: Whether to update all prices from market data
+        no_cache: Whether to clear the cache before loading (forces fresh data)
 
     Returns:
         Dictionary containing:
@@ -70,12 +75,26 @@ def load_portfolio(file_path: str | None = None) -> dict[str, Any]:
 
     # Parse portfolio holdings
     console.print("Parsing portfolio holdings...")
-    holdings = parse_portfolio_holdings(df)
-    console.print(f"Parsed [bold]{len(holdings)}[/bold] holdings")
+    holdings, stock_tickers = parse_portfolio_holdings(df)
+    console.print(
+        f"Parsed [bold]{len(holdings)}[/bold] holdings with [bold]{len(stock_tickers)}[/bold] stock tickers"
+    )
 
     # Process the portfolio
     console.print("Processing portfolio...")
-    portfolio = process_portfolio(holdings)
+
+    # Handle cache clearing if requested
+    if no_cache:
+        console.print("[yellow]Clearing cache to force fresh data...[/yellow]")
+        ticker_service.clear_cache(backup=True)
+
+    if update_prices:
+        console.print(
+            "[yellow]Updating all prices from market data (this may use significant API quota)[/yellow]"
+        )
+    portfolio = process_portfolio(
+        (holdings, stock_tickers), update_prices=update_prices
+    )
     console.print(
         f"Processed portfolio with [bold]{len(portfolio.positions)}[/bold] positions"
     )
@@ -83,5 +102,6 @@ def load_portfolio(file_path: str | None = None) -> dict[str, Any]:
     return {
         "df": df,
         "holdings": holdings,
+        "stock_tickers": stock_tickers,
         "portfolio": portfolio,
     }

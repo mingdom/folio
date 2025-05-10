@@ -12,13 +12,18 @@ from typing import Any
 from rich.table import Table
 
 
-def format_currency(value: float | Decimal | None, include_sign: bool = False) -> str:
+def format_currency(
+    value: float | Decimal | None,
+    include_sign: bool = False,
+    round_to_dollar: bool = True,
+) -> str:
     """
     Format a value as currency.
 
     Args:
         value: The value to format
         include_sign: Whether to include a sign for positive values
+        round_to_dollar: Whether to round to the nearest dollar (no decimal places)
 
     Returns:
         Formatted currency string
@@ -34,21 +39,38 @@ def format_currency(value: float | Decimal | None, include_sign: bool = False) -
     if isinstance(value, Decimal):
         value = float(value)
 
-    # Format with commas and 2 decimal places
-    # Always use full numbers with commas for financial display
-    # Format according to financial reporting standards
-    # Negative values in brackets, positive values as is
-    if value < 0:
-        # For negative values, don't use abs() - preserve the sign semantics
-        # but display in brackets without the minus sign
-        formatted = f"${-value:,.2f}"  # Negate to get positive number for display
-        return f"({formatted})"  # Negative values in brackets
-    elif include_sign and value > 0:
-        formatted = f"${value:,.2f}"
-        return f"+{formatted}"
+    # Round to nearest dollar if requested
+    if round_to_dollar:
+        value = round(value)
+
+        # Format with commas and no decimal places
+        if value < 0:
+            # For negative values, don't use abs() - preserve the sign semantics
+            # but display in brackets without the minus sign
+            formatted = f"${-value:,.0f}"  # Negate to get positive number for display
+            return f"({formatted})"  # Negative values in brackets
+        elif include_sign and value > 0:
+            formatted = f"${value:,.0f}"
+            return f"+{formatted}"
+        else:
+            formatted = f"${value:,.0f}"
+            return formatted
     else:
-        formatted = f"${value:,.2f}"
-        return formatted
+        # Format with commas and 2 decimal places
+        # Always use full numbers with commas for financial display
+        # Format according to financial reporting standards
+        # Negative values in brackets, positive values as is
+        if value < 0:
+            # For negative values, don't use abs() - preserve the sign semantics
+            # but display in brackets without the minus sign
+            formatted = f"${-value:,.2f}"  # Negate to get positive number for display
+            return f"({formatted})"  # Negative values in brackets
+        elif include_sign and value > 0:
+            formatted = f"${value:,.2f}"
+            return f"+{formatted}"
+        else:
+            formatted = f"${value:,.2f}"
+            return formatted
 
 
 def format_percentage(value: float | Decimal | None, include_sign: bool = False) -> str:
@@ -194,6 +216,8 @@ def create_positions_table(
     table.add_column("Quantity", justify="right")
     table.add_column("Price", justify="right")
     table.add_column("Value", justify="right")
+    table.add_column("Beta", justify="right")  # Beta column
+    table.add_column("Beta-Adj Exp", justify="right")  # Beta-adjusted exposure column
 
     for i, position in enumerate(positions, 1):
         # Check if position is a dictionary or a Position object
@@ -204,6 +228,9 @@ def create_positions_table(
             quantity = position.get("quantity")
             price = position.get("price")
             market_value = position.get("market_value")
+            # Get beta and exposure values if available, otherwise default to 0
+            beta = position.get("beta", 1.0)
+            beta_adjusted_exposure = position.get("beta_adjusted_exposure", 0.0)
         else:
             # It's a Position object
             position_type = position.position_type
@@ -211,6 +238,21 @@ def create_positions_table(
             quantity = position.quantity
             price = position.price
             market_value = position.market_value
+            # Get beta and exposure values if available, otherwise default to 0
+            beta = getattr(position, "beta", 1.0)
+            beta_adjusted_exposure = getattr(position, "beta_adjusted_exposure", 0.0)
+
+        # Round values to nearest dollar
+        if price is not None and isinstance(price, (int, float)):
+            price = round(price, 2)  # Keep 2 decimal places for price
+        if market_value is not None and isinstance(market_value, (int, float)):
+            market_value = round(market_value)  # Round to nearest dollar
+        if beta_adjusted_exposure is not None and isinstance(
+            beta_adjusted_exposure, (int, float)
+        ):
+            beta_adjusted_exposure = round(
+                beta_adjusted_exposure
+            )  # Round to nearest dollar
 
         # Format the row based on position type
         table.add_row(
@@ -218,8 +260,16 @@ def create_positions_table(
             ticker,
             position_type,
             format_quantity(quantity),
-            format_currency(price),
-            format_currency(market_value),
+            format_currency(
+                price, round_to_dollar=False
+            ),  # Keep decimal places for price
+            format_currency(
+                market_value, round_to_dollar=True
+            ),  # Round to nearest dollar
+            f"{beta:.2f}" if isinstance(beta, (int, float)) else "1.00",  # Format beta
+            format_currency(
+                beta_adjusted_exposure, round_to_dollar=True
+            ),  # Round to nearest dollar
         )
 
     return table

@@ -19,6 +19,8 @@ dash-bootstrap-components = ">=1.5.0"
 dash-bootstrap-templates = ">=1.1.1"
 gunicorn = ">=21.2.0"
 google-generativeai = ">=0.3.0"
+diskcache = ">=5.6.3"  # For persistent caching of market data
+cachetools = ">=5.3.3"  # For improved in-memory caching with better method support
 
 # The dev group includes both development tools (linting, testing)
 # and CLI tools (focli interactive shell)
@@ -63,6 +65,8 @@ ignore_missing_imports = true
 # Line length and target version are top-level
 line-length = 88
 target-version = "py311"
+# Enable preview features (required for PLC0415)
+preview = true
 
 [tool.ruff.lint]
 # Enable recommended rules + specific ones useful for data science projects
@@ -72,7 +76,6 @@ select = [
     "I",        # isort
     "N",        # pep8-naming
     "UP",       # pyupgrade
-    "PL",       # pylint
     "RUF",      # ruff-specific rules
     "W",        # pycodestyle warnings
     "F401",     # Module imported but unused
@@ -81,6 +84,7 @@ select = [
     "F811",     # Redefined name
     "F822",     # Undefined name in __all__
     "PLC0414",  # Useless import alias
+    "PLC0415",  # Import outside top-level (prevents imports inside functions)
     "PLE0101",  # Function defined outside __init__
     "PLE0604",  # Invalid object in __all__, or invalid __all__ format
     "PLE0605",  # Invalid format for __all__
@@ -98,6 +102,7 @@ ignore = [
     "E501",  # line too long - let's handle line length more flexibly for data science code
     "N803",  # argument name should be lowercase - common in ML to use X, y
     "N806",  # variable name should be lowercase - common in ML to use X_train, y_test
+    "N813",  # camelcase module imported as lowercase - common for libraries like QuantLib
     "PLR0913",  # too many arguments - common in ML functions with many parameters
     "PLR0912",  # too many branches - common in ML data processing and training loops
     "PLR0915",  # too many statements - common in ML training and evaluation functions
@@ -106,26 +111,50 @@ ignore = [
 
 # Allow autofix for all enabled rules (when `--fix`) is provided
 fixable = ["ALL"]
+unfixable = []
 
 # Exclude a variety of commonly ignored directories
 exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
     ".git",
+    ".git-rewrite",
+    ".hg",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
     ".venv",
-    "venv",
-    "__pycache__",
+    "__pypackages__",
+    "_build",
+    "buck-out",
     "build",
     "dist",
-    "mlruns",
-    ".pytest_cache",
-    ".archive",
+    "node_modules",
+    "venv",
 ]
-
-# Allow unused variables when underscore-prefixed
-dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
 [tool.ruff.lint.per-file-ignores]
 # DO NOT IGNORE UNLESS IT'S A REALLY GOOD REASON!
 "__init__.py" = ["F401"]  # Re-exports are common in __init__.py files
+# Ignore PLC0415 for files outside of src/cli and src/folio
+"src/stockdata.py" = ["PLC0415"]
+"src/yfinance.py" = ["PLC0415"]
+"src/folio/**/*.py" = ["PLC0415"]
+"tests/**/*.py" = ["PLC0415", "ARG001"]  # Ignore unused function arguments in tests
 
 [tool.ruff.lint.isort]
 known-first-party = ["src"]
+
+[tool.pytest.ini_options]
+markers = [
+    "critical: marks tests that verify critical functionality",
+]
+# Filter out QuantLib SWIG binding warnings
+filterwarnings = [
+    "ignore::DeprecationWarning:importlib._bootstrap:488",
+]

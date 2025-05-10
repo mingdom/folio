@@ -6,7 +6,7 @@ import os
 
 import yaml
 
-from src.folib.data.stock import stockdata
+from src.folib.data.market_data import market_data_provider
 
 # Import cash detection functions
 from .cash_detection import is_cash_or_short_term
@@ -18,7 +18,7 @@ def load_config():
     config_path = os.path.join(os.path.dirname(__file__), "folio.yaml")
     if os.path.exists(config_path):
         try:
-            with open(config_path) as f:
+            with open(config_path, encoding="utf-8") as f:
                 return yaml.safe_load(f)
         except Exception as e:
             logger.warning(
@@ -30,7 +30,7 @@ def load_config():
 def get_beta(ticker: str, description: str = "") -> float:
     """Calculates the beta (systematic risk) for a given financial instrument.
 
-    DEPRECATED: Use stockdata.get_beta() directly instead.
+    DEPRECATED: Use market_data_provider.get_beta() directly instead.
 
     Beta measures the volatility of an instrument in relation to the overall market.
     Returns 0.0 when beta cannot be meaningfully calculated (e.g., for money market funds,
@@ -52,15 +52,15 @@ def get_beta(ticker: str, description: str = "") -> float:
         return 0.0
 
     try:
-        # Use the new stockdata API to get beta
-        beta = stockdata.get_beta(ticker)
+        # Use the market_data_provider API to get beta
+        beta = market_data_provider.get_beta(ticker)
 
         # If beta is None, return 0.0 for consistency with old behavior
         if beta is None:
             logger.debug(f"No beta available for {ticker}, returning 0.0")
             return 0.0
 
-        logger.debug(f"Got beta of {beta:.2f} for {ticker} from stockdata")
+        logger.debug(f"Got beta of {beta:.2f} for {ticker} from market_data_provider")
         return beta
 
     except Exception as e:
@@ -95,7 +95,7 @@ def clean_currency_value(value_str: str) -> float:
     value_str = str(value_str)
 
     # Handle empty or dash values
-    if value_str in ("--", ""):
+    if value_str in {"--", ""}:
         return 0.0
 
     # Remove currency symbols and commas

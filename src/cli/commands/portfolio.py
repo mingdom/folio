@@ -10,9 +10,17 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
+from src.folib.data.cache import log_cache_stats
 from src.folib.services.portfolio_service import (
     create_portfolio_summary,
+    filter_positions_by_criteria,
     get_portfolio_exposures,
+    sort_positions,
+)
+from src.folib.services.position_service import (
+    get_position_beta,
+    get_position_beta_adjusted_exposure,
+    get_position_market_exposure,
 )
 
 from ..formatters import (
@@ -32,14 +40,18 @@ console = Console()
 @portfolio_app.command("load")
 def portfolio_load_cmd(
     file_path: str = typer.Argument(..., help="Path to the portfolio CSV file"),
+    no_cache: bool = typer.Option(
+        False, "--no-cache", help="Clear cache before loading (forces fresh data)"
+    ),
 ):
     """Load portfolio data from a CSV file."""
     try:
         # Load the portfolio
-        load_portfolio(file_path)
+        load_portfolio(file_path, update_prices=False, no_cache=no_cache)
 
-        # Print success message
-        console.print(f"[green]Successfully loaded portfolio from {file_path}[/green]")
+        # Print success message with prominent portfolio path
+        console.print("[green]Successfully loaded portfolio[/green]")
+        console.print(f"[bold blue]PORTFOLIO:[/bold blue] [bold]{file_path}[/bold]")
 
     except Exception as e:
         console.print(f"[red]Error loading portfolio:[/red] {e!s}")
@@ -51,11 +63,14 @@ def portfolio_summary_cmd(
     file_path: str | None = typer.Option(
         None, "--file", "-f", help="Path to the portfolio CSV file"
     ),
+    no_cache: bool = typer.Option(
+        False, "--no-cache", help="Clear cache before loading (forces fresh data)"
+    ),
 ):
     """Display high-level portfolio metrics."""
     try:
         # Load the portfolio
-        result = load_portfolio(file_path)
+        result = load_portfolio(file_path, no_cache=no_cache)
         portfolio = result["portfolio"]
 
         # Create portfolio summary
@@ -65,6 +80,9 @@ def portfolio_summary_cmd(
         # Calculate portfolio exposures
         console.print("Calculating portfolio exposures...")
         exposures = get_portfolio_exposures(portfolio)
+
+        # Log cache statistics after all calculations are complete
+        log_cache_stats(show_all=True)
 
         # Display portfolio summary
         console.print("\n")
@@ -100,6 +118,9 @@ def portfolio_list_cmd(
         None, "--file", "-f", help="Path to the portfolio CSV file"
     ),
     filter_args: list[str] = filter_args_arg,
+    no_cache: bool = typer.Option(
+        False, "--no-cache", help="Clear cache before loading (forces fresh data)"
+    ),
 ):
     """
     List positions with filtering and sorting.
@@ -112,7 +133,7 @@ def portfolio_list_cmd(
     """
     try:
         # Load the portfolio
-        result = load_portfolio(file_path)
+        result = load_portfolio(file_path, no_cache=no_cache)
         portfolio = result["portfolio"]
 
         # Get all positions
@@ -120,7 +141,7 @@ def portfolio_list_cmd(
 
         # Parse filter arguments
         filter_criteria = {}
-        sort_by = "value"
+        sort_by = "beta_adjusted_exposure"  # Default to beta-adjusted exposure
         sort_direction = "desc"
 
         if filter_args:
@@ -137,21 +158,41 @@ def portfolio_list_cmd(
                         # Add to filter criteria
                         filter_criteria[key.lower()] = value
 
-        # Apply filters using the new filter_positions_by_criteria function
-        from src.folib.services.portfolio_service import (
-            filter_positions_by_criteria,
-            sort_positions,
-        )
-
+        # Apply filters using the filter_positions_by_criteria function
         filtered_positions = filter_positions_by_criteria(positions, filter_criteria)
 
-        # Sort positions using the new sort_positions function
+        # Use standard sorting for all fields
         filtered_positions = sort_positions(filtered_positions, sort_by, sort_direction)
 
         # Display positions
         if filtered_positions:
+            # Get portfolio exposures to access exposure data
+            get_portfolio_exposures(portfolio)
+
             # Create a list of dictionaries for the table using to_dict method
-            position_data = [p.to_dict() for p in filtered_positions]
+            position_data = []
+
+            for position in filtered_positions:
+                # Start with the basic position data
+                pos_dict = position.to_dict()
+
+                # Use the position service to calculate exposures
+                beta = get_position_beta(position)
+                get_position_market_exposure(position)
+                beta_adjusted_exposure = get_position_beta_adjusted_exposure(position)
+
+                # Add beta and exposure values to the position dictionary
+                pos_dict["beta"] = beta
+                pos_dict["beta_adjusted_exposure"] = beta_adjusted_exposure
+
+                position_data.append(pos_dict)
+
+            # Sort position data by beta-adjusted exposure if that's the sort criteria
+            if sort_by.lower() == "beta_adjusted_exposure":
+                position_data.sort(
+                    key=lambda x: x["beta_adjusted_exposure"],
+                    reverse=(sort_direction.lower() == "desc"),
+                )
 
             # Create and display the table
             table = create_positions_table(
@@ -159,6 +200,9 @@ def portfolio_list_cmd(
                 title=f"Portfolio Positions ({len(filtered_positions)} of {len(positions)})",
             )
             console.print(table)
+
+            # Log cache statistics after all calculations are complete
+            log_cache_stats(show_all=True)
 
             # Display filter criteria if any
             if filter_criteria:
@@ -182,14 +226,16 @@ def portfolio_load(state, args):
     """Load portfolio data from a CSV file (interactive mode)."""
     if not args:
         console.print("[red]Error:[/red] Missing file path")
-        console.print("Usage: portfolio load <FILE_PATH>")
+        console.print("Usage: portfolio load <FILE_PATH> [--no-cache]")
         return
 
+    # Parse arguments
     file_path = args[0]
+    no_cache = "--no-cache" in args
 
     try:
         # Load the portfolio
-        result = load_portfolio(file_path)
+        result = load_portfolio(file_path, no_cache=no_cache)
 
         # Update state
         state.loaded_portfolio_path = Path(file_path)
@@ -197,14 +243,15 @@ def portfolio_load(state, args):
         state.portfolio = result["portfolio"]
         state.portfolio_summary = create_portfolio_summary(result["portfolio"])
 
-        # Print success message
-        console.print(f"[green]Successfully loaded portfolio from {file_path}[/green]")
+        # Print success message with prominent portfolio path
+        console.print("[green]Successfully loaded portfolio[/green]")
+        console.print(f"[bold blue]PORTFOLIO:[/bold blue] [bold]{file_path}[/bold]")
 
     except Exception as e:
         console.print(f"[red]Error loading portfolio:[/red] {e!s}")
 
 
-def portfolio_summary(state, args):  # noqa: ARG001
+def portfolio_summary(state, _args):
     """Display high-level portfolio metrics (interactive mode)."""
     # Check if portfolio is loaded
     if not state.has_portfolio():
@@ -219,6 +266,9 @@ def portfolio_summary(state, args):  # noqa: ARG001
 
         # Calculate portfolio exposures
         exposures = get_portfolio_exposures(state.portfolio)
+
+        # Log cache statistics after all calculations are complete
+        log_cache_stats(show_all=True)
 
         # Display portfolio summary
         console.print("\n")
@@ -262,7 +312,7 @@ def portfolio_list(state, args):
 
         # Parse filter arguments
         filter_criteria = {}
-        sort_by = "value"
+        sort_by = "beta_adjusted_exposure"  # Default to beta-adjusted exposure
         sort_direction = "desc"
 
         for arg in args:
@@ -278,21 +328,41 @@ def portfolio_list(state, args):
                     # Add to filter criteria
                     filter_criteria[key.lower()] = value
 
-        # Apply filters using the new filter_positions_by_criteria function
-        from src.folib.services.portfolio_service import (
-            filter_positions_by_criteria,
-            sort_positions,
-        )
-
+        # Apply filters using the filter_positions_by_criteria function
         filtered_positions = filter_positions_by_criteria(positions, filter_criteria)
 
-        # Sort positions using the new sort_positions function
+        # Use standard sorting for all fields
         filtered_positions = sort_positions(filtered_positions, sort_by, sort_direction)
 
         # Display positions
         if filtered_positions:
+            # Get portfolio exposures to access exposure data
+            get_portfolio_exposures(state.portfolio)
+
             # Create a list of dictionaries for the table using to_dict method
-            position_data = [p.to_dict() for p in filtered_positions]
+            position_data = []
+
+            for position in filtered_positions:
+                # Start with the basic position data
+                pos_dict = position.to_dict()
+
+                # Use the position service to calculate exposures
+                beta = get_position_beta(position)
+                get_position_market_exposure(position)
+                beta_adjusted_exposure = get_position_beta_adjusted_exposure(position)
+
+                # Add beta and exposure values to the position dictionary
+                pos_dict["beta"] = beta
+                pos_dict["beta_adjusted_exposure"] = beta_adjusted_exposure
+
+                position_data.append(pos_dict)
+
+            # Sort position data by beta-adjusted exposure if that's the sort criteria
+            if sort_by.lower() == "beta_adjusted_exposure":
+                position_data.sort(
+                    key=lambda x: x["beta_adjusted_exposure"],
+                    reverse=(sort_direction.lower() == "desc"),
+                )
 
             # Create and display the table
             table = create_positions_table(
@@ -300,6 +370,9 @@ def portfolio_list(state, args):
                 title=f"Portfolio Positions ({len(filtered_positions)} of {len(positions)})",
             )
             console.print(table)
+
+            # Log cache statistics after all calculations are complete
+            log_cache_stats(show_all=True)
 
             # Display filter criteria if any
             if filter_criteria:

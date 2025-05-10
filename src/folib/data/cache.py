@@ -1,207 +1,345 @@
 """
-Cache utilities for market data providers.
+Enhanced caching utilities using cachetools.
 
-This module provides file-based caching functionality for market data providers,
-with support for TTL-based expiration and methods for caching DataFrames and values.
+This module provides decorators and utilities for caching data from external sources,
+using the cachetools library for improved in-memory caching with better method support.
+It maintains compatibility with the existing cache.py module while providing better
+handling of method caching and key generation.
 """
 
+import functools
 import logging
 import os
+import shutil
 import time
+from collections.abc import Callable
+from typing import Any, TypeVar, cast
 
-import pandas as pd
+from cachetools import TTLCache
+from diskcache import Cache
 
-# Set up logging
+# Type variables for better type hinting
+T = TypeVar("T")
+R = TypeVar("R")
+
 logger = logging.getLogger(__name__)
 
+# Cache statistics
+_cache_stats: dict[str, dict[str, int]] = {}
 
-class DataCache:
+
+def get_cache_dir() -> str:
+    """Get the cache directory path."""
+    # Use project root/.cache by default
+    return os.path.join(
+        os.path.dirname(
+            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        ),
+        ".cache",
+    )
+
+
+def _make_key(prefix: str) -> Callable:
+    """Create a key function that properly handles method calls.
+
+    Args:
+        prefix: Prefix to add to the key
+
+    Returns:
+        A key function that can be used with cachetools
     """
-    Cache manager for market data.
 
-    This class provides methods for caching and retrieving market data,
-    with support for TTL-based expiration.
+    def key_func(*args, **kwargs) -> str:
+        """Generate a cache key from function arguments.
+
+        For methods, the first argument (self) is skipped.
+        For regular functions, all arguments are included.
+        """
+        # Skip the first argument if it's a method call (self)
+        if (
+            args
+            and hasattr(args[0], "__class__")
+            and not isinstance(args[0], (str, int, float, bool, tuple, list, dict))
+        ):
+            # This is likely a method call, skip the first argument (self)
+            key_args = args[1:]
+        else:
+            # Regular function call, use all arguments
+            key_args = args
+
+        # Create key parts
+        key_parts = [prefix] if prefix else []
+
+        # Add arguments
+        for arg in key_args:
+            # Special case for ticker symbols - normalize to uppercase
+            if isinstance(arg, str) and len(arg) < 10:  # Likely a ticker symbol
+                key_parts.append(arg.upper())
+            else:
+                key_parts.append(str(arg))
+
+        # Add keyword arguments
+        for k, v in sorted(kwargs.items()):
+            key_parts.append(f"{k}={v}")
+
+        # Join with underscore and return
+        key = "_".join(key_parts)
+        logger.debug(f"Created cache key: {key}")
+        return key
+
+    return key_func
+
+
+def cached(
+    ttl: int = 3600,  # Default: 1 hour
+    key_prefix: str = "",
+    cache_dir: str | None = None,
+    use_expired_on_error: bool = True,
+    maxsize: int = 128,  # Default cache size
+) -> Callable[[Callable[..., R]], Callable[..., R]]:
     """
+    Decorator for caching function results using cachetools with disk persistence.
 
-    def __init__(self, cache_dir: str, cache_ttl: int = 86400):
-        """
-        Initialize the DataCache.
+    This combines cachetools' in-memory caching with diskcache for persistence.
 
-        Args:
-            cache_dir: Directory to store cached data
-            cache_ttl: Cache TTL in seconds (default: 86400 - 1 day)
-        """
-        self.cache_dir = cache_dir
-        self.cache_ttl = cache_ttl
+    Args:
+        ttl: Time-to-live in seconds
+        key_prefix: Prefix for cache keys
+        cache_dir: Directory to store cache files
+        use_expired_on_error: Whether to use expired cache on error
+        maxsize: Maximum size of the in-memory cache
 
-        # Create cache directory if it doesn't exist
-        os.makedirs(cache_dir, exist_ok=True)
+    Returns:
+        Decorated function
+    """
+    # Create the memory cache
+    memory_cache = TTLCache(maxsize=maxsize, ttl=ttl)
 
-    def get_cache_path(
-        self, ticker: str, period: str | None = None, interval: str | None = None
-    ) -> str:
-        """
-        Get the path to the cache file for a ticker.
+    # Create the key function
+    key_func = _make_key(key_prefix)
 
-        Args:
-            ticker: Stock ticker symbol
-            period: Time period (optional)
-            interval: Data interval (optional)
+    def decorator(func: Callable[..., R]) -> Callable[..., R]:
+        # Initialize cache statistics for this function
+        func_name = f"{key_prefix}_{func.__name__}" if key_prefix else func.__name__
+        if func_name not in _cache_stats:
+            _cache_stats[func_name] = {"hits": 0, "misses": 0, "fallbacks": 0}
 
-        Returns:
-            Path to cache file
-        """
-        if period and interval:
-            return os.path.join(self.cache_dir, f"{ticker}_{period}_{interval}.csv")
-        else:
-            return os.path.join(self.cache_dir, f"{ticker}.csv")
+        @functools.wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> R:
+            # Get cache directory
+            cache_directory = cache_dir or get_cache_dir()
+            os.makedirs(cache_directory, exist_ok=True)
 
-    def get_beta_cache_path(self, ticker: str) -> str:
-        """
-        Get the path to the beta cache file for a ticker.
+            # Generate the cache key
+            cache_key = key_func(*args, **kwargs)
 
-        Args:
-            ticker: Stock ticker symbol
+            # Try to get from memory cache first
+            try:
+                result = memory_cache[cache_key]
+                logger.debug(f"Memory cache hit for {func_name}")
+                _cache_stats[func_name]["hits"] += 1
+                return result
+            except KeyError:
+                # Not in memory cache, try disk cache
+                with Cache(cache_directory) as disk_cache:
+                    # Try to get from disk cache
+                    cache_item = disk_cache.get(cache_key)
+                    current_time = time.time()
 
-        Returns:
-            Path to beta cache file
-        """
-        return os.path.join(self.cache_dir, f"{ticker}_beta.txt")
+                    if cache_item is not None:
+                        value, timestamp = cache_item
 
-    def get_volatility_cache_path(self, ticker: str) -> str:
-        """
-        Get the path to the volatility cache file for a ticker.
+                        # Check if cache is still valid
+                        if current_time - timestamp <= ttl:
+                            # Valid cache, store in memory for next time
+                            memory_cache[cache_key] = value
+                            logger.debug(f"Disk cache hit for {func_name}")
+                            _cache_stats[func_name]["hits"] += 1
+                            return cast(R, value)
 
-        Args:
-            ticker: Stock ticker symbol
+                        # Cache is expired
+                        cache_age_hours = (current_time - timestamp) / 3600
+                        logger.debug(
+                            f"Cache expired for {func_name} (age: {cache_age_hours:.2f} hours)"
+                        )
 
-        Returns:
-            Path to volatility cache file
-        """
-        return os.path.join(self.cache_dir, f"{ticker}_volatility.txt")
+                    # Cache miss or expired
+                    logger.debug(f"Cache miss for {func_name}")
+                    _cache_stats[func_name]["misses"] += 1
 
-    def is_cache_expired(self, cache_timestamp: float) -> bool:
-        """
-        Determine if cache should be considered expired based on TTL.
+                    try:
+                        # Call the original function
+                        result = func(*args, **kwargs)
 
-        Args:
-            cache_timestamp: The timestamp of when the cache was created/modified
+                        # Store in both caches
+                        memory_cache[cache_key] = result
+                        disk_cache.set(cache_key, (result, current_time))
 
-        Returns:
-            True if cache should be considered expired, False otherwise
-        """
-        cache_age = time.time() - cache_timestamp
-        return cache_age >= self.cache_ttl
+                        return result
+                    except Exception as e:
+                        # If we have expired cache and use_expired_on_error is True
+                        if cache_item is not None and use_expired_on_error:
+                            value, timestamp = cache_item
+                            cache_age_hours = (current_time - timestamp) / 3600
+                            logger.warning(
+                                f"Error calling {func_name}, using expired cache as fallback. "
+                                f"Cache age: {cache_age_hours:.2f} hours. Error: {e}"
+                            )
+                            _cache_stats[func_name]["fallbacks"] += 1
+                            return cast(R, value)
 
-    def read_dataframe_from_cache(self, cache_path: str) -> pd.DataFrame | None:
-        """
-        Read a DataFrame from cache if it exists and is not expired.
+                        # Re-raise the exception
+                        raise
 
-        Args:
-            cache_path: Path to the cache file
+        return wrapper
 
-        Returns:
-            DataFrame from cache, or None if cache doesn't exist, is expired, or can't be read
-        """
-        if not os.path.exists(cache_path):
-            logger.debug(f"Cache file does not exist: {cache_path}")
-            return None
+    return decorator
 
-        # Get cache age in seconds
-        cache_age = time.time() - os.path.getmtime(cache_path)
-        cache_age_hours = cache_age / 3600  # Convert to hours for more readable logging
 
-        if self.is_cache_expired(os.path.getmtime(cache_path)):
-            logger.debug(
-                f"Cache expired: {cache_path} (age: {cache_age_hours:.1f} hours)"
-            )
-            return None
-        else:
-            logger.debug(
-                f"Cache valid: {cache_path} (age: {cache_age_hours:.1f} hours)"
-            )
+def get_cache_stats() -> dict[str, dict[str, int]]:
+    """Get cache statistics."""
+    return _cache_stats
 
-        try:
-            logger.debug(f"Loading data from cache: {cache_path}")
-            df = pd.read_csv(cache_path, index_col=0, parse_dates=True)
-            logger.debug(f"Loaded {len(df)} rows from cache")
-            return df
-        except Exception as e:
-            logger.warning(f"Error reading cache: {e}")
-            return None
 
-    def write_dataframe_to_cache(self, df: pd.DataFrame, cache_path: str) -> bool:
-        """
-        Write a DataFrame to cache.
+def log_cache_stats(aggregate: bool = True, show_all: bool = False) -> None:
+    """
+    Log cache statistics at INFO level.
 
-        Args:
-            df: DataFrame to cache
-            cache_path: Path to the cache file
+    Args:
+        aggregate: If True, log all statistics in a single message.
+                  If False, log overall statistics and detailed statistics separately.
+        show_all: If True, show all cache functions even if they have no activity.
+                 If False (default), only show functions with activity.
+    """
+    # Calculate overall statistics
+    total_hits = sum(stats["hits"] for stats in _cache_stats.values())
+    total_misses = sum(stats["misses"] for stats in _cache_stats.values())
+    total_fallbacks = sum(stats["fallbacks"] for stats in _cache_stats.values())
+    total_requests = total_hits + total_misses
+    overall_hit_rate = (total_hits / total_requests) * 100 if total_requests > 0 else 0
 
-        Returns:
-            True if successful, False otherwise
-        """
-        try:
-            df.to_csv(cache_path)
-            logger.debug(f"Cached {len(df)} rows of data to: {cache_path}")
-            return True
-        except Exception as e:
-            logger.warning(f"Error writing cache: {e}")
-            return False
+    # Sort cache stats by function name for consistent output
+    sorted_stats = sorted(_cache_stats.items())
 
-    def read_value_from_cache(self, cache_path: str) -> float | None:
-        """
-        Read a numeric value from cache if it exists and is not expired.
+    # Group by prefix for better organization
+    grouped_stats = {}
+    for func_name, stats in sorted_stats:
+        # Extract prefix (e.g., "ticker_price" from "ticker_price_get_price")
+        prefix = func_name.split("_")[0] if "_" in func_name else "other"
+        if prefix not in grouped_stats:
+            grouped_stats[prefix] = []
+        grouped_stats[prefix].append((func_name, stats))
 
-        Args:
-            cache_path: Path to the cache file
+    if aggregate:
+        # Build a single aggregated message with all statistics
+        message_parts = [
+            f"Cache hit rate: {overall_hit_rate:.1f}% (hits: {total_hits}, misses: {total_misses}, fallbacks: {total_fallbacks}, total requests: {total_requests})"
+        ]
 
-        Returns:
-            Value from cache, or None if cache doesn't exist, is expired, or can't be read
-        """
-        if not os.path.exists(cache_path):
-            logger.debug(f"Cache file does not exist: {cache_path}")
-            return None
+        # Add per-function statistics, grouped by prefix
+        for prefix, funcs in sorted(grouped_stats.items()):
+            # Add group header
+            prefix_hits = sum(stats["hits"] for _, stats in funcs)
+            prefix_misses = sum(stats["misses"] for _, stats in funcs)
+            prefix_total = prefix_hits + prefix_misses
+            if prefix_total > 0 or show_all:
+                prefix_hit_rate = (
+                    (prefix_hits / prefix_total) * 100 if prefix_total > 0 else 0
+                )
+                message_parts.append(
+                    f"\n  {prefix.upper()} CACHE: {prefix_hit_rate:.1f}% (hits: {prefix_hits}, misses: {prefix_misses})"
+                )
 
-        # Get cache age in seconds
-        cache_age = time.time() - os.path.getmtime(cache_path)
-        cache_age_hours = cache_age / 3600  # Convert to hours for more readable logging
+                # Add individual functions in the group
+                for func_name, stats in funcs:
+                    total = stats["hits"] + stats["misses"]
+                    if total > 0 or show_all:
+                        hit_rate = (stats["hits"] / total) * 100 if total > 0 else 0
+                        func_display = func_name.replace("_", " ").strip()
+                        message_parts.append(
+                            f"    {func_display}: {hit_rate:.1f}% (hits: {stats['hits']}, misses: {stats['misses']}, fallbacks: {stats.get('fallbacks', 0)})"
+                        )
 
-        if self.is_cache_expired(os.path.getmtime(cache_path)):
-            logger.debug(
-                f"Cache expired: {cache_path} (age: {cache_age_hours:.1f} hours)"
-            )
-            return None
-        else:
-            logger.debug(
-                f"Cache valid: {cache_path} (age: {cache_age_hours:.1f} hours)"
-            )
+        # Log the aggregated message
+        logger.info("\n".join(message_parts))
+    else:
+        # Log overall statistics
+        logger.info(
+            f"Cache overall hit rate: {overall_hit_rate:.1f}% "
+            f"(hits: {total_hits}, misses: {total_misses}, fallbacks: {total_fallbacks}, "
+            f"total requests: {total_requests})"
+        )
 
-        try:
-            with open(cache_path) as f:
-                value = float(f.read().strip())
-            logger.debug(f"Loaded value from cache: {value:.3f}")
-            return value
-        except Exception as e:
-            logger.warning(f"Error reading cache: {e}")
-            return None
+        # Log detailed statistics for each function, grouped by prefix
+        for prefix, funcs in sorted(grouped_stats.items()):
+            # Log group header
+            prefix_hits = sum(stats["hits"] for _, stats in funcs)
+            prefix_misses = sum(stats["misses"] for _, stats in funcs)
+            prefix_total = prefix_hits + prefix_misses
+            if prefix_total > 0 or show_all:
+                prefix_hit_rate = (
+                    (prefix_hits / prefix_total) * 100 if prefix_total > 0 else 0
+                )
+                logger.info(
+                    f"{prefix.upper()} CACHE: {prefix_hit_rate:.1f}% "
+                    f"(hits: {prefix_hits}, misses: {prefix_misses})"
+                )
 
-    def write_value_to_cache(self, value: float, cache_path: str) -> bool:
-        """
-        Write a numeric value to cache.
+                # Log individual functions in the group
+                for func_name, stats in funcs:
+                    total = stats["hits"] + stats["misses"]
+                    if total > 0 or show_all:
+                        hit_rate = (stats["hits"] / total) * 100 if total > 0 else 0
+                        logger.info(
+                            f"  {func_name}: "
+                            f"hit rate: {hit_rate:.1f}% "
+                            f"(hits: {stats['hits']}, misses: {stats['misses']}, fallbacks: {stats.get('fallbacks', 0)})"
+                        )
 
-        Args:
-            value: Value to cache
-            cache_path: Path to the cache file
 
-        Returns:
-            True if successful, False otherwise
-        """
-        try:
-            with open(cache_path, "w") as f:
-                f.write(f"{value:.6f}")
-            logger.debug(f"Cached value: {value:.3f} to {cache_path}")
-            return True
-        except Exception as e:
-            logger.warning(f"Error writing cache: {e}")
-            return False
+def clear_cache(cache_dir: str | None = None, backup: bool = False) -> None:
+    """
+    Clear the entire cache.
+
+    Args:
+        cache_dir: Directory containing the cache. If None, uses the default cache directory.
+        backup: If True, backs up the cache to a backup directory before clearing it.
+    """
+    cache_directory = cache_dir or get_cache_dir()
+
+    if os.path.exists(cache_directory):
+        if backup:
+            # Create backup directory
+            backup_dir = os.path.join(cache_directory, "backup")
+            backup_timestamp = time.strftime("%Y%m%d_%H%M%S")
+            backup_path = os.path.join(backup_dir, f"cache_backup_{backup_timestamp}")
+
+            # Ensure backup directory exists
+            os.makedirs(backup_dir, exist_ok=True)
+
+            # Copy cache files to backup directory
+            try:
+                # Copy all files except the backup directory itself
+                for item in os.listdir(cache_directory):
+                    if item != "backup":
+                        src_path = os.path.join(cache_directory, item)
+                        dst_path = os.path.join(backup_path, item)
+                        if os.path.isdir(src_path):
+                            shutil.copytree(src_path, dst_path)
+                        else:
+                            # Ensure parent directory exists
+                            os.makedirs(os.path.dirname(dst_path), exist_ok=True)
+                            shutil.copy2(src_path, dst_path)
+                logger.info(f"Cache backed up to {backup_path}")
+            except Exception as e:
+                logger.warning(f"Failed to backup cache: {e}")
+
+        # Clear the cache
+        with Cache(cache_directory) as cache:
+            cache.clear()
+        logger.info(f"Cache cleared from {cache_directory}")
+
+    # Reset statistics
+    for func_stats in _cache_stats.values():
+        for key in func_stats:
+            func_stats[key] = 0

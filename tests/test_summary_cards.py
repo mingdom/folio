@@ -62,6 +62,11 @@ def test_summary():
         cash_like_count=1,
         cash_percentage=20.0,  # (2000 / 10000) * 100
         portfolio_estimate_value=10000.0,  # 8000 + 2000
+        cash_like_positions=[],
+        stock_value=7000.0,  # 10000 - 3000
+        option_value=1000.0,  # 2000 - 1000
+        pending_activity_value=0.0,
+        price_updated_at="2025-05-03T09:00:00Z",
     )
 
     return summary

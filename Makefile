@@ -20,7 +20,6 @@ help:
 	@echo "  folio       - Start the portfolio dashboard with debug mode enabled"
 	@echo "               Options: portfolio=path/to/file.csv (use custom portfolio file)"
 	@echo "                        log=LEVEL (set logging level: DEBUG, INFO, WARNING, ERROR)"
-	@echo "  focli       - Start the legacy interactive Folio CLI shell for portfolio analysis"
 	@echo "  cli         - Start the new interactive Folio CLI shell for portfolio analysis"
 	@echo "  simulate    - Run portfolio simulation using the improved simulator_v2"
 	@echo "  sim         - Alias for simulate (shorter to type)"
@@ -127,7 +126,7 @@ lint:
 --fix:
 
 # Portfolio and CLI Projects
-.PHONY: folio stop-folio port focli cli simulate
+.PHONY: folio stop-folio cli
 
 # Poetry is used under the hood for all targets
 
@@ -140,7 +139,7 @@ folio:
 		echo "Poetry not found. Please run 'make env' first."; \
 		exit 1; \
 	fi
-	@LOG_LEVEL=$(if $(log),$(log),INFO) \
+	@LOG_LEVEL=$(if $(level),$(level),INFO) \
 	$(POETRY) run python -m src.folio.app --port 8051 --debug $(if $(portfolio),--portfolio $(portfolio),)
 
 stop-folio:
@@ -157,59 +156,14 @@ stop-folio:
 		echo "No running folio processes found."; \
 	fi
 
-
-
-focli:
-	@echo "Starting Folio CLI interactive shell..."
-	@if ! command -v $(POETRY) &> /dev/null; then \
-		echo "Poetry not found. Please run 'make env' first."; \
-		exit 1; \
-	fi
-	@$(POETRY) run python src/focli/focli.py
-
 cli:
 	@echo "Starting new Folio CLI interactive shell..."
 	@if ! command -v $(POETRY) &> /dev/null; then \
 		echo "Poetry not found. Please run 'make env' first."; \
 		exit 1; \
 	fi
-	@$(POETRY) run python -m src.cli
-
-simulate:
-	@echo "Running portfolio simulation with simulator_v2..."
-	@if ! command -v $(POETRY) &> /dev/null; then \
-		echo "Poetry not found. Please run 'make env' first."; \
-		exit 1; \
-	fi
-	@if [ -n "$(portfolio)" ]; then \
-		$(POETRY) run python -m src.focli.commands.sim $(portfolio) --min-spy-change -0.1 --max-spy-change 0.1 --steps 5 $(if $(ticker),--ticker $(ticker),) $(if $(detailed),--detailed,) $(if $(type),--position-type $(type),); \
-	elif [ -f "@private-data/private-portfolio.csv" ]; then \
-		$(POETRY) run python -m src.focli.commands.sim @private-data/private-portfolio.csv --min-spy-change -0.1 --max-spy-change 0.1 --steps 5 $(if $(ticker),--ticker $(ticker),) $(if $(detailed),--detailed,) $(if $(type),--position-type $(type),); \
-	elif [ -f "private-data/portfolio-private.csv" ]; then \
-		$(POETRY) run python -m src.focli.commands.sim private-data/portfolio-private.csv --min-spy-change -0.1 --max-spy-change 0.1 --steps 5 $(if $(ticker),--ticker $(ticker),) $(if $(detailed),--detailed,) $(if $(type),--position-type $(type),); \
-	else \
-		echo "Error: Portfolio file not found. Please specify a file path:"; \
-		echo "  make simulate portfolio=path/to/your/portfolio.csv"; \
-		exit 1; \
-	fi
-
-analyze:
-	@echo "Analyzing position contributions to portfolio performance..."
-	@if ! command -v $(POETRY) &> /dev/null; then \
-		echo "Poetry not found. Please run 'make env' first."; \
-		exit 1; \
-	fi
-	@if [ -n "$(portfolio)" ]; then \
-		$(POETRY) run python -m src.focli.commands.analyze $(portfolio) --min-spy-change -0.2 --max-spy-change 0.2 --steps 21 $(if $(focus_spy),--focus-spy $(focus_spy),) $(if $(top_n),--top-n $(top_n),); \
-	elif [ -f "@private-data/private-portfolio.csv" ]; then \
-		$(POETRY) run python -m src.focli.commands.analyze @private-data/private-portfolio.csv --min-spy-change -0.2 --max-spy-change 0.2 --steps 21 $(if $(focus_spy),--focus-spy $(focus_spy),) $(if $(top_n),--top-n $(top_n),); \
-	elif [ -f "private-data/portfolio-private.csv" ]; then \
-		$(POETRY) run python -m src.focli.commands.analyze private-data/portfolio-private.csv --min-spy-change -0.2 --max-spy-change 0.2 --steps 21 $(if $(focus_spy),--focus-spy $(focus_spy),) $(if $(top_n),--top-n $(top_n),); \
-	else \
-		echo "Error: Portfolio file not found. Please specify a file path:"; \
-		echo "  make analyze portfolio=path/to/your/portfolio.csv"; \
-		exit 1; \
-	fi
+	@LOG_LEVEL=$(if $(level),$(level),INFO) \
+	$(POETRY) run python -m src.cli
 
 # Alias for simulate
 sim: simulate
@@ -225,6 +179,7 @@ test:
 	@mkdir -p $(LOGS_DIR)
 	@(echo "=== Test Run Log $(TIMESTAMP) ===" && \
 	echo "Starting tests at: $$(date)" && \
+	LOG_LEVEL=$(if $(level),$(level),INFO) \
 	$(POETRY) run pytest tests/ --ignore=tests/e2e/ -v 2>&1) | tee $(LOGS_DIR)/test_latest.log
 	@echo "Test log saved to: $(LOGS_DIR)/test_latest.log"
 
@@ -241,6 +196,7 @@ test-e2e:
 	@mkdir -p $(LOGS_DIR)
 	@(echo "=== E2E Test Run Log $(TIMESTAMP) ===" && \
 	echo "Starting E2E tests at: $$(date)" && \
+	LOG_LEVEL=$(if $(level),$(level),INFO) \
 	$(POETRY) run pytest tests/e2e/ -v 2>&1) | tee $(LOGS_DIR)/test_e2e_latest.log
 	@echo "E2E test log saved to: $(LOGS_DIR)/test_e2e_latest.log"
 
@@ -254,6 +210,7 @@ test-cli:
 	@mkdir -p tests/cli/reports
 	@(echo "=== CLI Test Run Log $(TIMESTAMP) ===" && \
 	echo "Starting CLI tests at: $$(date)" && \
+	LOG_LEVEL=$(if $(level),$(level),INFO) \
 	$(POETRY) run bash tests/cli/e2e/test_cli_errors.sh 2>&1) | tee $(LOGS_DIR)/test_cli_latest.log
 	@echo "CLI test log saved to: $(LOGS_DIR)/test_cli_latest.log"
 	@echo "CLI test report saved to: tests/cli/reports/cli-error-report.md"

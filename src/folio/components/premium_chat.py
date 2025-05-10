@@ -4,6 +4,9 @@ import dash
 import dash_bootstrap_components as dbc
 from dash import Input, Output, State, dcc, html
 
+from ..ai_utils import prepare_portfolio_data_for_analysis
+from ..data_model import PortfolioGroup, PortfolioSummary
+from ..gemini_client import GeminiClient
 from ..logger import logger
 
 
@@ -315,11 +318,6 @@ def register_callbacks(app):
             )
         else:
             try:
-                # Import here to avoid circular imports
-                from ..ai_utils import prepare_portfolio_data_for_analysis
-                from ..data_model import PortfolioGroup, PortfolioSummary
-                from ..gemini_client import GeminiClient
-
                 # Check if the message is related to finance/portfolio
                 non_financial_keywords = [
                     "weather",

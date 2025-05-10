@@ -492,7 +492,7 @@ class TestPriceUpdates:
         from src.folio.portfolio import process_portfolio_data
 
         # Process the portfolio data
-        groups, summary, cash_like = process_portfolio_data(df)
+        groups, _summary, _cash_like = process_portfolio_data(df)
 
         # Verify that a group was created for the SPY options
         assert len(groups) > 0, "No portfolio groups were created"

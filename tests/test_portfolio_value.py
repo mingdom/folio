@@ -109,6 +109,7 @@ def create_test_portfolio_summary():
         option_value=1000.0,
         pending_activity_value=500.0,
         portfolio_estimate_value=15000.0,
+        price_updated_at="2025-05-03T08:00:00Z",
     )
 
 
@@ -517,6 +518,8 @@ def test_option_categorization_by_delta_exposure():
                 delta_exposure=28000.0,  # Positive delta exposure
                 notional_value=40000.0,
                 underlying_beta=1.0,
+                price=10.0,
+                cost_basis=8.0,
                 market_exposure=28000.0,  # Same as delta_exposure
             ),
             # Long put with negative delta (should be categorized as SHORT)
@@ -534,6 +537,8 @@ def test_option_categorization_by_delta_exposure():
                 delta_exposure=-12000.0,  # Negative delta exposure
                 notional_value=40000.0,
                 underlying_beta=1.0,
+                price=10.0,
+                cost_basis=12.0,
                 market_exposure=-12000.0,  # Same as delta_exposure
             ),
             # Short call with negative delta (should be categorized as SHORT)
@@ -551,6 +556,8 @@ def test_option_categorization_by_delta_exposure():
                 delta_exposure=-16000.0,  # Negative delta exposure
                 notional_value=40000.0,
                 underlying_beta=1.0,
+                price=10.0,
+                cost_basis=12.0,
                 market_exposure=-16000.0,  # Same as delta_exposure
             ),
             # Short put with positive delta (should be categorized as LONG)
@@ -568,6 +575,8 @@ def test_option_categorization_by_delta_exposure():
                 delta_exposure=8000.0,  # Positive delta exposure
                 notional_value=40000.0,
                 underlying_beta=1.0,
+                price=10.0,
+                cost_basis=12.0,
                 market_exposure=8000.0,  # Same as delta_exposure
             ),
         ],

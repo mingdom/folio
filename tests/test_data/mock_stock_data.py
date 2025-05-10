@@ -55,16 +55,14 @@ def generate_price_series(base_price=100.0, volatility=0.01, days=252, seed=42):
         low_price = min(open_price, price) * (1 - abs(np.random.normal(0, 0.005)))
         volume = int(np.random.normal(1000000, 300000))
 
-        data.append(
-            {
-                "date": date,
-                "Open": open_price,
-                "High": high_price,
-                "Low": low_price,
-                "Close": price,
-                "Volume": max(0, volume),  # Ensure volume is positive
-            }
-        )
+        data.append({
+            "date": date,
+            "Open": open_price,
+            "High": high_price,
+            "Low": low_price,
+            "Close": price,
+            "Volume": max(0, volume),  # Ensure volume is positive
+        })
 
     # Create DataFrame
     df = pd.DataFrame(data)
@@ -273,7 +271,7 @@ def get_mock_raw_data(ticker, period="1y"):
         raise ValueError(f"No sample file found for {ticker} with period {period}")
 
     # Load sample data
-    with open(sample_file) as f:
+    with open(sample_file, encoding="utf-8") as f:
         sample_data = json.load(f)
 
     # Get full data
@@ -323,7 +321,7 @@ def get_real_beta(ticker):
     if not os.path.exists(beta_file):
         raise ValueError("Beta values file not found")
 
-    with open(beta_file) as f:
+    with open(beta_file, encoding="utf-8") as f:
         betas = json.load(f)
 
     if ticker not in betas:

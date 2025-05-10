@@ -13,7 +13,7 @@ import numpy as np
 
 from .data_model import OptionPosition, StockPosition
 from .logger import logger
-from .options import OptionContract, calculate_bs_price
+from .options import OptionContract, calculate_black_scholes_delta, calculate_bs_price
 
 
 def calculate_position_pnl(
@@ -295,10 +295,6 @@ def analyze_asymptotic_behavior(positions: list) -> dict[str, bool]:
         # For options, use their delta calculation
         if position.get("position_type") == "option":
             # Create an OptionContract for delta calculation
-            import datetime
-
-            from src.folio.options import OptionContract
-
             # Parse expiry date from string format (assuming YYYY-MM-DD)
             expiry_str = position.get("expiration", "2025-01-01")
             if isinstance(expiry_str, str):
@@ -332,8 +328,6 @@ def analyze_asymptotic_behavior(positions: list) -> dict[str, bool]:
             quantity = position.get("quantity", 0)
 
             # Calculate delta at extreme prices
-            from src.folio.options import calculate_black_scholes_delta
-
             try:
                 delta_at_high_price = calculate_black_scholes_delta(
                     option_contract, high_price
@@ -352,16 +346,14 @@ def analyze_asymptotic_behavior(positions: list) -> dict[str, bool]:
                 low_price_delta += position_low_delta
 
                 # Track individual position deltas for debugging
-                position_deltas.append(
-                    {
-                        "type": "option",
-                        "option_type": position.get("option_type", ""),
-                        "strike": position.get("strike", 0),
-                        "quantity": quantity,
-                        "high_delta": position_high_delta,
-                        "low_delta": position_low_delta,
-                    }
-                )
+                position_deltas.append({
+                    "type": "option",
+                    "option_type": position.get("option_type", ""),
+                    "strike": position.get("strike", 0),
+                    "quantity": quantity,
+                    "high_delta": position_high_delta,
+                    "low_delta": position_low_delta,
+                })
             except Exception:
                 # If delta calculation fails, use simplified approach based on option type
                 if option_type == "CALL":
@@ -372,16 +364,14 @@ def analyze_asymptotic_behavior(positions: list) -> dict[str, bool]:
                     # No contribution at low prices (delta approaches 0)
 
                     # Track individual position deltas for debugging
-                    position_deltas.append(
-                        {
-                            "type": "option (fallback)",
-                            "option_type": "CALL",
-                            "strike": position.get("strike", 0),
-                            "quantity": quantity,
-                            "high_delta": position_high_delta,
-                            "low_delta": position_low_delta,
-                        }
-                    )
+                    position_deltas.append({
+                        "type": "option (fallback)",
+                        "option_type": "CALL",
+                        "strike": position.get("strike", 0),
+                        "quantity": quantity,
+                        "high_delta": position_high_delta,
+                        "low_delta": position_low_delta,
+                    })
                 elif option_type == "PUT":
                     # For puts: delta approaches 0 at high prices, -1 at low prices
                     position_high_delta = 0
@@ -390,16 +380,14 @@ def analyze_asymptotic_behavior(positions: list) -> dict[str, bool]:
                     # No contribution at high prices (delta approaches 0)
 
                     # Track individual position deltas for debugging
-                    position_deltas.append(
-                        {
-                            "type": "option (fallback)",
-                            "option_type": "PUT",
-                            "strike": position.get("strike", 0),
-                            "quantity": quantity,
-                            "high_delta": position_high_delta,
-                            "low_delta": position_low_delta,
-                        }
-                    )
+                    position_deltas.append({
+                        "type": "option (fallback)",
+                        "option_type": "PUT",
+                        "strike": position.get("strike", 0),
+                        "quantity": quantity,
+                        "high_delta": position_high_delta,
+                        "low_delta": position_low_delta,
+                    })
 
         # For stocks, delta is always 1 (or -1 for short positions)
         elif position.get("position_type") == "stock":
@@ -410,15 +398,13 @@ def analyze_asymptotic_behavior(positions: list) -> dict[str, bool]:
             low_price_delta += position_low_delta
 
             # Track individual position deltas for debugging
-            position_deltas.append(
-                {
-                    "type": "stock",
-                    "ticker": position.get("ticker", ""),
-                    "quantity": quantity,
-                    "high_delta": position_high_delta,
-                    "low_delta": position_low_delta,
-                }
-            )
+            position_deltas.append({
+                "type": "stock",
+                "ticker": position.get("ticker", ""),
+                "quantity": quantity,
+                "high_delta": position_high_delta,
+                "low_delta": position_low_delta,
+            })
 
         # Skip unknown position types
         else:

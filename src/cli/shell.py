@@ -103,7 +103,7 @@ def process_command(command: str) -> bool:
             # Call the appropriate command function
             subcmd = parts[2]
             ticker = parts[1]
-            args = [ticker] + parts[3:]
+            args = [ticker, *parts[3:]]
             try:
                 COMMANDS["position"][subcmd](state=state, args=args)
             except Exception as e:
@@ -195,13 +195,11 @@ def start_interactive_shell():
     if default_portfolio_path.exists():
         try:
             portfolio_load(state=state, args=[str(default_portfolio_path)])
-            console.print(
-                f"[green]Loaded default portfolio:[/green] {default_portfolio_path}"
-            )
+            console.print("[green]Loaded default portfolio[/green]")
 
             # Display portfolio summary by default
             console.print("\n[bold]Portfolio Summary:[/bold]")
-            portfolio_summary(state=state, args=[])
+            portfolio_summary(state=state, _args=[])
         except Exception as e:
             console.print(f"[yellow]Could not load default portfolio:[/yellow] {e!s}")
 

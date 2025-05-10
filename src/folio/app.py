@@ -26,6 +26,7 @@ from .components.pnl_chart import create_pnl_modal
 from .components.pnl_chart import register_callbacks as register_pnl_callbacks
 from .components.portfolio_table import create_portfolio_table
 from .components.summary_cards import create_summary_cards
+from .components.summary_cards import register_callbacks as register_summary_callbacks
 from .data_model import OptionPosition, PortfolioGroup, StockPosition
 from .error_utils import handle_callback_error
 from .logger import logger
@@ -97,37 +98,31 @@ def create_upload_section() -> dbc.Card:
                 className="d-flex justify-content-between align-items-center",
             ),
             dbc.Collapse(
-                dbc.CardBody(
-                    [
-                        dcc.Upload(
-                            id="upload-portfolio",
-                            children=html.Div(
-                                [
-                                    html.I(className="fas fa-file-upload me-2"),
-                                    "Drag and Drop or ",
-                                    html.A(
-                                        "Select a CSV File", className="text-primary"
-                                    ),
-                                ]
-                            ),
-                            style={
-                                "width": "100%",
-                                "height": "60px",
-                                "lineHeight": "60px",
-                                "textAlign": "center",
-                                "margin": "10px 0",
-                            },
-                            # Filter for CSV files
-                            accept=".csv",
-                            multiple=False,
-                        ),
-                        dcc.Loading(
-                            id="upload-loading",
-                            type="circle",
-                            children=[html.Div(id="upload-status")],
-                        ),
-                    ]
-                ),
+                dbc.CardBody([
+                    dcc.Upload(
+                        id="upload-portfolio",
+                        children=html.Div([
+                            html.I(className="fas fa-file-upload me-2"),
+                            "Drag and Drop or ",
+                            html.A("Select a CSV File", className="text-primary"),
+                        ]),
+                        style={
+                            "width": "100%",
+                            "height": "60px",
+                            "lineHeight": "60px",
+                            "textAlign": "center",
+                            "margin": "10px 0",
+                        },
+                        # Filter for CSV files
+                        accept=".csv",
+                        multiple=False,
+                    ),
+                    dcc.Loading(
+                        id="upload-loading",
+                        type="circle",
+                        children=[html.Div(id="upload-status")],
+                    ),
+                ]),
                 id="upload-collapse",
                 is_open=True,  # Initially open
             ),
@@ -185,16 +180,14 @@ def create_filters() -> dbc.InputGroup:
 
 def create_main_table() -> html.Div:
     """Create the main portfolio table"""
-    return html.Div(
-        [
-            html.Div(
-                id="portfolio-table",
-                className="portfolio-table-container",
-            ),
-            # Add a Store to track sort state
-            dcc.Store(id="sort-state", data={"column": "value", "direction": "desc"}),
-        ]
-    )
+    return html.Div([
+        html.Div(
+            id="portfolio-table",
+            className="portfolio-table-container",
+        ),
+        # Add a Store to track sort state
+        dcc.Store(id="sort-state", data={"column": "value", "direction": "desc"}),
+    ])
 
 
 def create_position_modal() -> dbc.Modal:
@@ -323,24 +316,22 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
             dbc.Modal(
                 [
                     dbc.ModalHeader("AI Portfolio Advisor"),
-                    dbc.ModalBody(
-                        [
-                            html.P("What would you like to know about your portfolio?"),
-                            dbc.Textarea(
-                                id="ai-query-input",
-                                placeholder="Ask about your portfolio...",
-                                rows=3,
-                                className="mb-3",
-                            ),
-                            dbc.Button(
-                                "Analyze",
-                                id="analyze-portfolio-button",
-                                color="primary",
-                                className="mb-3",
-                            ),
-                            html.Div(id="ai-analysis-result"),
-                        ]
-                    ),
+                    dbc.ModalBody([
+                        html.P("What would you like to know about your portfolio?"),
+                        dbc.Textarea(
+                            id="ai-query-input",
+                            placeholder="Ask about your portfolio...",
+                            rows=3,
+                            className="mb-3",
+                        ),
+                        dbc.Button(
+                            "Analyze",
+                            id="analyze-portfolio-button",
+                            color="primary",
+                            className="mb-3",
+                        ),
+                        html.Div(id="ai-analysis-result"),
+                    ]),
                     dbc.ModalFooter(
                         dbc.Button(
                             "Close",
@@ -484,7 +475,7 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
                 logger.debug(f"Loading portfolio from: {portfolio_path}")
 
                 # Debug the file content
-                with open(portfolio_path) as f:
+                with open(portfolio_path, encoding="utf-8") as f:
                     content = f.read()
                     logger.debug(
                         f"Portfolio content (first 100 chars): {content[:100]}"
@@ -595,9 +586,10 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
                     None,
                 )
 
-            # Process portfolio data with automatic price updates
+            # Process portfolio data with price updates disabled by default
+            # Only unpaired options will have their underlying prices updated
             groups, summary, cash_like_positions = portfolio.process_portfolio_data(
-                df, update_prices=True
+                df, update_prices=False
             )
             logger.debug(
                 f"Successfully processed {len(groups)} portfolio groups and {len(cash_like_positions)} cash-like positions"
@@ -643,9 +635,7 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
             return [], {}, [], error_msg, error_div, None
 
     # Register summary cards callbacks
-    from .components.summary_cards import register_callbacks
-
-    register_callbacks(app)
+    register_summary_callbacks(app)
 
     # Register P&L chart callbacks
     register_pnl_callbacks(app)
@@ -1033,17 +1023,17 @@ def main():
     )
 
     if is_huggingface:
-        logger.info("\n\n🚀 Folio is running on Hugging Face Spaces!")
-        logger.info("📊 Access the dashboard at the URL provided by Hugging Face\n")
+        logger.info("\n\n Folio is running on Hugging Face Spaces!")
+        logger.info(" Access the dashboard at the URL provided by Hugging Face\n")
     elif is_docker and args.host == "0.0.0.0":
-        logger.info("\n\n🚀 Folio is running inside a Docker container!")
-        logger.info(f"📊 Access the dashboard at: http://localhost:{args.port}")
+        logger.info("\n\n Folio is running inside a Docker container!")
+        logger.info(f" Access the dashboard at: http://localhost:{args.port}")
         logger.info(
-            f"💻 (The app is bound to {args.host}:{args.port} inside the container)\n"
+            f" (The app is bound to {args.host}:{args.port} inside the container)\n"
         )
     else:
-        logger.info("\n\n🚀 Folio is running!")
-        logger.info(f"📊 Access the dashboard at: http://localhost:{args.port}\n")
+        logger.info("\n\n Folio is running!")
+        logger.info(f" Access the dashboard at: http://localhost:{args.port}\n")
 
     app.run(debug=args.debug, port=args.port, host=args.host)
     return 0

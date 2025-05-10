@@ -19,7 +19,7 @@ def create_test_option(
     option_type="CALL",
     days_to_expiry=30,
     strike=100,
-    underlying_price=100,  # noqa: ARG001
+    underlying_price=100,
 ):
     """Create a test option position."""
     expiry = datetime.datetime.now() + datetime.timedelta(days=days_to_expiry)

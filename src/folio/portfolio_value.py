@@ -12,71 +12,9 @@ For stocks, these are typically the same, but for options, the market value (wha
 can be much less than the exposure (delta * notional value).
 """
 
-from .data_model import (
-    ExposureBreakdown,
-    OptionPosition,
-    PortfolioGroup,
-    PortfolioSummary,
-    StockPosition,
-)
+from .data_model import ExposureBreakdown, PortfolioGroup, PortfolioSummary
 from .formatting import format_currency
 from .logger import logger
-
-
-def calculate_net_exposure(
-    stock_position: StockPosition | None,
-    option_positions: list[OptionPosition],
-) -> float:
-    """Calculate net exposure for a portfolio group.
-
-    This is the canonical implementation that should be used everywhere in the codebase.
-
-    Args:
-        stock_position: The stock position (if any)
-        option_positions: List of option positions
-
-    Returns:
-        Net exposure (stock market exposure + sum of option delta exposures)
-    """
-    stock_exposure = stock_position.market_exposure if stock_position else 0.0
-    option_delta_exposure = sum(opt.delta_exposure for opt in option_positions)
-
-    logger.debug("Calculating net exposure:")
-    logger.debug(f"  Stock exposure: {stock_exposure}")
-    logger.debug(f"  Option delta exposure: {option_delta_exposure}")
-    logger.debug(f"  Net exposure: {stock_exposure + option_delta_exposure}")
-
-    return stock_exposure + option_delta_exposure
-
-
-def calculate_beta_adjusted_exposure(
-    stock_position: StockPosition | None,
-    option_positions: list[OptionPosition],
-) -> float:
-    """Calculate beta-adjusted exposure for a portfolio group.
-
-    This is the canonical implementation that should be used everywhere in the codebase.
-
-    Args:
-        stock_position: The stock position (if any)
-        option_positions: List of option positions
-
-    Returns:
-        Beta-adjusted exposure (stock beta-adjusted exposure + sum of option beta-adjusted exposures)
-    """
-    stock_beta_adjusted = (
-        stock_position.beta_adjusted_exposure if stock_position else 0.0
-    )
-    options_beta_adjusted = sum(opt.beta_adjusted_exposure for opt in option_positions)
-
-    logger.debug("Calculating beta-adjusted exposure:")
-    logger.debug(f"  Stock beta-adjusted: {stock_beta_adjusted}")
-    logger.debug(f"  Options beta-adjusted: {options_beta_adjusted}")
-    logger.debug(
-        f"  Beta-adjusted exposure: {stock_beta_adjusted + options_beta_adjusted}"
-    )
-
-    return stock_beta_adjusted + options_beta_adjusted
 
 
 def process_stock_positions(groups: list[PortfolioGroup]) -> tuple[dict, dict]:
@@ -283,7 +221,6 @@ def calculate_portfolio_metrics(
     net_market_exposure = long_value.total_exposure + short_value.total_exposure
 
     # Add debug logging
-    from .logger import logger
 
     logger.debug(f"Long total exposure: {long_value.total_exposure}")
     logger.debug(f"Short total exposure: {short_value.total_exposure}")

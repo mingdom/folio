@@ -12,120 +12,122 @@ This document outlines how the Folio codebase is structured and how data flows t
 
 Folio is a Python-based application that provides comprehensive portfolio analysis capabilities through multiple interfaces:
 
-1. **Web Interface**: A Dash-based web application for visualizing portfolio data
-2. **CLI Interface (`focli`)**: A command-line interface for portfolio analysis and simulation
+1. **Web Interface (`src/folio/`)**: A Dash-based web application for visualizing portfolio data
+2. **CLI Interface (`src/cli/`)**: A command-line interface for portfolio analysis and simulation
 
-Both interfaces leverage the same core library (`src/folio/`) for business logic, following our [strict separation of concerns](#separation-of-concerns) principles. The primary domain entities for this app are outlined below. For an authoritative overview of the data model, [data_model.py](src/folio/data_model.py) is the source of truth.
+Both interfaces leverage the core library (`src/folib/`) for business logic, following our strict separation of concerns principles. The core library provides a functional-first approach to portfolio analysis with clear boundaries between layers.
 
-## Deployment Modes
+## System Architecture
 
-Folio can run in multiple deployment environments:
+The codebase is organized into three main components:
 
-- **Local Development**: Running directly on a developer's machine
-- **Docker Container**: Running in a containerized environment
-- **Hugging Face Spaces**: Deployed as a Hugging Face Space for public access
+```
+src/
+├── folib/                  # Core library - business logic
+│   ├── domain.py           # Data classes (Position, Portfolio, etc.)
+│   ├── calculations/       # Pure calculation functions
+│   │   ├── exposure.py     # Exposure calculations
+│   │   ├── options.py      # Option pricing and Greeks
+│   ├── data/               # Data access layer
+│   │   ├── stock.py        # Market data access
+│   │   ├── loader.py       # Portfolio loading
+│   ├── services/           # Orchestration layer
+│       ├── portfolio_service.py  # Portfolio processing
+│       ├── position_service.py   # Position analysis
+│       ├── simulation_service.py # Portfolio simulation
+├── folio/                  # Web interface (Dash)
+│   ├── app.py              # Main Dash application
+│   ├── components/         # UI components
+├── cli/                    # Command-line interface
+    ├── main.py             # CLI entry point
+    ├── commands/           # Command implementations
+    ├── shell.py            # Interactive shell
+```
 
-The application detects its environment and adjusts settings accordingly, such as cache directories and logging behavior.
+## Core Library (`src/folib/`)
 
-## Core Data Model
+The core library follows a layered architecture with clear separation of concerns:
 
-The core data model consists of several key classes that represent portfolio components:
+### 1. Domain Layer (`domain.py`)
+
+Contains immutable data classes that represent the core entities:
 
 - **Position**: Base class for all positions
-  - **StockPosition**: Represents a stock position with quantity, price, beta, etc.
-  - **OptionPosition**: Represents an option position with strike, expiry, option type, delta, etc.
-- **PortfolioGroup**: Groups a stock with its related options (e.g., AAPL stock with AAPL options)
+  - **StockPosition**: Represents a stock position with quantity, price, etc.
+  - **OptionPosition**: Represents an option position with strike, expiry, option type, etc.
+  - **CashPosition**: Represents cash or cash-like positions
+- **Portfolio**: Contains a collection of positions and portfolio-level data
 - **PortfolioSummary**: Contains aggregated metrics for the entire portfolio
-- **ExposureBreakdown**: Detailed breakdown of exposure metrics by category
+- **ExposureMetrics**: Represents exposure metrics for positions and portfolios
 
-These classes are defined in [data_model.py](src/folio/data_model.py) and provide the foundation for all portfolio analysis.
+### 2. Calculation Layer (`calculations/`)
 
-## Data Flow
+Pure functions for financial calculations with no side effects:
 
-The data flow in Folio follows these main steps:
+- **exposure.py**: Functions for calculating position and portfolio exposures
+- **options.py**: Functions for option pricing and Greeks calculations using QuantLib
 
-1. **Data Input**: User uploads a portfolio CSV file or loads a sample portfolio
-2. **Data Processing**: The CSV is parsed, validated, and transformed into structured portfolio data
-3. **Position Grouping**: Stocks and their related options are grouped together
-4. **Metrics Calculation**: Exposure, beta, and other metrics are calculated for each position and group
-5. **Visualization**: The processed data is displayed in the dashboard with charts and tables
-6. **Interactivity**: User interactions trigger callbacks that update the displayed data
+### 3. Data Layer (`data/`)
 
-### CSV Processing
+Handles external data access and portfolio loading:
 
-When a user uploads a CSV file, the following process occurs:
+- **stock.py**: Market data access with provider abstraction
+  - **StockOracle**: Central class for market data retrieval
+  - Supports multiple providers (Yahoo Finance, Financial Modeling Prep)
+- **stock_data.py**: Stock data management with caching
+  - **StockData**: Container for stock-related information
+  - **StockDataService**: Service for fetching and caching stock data
+- **loader.py**: Portfolio loading and parsing from CSV files
+- **provider_*.py**: Implementations for different market data providers
 
-1. The file is validated for security in [security.py](src/folio/security.py)
-2. The CSV is parsed into a pandas DataFrame
-3. The DataFrame is processed by `process_portfolio_data()` in [portfolio.py](src/folio/portfolio.py)
-4. Stock positions are identified and processed
-5. Option positions are parsed and matched to their underlying stocks
-6. Cash-like positions are identified using [cash_detection.py](src/folio/cash_detection.py)
-7. Portfolio groups and summary metrics are calculated
+### 4. Service Layer (`services/`)
 
-### Stock Data Fetching
+Orchestrates the lower layers to fulfill specific use cases:
 
-Folio uses a pluggable data fetching system to retrieve stock data:
+- **portfolio_service.py**: Portfolio processing and analysis
+- **position_service.py**: Position analysis and calculations
+- **simulation_service.py**: Portfolio simulation
 
-1. A `DataFetcherInterface` defined in [stockdata.py](src/stockdata.py) provides a common interface
-2. Concrete implementations include `YFinanceDataFetcher` and `FMP` (Financial Modeling Prep) fetchers
-3. A singleton pattern ensures only one data fetcher is created throughout the application
-4. The data source can be configured at runtime through the `folio.yaml` configuration file
-5. Data is cached to improve performance and reduce API calls
+## Web Interface (`src/folio/`)
 
-### Options Processing
+The web interface is built with Dash and provides a visual dashboard for portfolio analysis:
 
-Option positions require special processing:
+### Components
 
-1. Option descriptions are parsed in [options.py](src/folio/options.py) to extract strike, expiry, and option type
-2. QuantLib is used for option pricing and Greeks calculations
-3. Delta exposure is calculated as delta * notional value
-4. Options are matched to their underlying stocks to form portfolio groups
-5. Option metrics are aggregated into the portfolio summary
+- **app.py**: Main Dash application setup and callbacks
+- **components/**: UI components for the dashboard
+  - **charts.py**: Portfolio visualization charts
+  - **portfolio_table.py**: Table of portfolio positions
+  - **position_details.py**: Detailed view of a position
+  - **pnl_chart.py**: Profit/loss visualization
+  - **summary_cards.py**: High-level portfolio metrics
 
-### Portfolio Metrics Calculation
+### Data Flow
 
-Portfolio metrics are calculated in several steps:
+1. User uploads a portfolio CSV file or loads a sample portfolio
+2. The file is processed by the core library's portfolio service
+3. The resulting portfolio data is stored in Dash's client-side state
+4. UI components subscribe to changes in the state and update accordingly
+5. User interactions trigger callbacks that update the state
 
-1. Individual position metrics are calculated first (market value, beta, exposure)
-2. Positions are grouped by underlying ticker
-3. Group-level metrics are calculated (net exposure, beta-adjusted exposure)
-4. Portfolio-level metrics are calculated (total exposure, portfolio beta, etc.)
-5. Exposure breakdowns are created for visualization
+## CLI Interface (`src/cli/`)
 
-The canonical implementations for these calculations are in [portfolio_value.py](src/folio/portfolio_value.py).
-
-## Web UI Components
-
-The web UI is built with Dash and consists of several key components:
-
-1. **Summary Cards**: Display high-level portfolio metrics
-2. **Charts**: Visualize portfolio allocation and exposure
-3. **Portfolio Table**: Display all positions with key metrics
-4. **Position Details**: Show detailed information for a selected position
-5. **P&L Chart**: Visualize profit/loss scenarios for options strategies
-
-Each component is defined in the [components](src/folio/components) directory and registered with callbacks in [app.py](src/folio/app.py).
-
-### Component Interaction
-
-Components interact through Dash callbacks:
-
-1. Data is stored in `dcc.Store` components that act as a client-side state
-2. User interactions trigger callbacks that update the stored data
-3. Components subscribe to changes in the stored data and update accordingly
-4. This pattern allows for a reactive UI without page reloads
-
-## CLI Interface
-
-The CLI interface (`focli`) provides a command-line tool for portfolio analysis and simulation:
+The CLI provides a command-line tool for portfolio analysis and simulation:
 
 ### Architecture
 
-1. **Shell**: An interactive shell implemented in [shell.py](src/focli/shell.py) using the `cmd` module
-2. **Commands**: Command handlers in the [commands](src/focli/commands) directory
-3. **Formatters**: Output formatting utilities in [formatters.py](src/focli/formatters.py)
-4. **Utils**: CLI-specific utilities in [utils.py](src/focli/utils.py)
+- **main.py**: Main entry point for the CLI
+- **shell.py**: Interactive shell implementation
+- **commands/**: Command implementations
+  - **portfolio.py**: Portfolio commands (load, summary, list)
+  - **position.py**: Position commands (details, risk)
+- **formatters.py**: Output formatting utilities
+- **state.py**: State management for interactive mode
+
+### Usage Modes
+
+1. **Interactive Shell Mode**: Provides a persistent session with command history and tab completion
+2. **Direct Execution Mode**: Commands can be executed directly from the system shell
 
 ### Command Structure
 
@@ -136,80 +138,77 @@ folio> command [subcommand] [options]
 ```
 
 Key commands include:
-- `simulate`: Simulate portfolio performance with SPY changes
-- `position`: Analyze a specific position group
-- `portfolio`: View and analyze portfolio data
+- `portfolio`: View and manage the portfolio (load, summary, list)
+- `position`: Analyze a specific position (details, risk)
 
-### Separation of Concerns
+## Data Flow
 
-The CLI strictly adheres to the [separation of concerns](#separation-of-concerns) principles:
-- Command handlers only handle parsing, validation, and presentation
-- All business logic is delegated to the core library
-- No calculation or simulation logic exists in the CLI layer
+The data flow in Folio follows these main steps:
 
-## Key Modules
+1. **Data Input**: User uploads a portfolio CSV file or loads a sample portfolio
+2. **Data Loading**: The CSV is loaded and parsed into portfolio holdings by the data layer
+3. **Portfolio Processing**: Holdings are processed into a structured portfolio by the service layer
+4. **Position Analysis**: Positions are analyzed to calculate metrics (exposure, beta, etc.)
+5. **Presentation**: Results are presented to the user through the web UI or CLI
 
-### Core Library (src/folio/)
+### Portfolio Processing Flow
 
-#### Data Processing
+```
+CSV File → load_portfolio_from_csv() → parse_portfolio_holdings() → process_portfolio() → Portfolio
+```
 
-- **portfolio.py**: Core portfolio processing logic
-- **portfolio_value.py**: Canonical implementations of portfolio value calculations
-- **simulator.py**: Portfolio and position simulation logic
-- **options.py**: Option pricing and Greeks calculations
-- **cash_detection.py**: Identification of cash-like positions
+### Market Data Flow
 
-#### Data Fetching
+```
+Ticker → StockDataService → StockOracle → Provider (YFinance/FMP) → Market Data
+                         ↓
+                    Cache (.cache_stock_data)
+```
 
-- **stockdata.py**: Common interface for data fetchers
-- **yfinance.py**: Yahoo Finance data fetcher
-- **fmp.py**: Financial Modeling Prep data fetcher
+## Key Design Decisions
 
-#### Application Core
+### 1. Functional-First Approach
 
-- **data_model.py**: Core data structures
-- **logger.py**: Logging configuration
-- **security.py**: Security utilities for validating user inputs
+The core library follows functional programming principles:
+- Pure functions with no side effects
+- Immutable data structures
+- Explicit data flow
+- Minimal dependencies between components
 
-### Web UI (src/folio/)
+### 2. Provider Abstraction
 
-#### UI Components
+Market data can be fetched from multiple providers:
+- Yahoo Finance (default)
+- Financial Modeling Prep (FMP)
+- Providers implement a common interface
+- Configuration can be changed at runtime
 
-- **components/**: UI components for the dashboard
-  - **charts.py**: Portfolio visualization charts
-  - **portfolio_table.py**: Table of portfolio positions
-  - **position_details.py**: Detailed view of a position
-  - **pnl_chart.py**: Profit/loss visualization
-  - **summary_cards.py**: High-level portfolio metrics
+### 3. Caching Strategy
 
-#### Web Application
+Market data is cached to improve performance and reduce API calls:
+- Centralized caching through the StockDataService class
+- In-memory caching for fast access
+- File-based persistence in a single .cache_stock_data directory
+- Time-based cache invalidation (default: 1 hour)
+- Clear separation between data fetching (StockOracle) and caching (StockDataService)
 
-- **app.py**: Main Dash application setup and callbacks
+### 4. Separation of Concerns
 
-### CLI Interface (src/focli/)
+The codebase strictly separates concerns:
+- Core library contains all business logic
+- Interface layers (web UI, CLI) only handle presentation
+- No business logic in interface layers
+- Clear boundaries between layers
 
-#### Command Handling
+## Deployment Modes
 
-- **shell.py**: Interactive shell implementation
-- **commands/**: Command handlers
-  - **simulate.py**: Portfolio simulation commands
-  - **position.py**: Position analysis commands
-  - **portfolio.py**: Portfolio management commands
+Folio can run in multiple deployment environments:
 
-#### Presentation
+- **Local Development**: Running directly on a developer's machine
+- **Docker Container**: Running in a containerized environment
+- **Hugging Face Spaces**: Deployed as a Hugging Face Space for public access
 
-- **formatters.py**: Output formatting utilities
-- **utils.py**: CLI-specific utilities (no business logic)
-
-## Configuration
-
-Folio uses a YAML configuration file (`folio.yaml`) for runtime settings:
-
-- **Data Source**: Configure which data source to use (Yahoo Finance or FMP)
-- **Cache Settings**: Configure cache directories and TTL
-- **UI Settings**: Configure dashboard appearance and behavior
-
-The configuration is loaded at startup and can be overridden by environment variables.
+The application detects its environment and adjusts settings accordingly, such as cache directories and logging behavior.
 
 ## Error Handling
 
@@ -230,57 +229,12 @@ The codebase includes comprehensive tests:
 
 Tests are organized to mirror the structure of the source code, with test files corresponding to source files.
 
-## Development Workflow
-
-To add new features to Folio:
-
-1. **UI Components**: Add new components in the `components/` directory
-2. **Data Processing**: Extend the data model in `data_model.py` and processing logic in `utils.py`
-3. **Callbacks**: Add new callbacks in `app.py` to handle user interactions
-4. **Testing**: Add tests for new functionality
-
-## Separation of Concerns
-
-Folio strictly adheres to separation of concerns principles:
-
-### Core Library vs Interface Layers
-
-1. **Core Library (`src/folio/`)**:
-   - Contains ALL business logic, data processing, and calculation functionality
-   - Provides a stable API for interface layers to use
-   - Should never depend on interface-specific code
-
-2. **Interface Layers (`src/focli/`, web UI)**:
-   - Handle user interaction, command parsing, and result presentation
-   - Call core library functions to perform business operations
-   - Should NEVER contain business logic
-   - Focus solely on translating user inputs to core library calls and formatting outputs
-
-### Business Logic Placement
-
-Business logic must ALWAYS reside in the core library, not in interface layers. Examples include:
-
-- Calculations and algorithms
-- Data transformations
-- Simulation logic
-- Portfolio analysis
-- Value calculations
-
-Interface layers should be thin wrappers around the core library, focusing only on:
-- Parsing user input
-- Calling appropriate core library functions
-- Formatting and presenting results
-- Managing UI state
-
 ## Conclusion
 
-Folio is designed with a clean separation of concerns:
+Folio is designed with a clean architecture that separates concerns and promotes maintainability:
 
-- Business logic is centralized in the core library
-- Data fetching is abstracted behind interfaces
-- Data processing is separated from UI components
-- UI components are modular and reusable
-- Configuration is externalized for flexibility
-- Interface layers are thin and focused on user interaction
+- **Core Library (`src/folib/`)**: Contains all business logic in a functional-first approach
+- **Web Interface (`src/folio/`)**: Provides a visual dashboard using Dash
+- **CLI Interface (`src/cli/`)**: Provides a command-line tool for portfolio analysis
 
 This architecture makes the codebase maintainable, testable, and extensible, allowing for easy addition of new features and improvements.

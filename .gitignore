@@ -88,3 +88,6 @@ private-data/**
 
 # Local documentation folder
 .refs/
+
+# repomix
+repomix**

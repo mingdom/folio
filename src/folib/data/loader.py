@@ -25,7 +25,8 @@ from typing import Any
 
 import pandas as pd
 
-from ..data.stock import stockdata
+from src.folio.cash_detection import is_cash_or_short_term
+
 from ..domain import PortfolioHolding
 
 # Set up logging
@@ -61,7 +62,7 @@ def clean_currency_value(value: Any) -> float:
     value_str = str(value)
 
     # Handle empty or dash values
-    if value_str in ("--", ""):
+    if value_str in {"--", ""}:
         return 0.0
 
     # Remove currency symbols and commas
@@ -89,7 +90,7 @@ def load_portfolio_from_csv(file_path: str) -> pd.DataFrame:
     This function reads the portfolio CSV file and returns it as a pandas DataFrame.
     It handles basic file I/O errors and ensures the CSV has the expected format.
 
-    The expected CSV format is based on portfolio-private.csv with columns:
+    The expected CSV format is based on portfolio-default.csv with columns:
     Symbol, Description, Quantity, Last Price, Current Value, Cost Basis Total, etc.
 
     Args:
@@ -136,9 +137,11 @@ def load_portfolio_from_csv(file_path: str) -> pd.DataFrame:
     return df
 
 
-def parse_portfolio_holdings(df: pd.DataFrame) -> list[PortfolioHolding]:
+def parse_portfolio_holdings(
+    df: pd.DataFrame,
+) -> tuple[list[PortfolioHolding], set[str]]:
     """
-    Parse raw CSV data into portfolio holdings.
+    Parse raw CSV data into portfolio holdings and identify stock tickers.
 
     This function transforms the raw DataFrame into a list of PortfolioHolding objects,
     extracting only the essential columns and cleaning the data as needed.
@@ -148,12 +151,15 @@ def parse_portfolio_holdings(df: pd.DataFrame) -> list[PortfolioHolding]:
     - Cleaning currency values (removing '$', ',', etc.)
     - Converting data types (strings to floats, etc.)
     - Handling missing or invalid values
+    - Identifying stock tickers for option pairing
 
     Args:
         df: DataFrame with portfolio data from load_portfolio_from_csv()
 
     Returns:
-        List of PortfolioHolding objects containing only the essential position data
+        Tuple containing:
+        - List of PortfolioHolding objects containing only the essential position data
+        - Set of stock tickers for option pairing
 
     Raises:
         ValueError: If required columns are missing or data conversion fails
@@ -165,8 +171,9 @@ def parse_portfolio_holdings(df: pd.DataFrame) -> list[PortfolioHolding]:
     df["Symbol"] = df["Symbol"].str.strip()
     df["Description"] = df["Description"].fillna("")  # Ensure Description is never NaN
 
-    # Initialize list to store holdings
+    # Initialize list to store holdings and set for stock tickers
     holdings = []
+    stock_tickers = set()
 
     # Process each row
     for index, row in df.iterrows():
@@ -241,7 +248,7 @@ def parse_portfolio_holdings(df: pd.DataFrame) -> list[PortfolioHolding]:
                 value = 0.0
 
             # Special handling for cash-like positions
-            is_cash_like = stockdata.is_cash_like(symbol, description)
+            is_cash_like = is_cash_or_short_term(symbol, description=description)
 
             # For cash-like positions, ensure we have valid quantity and price
             if is_cash_like:
@@ -302,6 +309,16 @@ def parse_portfolio_holdings(df: pd.DataFrame) -> list[PortfolioHolding]:
             holdings.append(holding)
             logger.debug(f"Row {index}: Added holding for {symbol}")
 
+            # Identify stock tickers (non-cash, non-pending activity, no option indicators in description)
+            if (
+                not is_cash_like
+                and not is_pending_activity
+                and "CALL" not in description.upper()
+                and "PUT" not in description.upper()
+            ):
+                stock_tickers.add(symbol)
+                logger.debug(f"Row {index}: Identified {symbol} as a stock ticker")
+
         except Exception as e:
             # Catch unexpected errors
             logger.error(f"Row {index}: Unexpected error: {e}", exc_info=True)
@@ -310,6 +327,8 @@ def parse_portfolio_holdings(df: pd.DataFrame) -> list[PortfolioHolding]:
     if not holdings:
         logger.warning("No valid holdings found in portfolio data")
     else:
-        logger.debug(f"Successfully parsed {len(holdings)} holdings")
+        logger.debug(
+            f"Successfully parsed {len(holdings)} holdings with {len(stock_tickers)} stock tickers"
+        )
 
-    return holdings
+    return holdings, stock_tickers

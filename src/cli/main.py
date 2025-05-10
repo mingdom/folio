@@ -18,6 +18,9 @@ import sys
 import typer
 from rich.console import Console
 
+from src.folib.logger import logger
+
+from . import __version__
 from .commands.portfolio import portfolio_app
 from .commands.position import position_app
 from .shell import start_interactive_shell
@@ -40,8 +43,6 @@ console = Console()
 def version_callback(value: bool):
     """Print version information and exit."""
     if value:
-        from . import __version__
-
         console.print(f"Folio CLI version: {__version__}")
         raise typer.Exit()
 
@@ -66,12 +67,18 @@ def main(
 
 def run():
     """Run the CLI application."""
+    # Log the startup with the current log level
+    logger.debug("Starting CLI application with DEBUG logging enabled")
+    logger.info("CLI application starting")
+
     # If no arguments are provided, start the interactive shell
     if len(sys.argv) == 1:
+        logger.debug("No arguments provided, starting interactive shell")
         start_interactive_shell()
         return
 
     # Otherwise, run the Typer app
+    logger.debug(f"Running with arguments: {sys.argv[1:]}")
     app()
 
 

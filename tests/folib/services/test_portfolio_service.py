@@ -23,13 +23,22 @@ from src.folib.services.portfolio_service import (
 
 
 @pytest.fixture
-def mock_stockdata():
-    """Create a mock stockdata object."""
+def mock_stock_service():
+    """Create a mock StockDataService object."""
     mock = MagicMock()
-    mock.get_price.return_value = 150.0
-    mock.get_beta.return_value = 1.2
+    # Create a mock StockData object
+    mock_stock_data = MagicMock()
+    mock_stock_data.price = 150.0
+    mock_stock_data.beta = 1.2
+    mock_stock_data.volatility = 0.25
+
+    # Configure the load_market_data method to return the mock StockData
+    mock.load_market_data.return_value = mock_stock_data
+
+    # Configure other methods
     mock.is_valid_stock_symbol.return_value = True
     mock.is_cash_like.return_value = False
+
     return mock
 
 
@@ -60,16 +69,16 @@ def sample_portfolio():
 class TestCreatePortfolioSummary:
     """Tests for the create_portfolio_summary function."""
 
-    @patch("src.folib.services.portfolio_service.stockdata")
-    @patch("src.folib.calculations.options.calculate_option_delta")
+    @patch("src.folib.services.portfolio_service.ticker_service")
+    @patch("src.folib.services.portfolio_service.calculate_option_delta")
     def test_create_portfolio_summary_with_stock_and_option(
-        self, mock_calculate_delta, mock_stockdata, sample_portfolio
+        self, mock_calculate_delta, mock_ticker_service, sample_portfolio
     ):
         """Test creating a portfolio summary with stock and option positions."""
         # Arrange
-        mock_stockdata.get_price.return_value = 150.0
-        mock_stockdata.get_beta.return_value = 1.2
-        mock_stockdata.is_cash_like.return_value = False
+        # Configure the mock ticker service
+        mock_ticker_service.get_price.return_value = 150.0
+        mock_ticker_service.get_beta.return_value = 1.2
         mock_calculate_delta.return_value = 0.6
 
         # Act
@@ -86,26 +95,29 @@ class TestCreatePortfolioSummary:
         assert hasattr(summary, "net_exposure_pct")
         assert hasattr(summary, "beta_adjusted_exposure")
         assert summary.net_exposure_pct >= 0
-        assert summary.beta_adjusted_exposure != 0
 
-        # Verify the exposure calculations were called correctly
-        mock_stockdata.get_beta.assert_called_with("AAPL")
-        # The function is called at least once for option exposure calculation
-        assert mock_calculate_delta.call_count >= 1
+        # Verify the beta-adjusted exposure calculation is correct
+        # Stock exposure: 10 shares * $150 = $1500
+        # Option exposure: 2 contracts * 100 shares * 0.6 delta * $150 = $18000
+        # Total exposure: $1500 + $18000 = $19500
+        # Beta-adjusted: $19500 * 1.2 = $23400
+        expected_beta_adjusted = 23400.0
+        assert abs(summary.beta_adjusted_exposure - expected_beta_adjusted) < 0.01
 
 
 class TestGetPortfolioExposures:
     """Tests for the get_portfolio_exposures function."""
 
-    @patch("src.folib.services.portfolio_service.stockdata")
-    @patch("src.folib.calculations.options.calculate_option_delta")
+    @patch("src.folib.services.portfolio_service.ticker_service")
+    @patch("src.folib.services.portfolio_service.calculate_option_delta")
     def test_get_portfolio_exposures(
-        self, mock_calculate_delta, mock_stockdata, sample_portfolio
+        self, mock_calculate_delta, mock_ticker_service, sample_portfolio
     ):
         """Test calculating portfolio exposures."""
         # Arrange
-        mock_stockdata.get_price.return_value = 150.0
-        mock_stockdata.get_beta.return_value = 1.2
+        # Configure the mock ticker service
+        mock_ticker_service.get_price.return_value = 150.0
+        mock_ticker_service.get_beta.return_value = 1.2
         mock_calculate_delta.return_value = 0.6
 
         # Act
@@ -113,25 +125,34 @@ class TestGetPortfolioExposures:
 
         # Assert
         assert isinstance(exposures, dict)
-        assert "long_stock_exposure" in exposures
-        assert "long_option_exposure" in exposures
-        assert "net_market_exposure" in exposures
-        assert "beta_adjusted_exposure" in exposures
 
-        # Verify the exposure calculations were called correctly
-        mock_stockdata.get_beta.assert_called_with("AAPL")
-        mock_calculate_delta.assert_called_once()
+        # Verify the exposure values are calculated correctly
+        # Stock exposure: 10 shares * $150 = $1500
+        assert exposures["long_stock_exposure"] == 1500.0
+
+        # Option exposure: 2 contracts * 100 shares * 0.6 delta * $150 = $18000
+        expected_option_exposure = 2 * 100 * 0.6 * 150.0
+        assert abs(exposures["long_option_exposure"] - expected_option_exposure) < 0.01
+
+        # Net exposure: long_stock + long_option + short_stock + short_option
+        expected_net_exposure = (
+            exposures["long_stock_exposure"] + exposures["long_option_exposure"]
+        )
+        assert abs(exposures["net_market_exposure"] - expected_net_exposure) < 0.01
+
+        # Beta-adjusted exposure: net_exposure * beta
+        expected_beta_adjusted = exposures["net_market_exposure"] * 1.2
+        assert abs(exposures["beta_adjusted_exposure"] - expected_beta_adjusted) < 0.01
 
 
 class TestProcessPortfolio:
     """Tests for the process_portfolio function."""
 
-    @patch("src.folib.services.portfolio_service.stockdata")
-    def test_process_portfolio_with_stock_and_option(self, mock_stockdata):
+    @patch("src.folib.services.portfolio_service.is_cash_or_short_term")
+    def test_process_portfolio_with_stock_and_option(self, mock_is_cash_or_short_term):
         """Test processing portfolio holdings into a structured portfolio."""
         # Arrange
-        mock_stockdata.is_valid_stock_symbol.return_value = True
-        mock_stockdata.is_cash_like.return_value = False
+        mock_is_cash_or_short_term.return_value = False
 
         holdings = [
             PortfolioHolding(
@@ -152,8 +173,11 @@ class TestProcessPortfolio:
             ),
         ]
 
+        # Create a tuple of holdings and stock_tickers to match the new interface
+        holdings_data = (holdings, {"AAPL"})
+
         # Act
-        portfolio = process_portfolio(holdings)
+        portfolio = process_portfolio(holdings_data)
 
         # Assert
         assert isinstance(portfolio, Portfolio)

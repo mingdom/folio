@@ -56,36 +56,32 @@ def prepare_portfolio_data_for_analysis(
         # Add stock position if present
         if group.stock_position:
             stock = group.stock_position
-            positions.append(
-                {
-                    "ticker": stock.ticker,
-                    "position_type": "stock",
-                    "market_value": stock.market_exposure,
-                    "beta": stock.beta,
-                    "weight": calculate_position_weight(
-                        stock.market_exposure, summary.net_market_exposure
-                    ),
-                    "quantity": stock.quantity,
-                }
-            )
+            positions.append({
+                "ticker": stock.ticker,
+                "position_type": "stock",
+                "market_value": stock.market_exposure,
+                "beta": stock.beta,
+                "weight": calculate_position_weight(
+                    stock.market_exposure, summary.net_market_exposure
+                ),
+                "quantity": stock.quantity,
+            })
 
         # Add option positions if present
         for option in group.option_positions:
-            positions.append(
-                {
-                    "ticker": option.ticker,
-                    "position_type": "option",
-                    "market_value": option.market_exposure,
-                    "beta": option.beta,
-                    "weight": calculate_position_weight(
-                        option.market_exposure, summary.net_market_exposure
-                    ),
-                    "option_type": option.option_type,
-                    "strike": option.strike,
-                    "expiry": option.expiry,
-                    "delta": option.delta,
-                }
-            )
+            positions.append({
+                "ticker": option.ticker,
+                "position_type": "option",
+                "market_value": option.market_exposure,
+                "beta": option.beta,
+                "weight": calculate_position_weight(
+                    option.market_exposure, summary.net_market_exposure
+                ),
+                "option_type": option.option_type,
+                "strike": option.strike,
+                "expiry": option.expiry,
+                "delta": option.delta,
+            })
 
     # Enhanced summary data with portfolio value
     summary_data = {

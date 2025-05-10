@@ -94,19 +94,20 @@ class TestParsePortfolioHoldings:
     def test_parse_portfolio_holdings(self):
         """Test parsing portfolio holdings from a DataFrame."""
         # Create a test DataFrame
-        df = pd.DataFrame(
-            {
-                "Symbol": ["AAPL", "MSFT"],
-                "Description": ["APPLE INC", "MICROSOFT CORP"],
-                "Quantity": [10, 5],
-                "Last Price": ["$150.00", "$300.00"],
-                "Current Value": ["$1500.00", "$1500.00"],
-                "Cost Basis Total": ["$1000.00", "$1200.00"],
-            }
-        )
+        df = pd.DataFrame({
+            "Symbol": ["AAPL", "MSFT"],
+            "Description": ["APPLE INC", "MICROSOFT CORP"],
+            "Quantity": [10, 5],
+            "Last Price": ["$150.00", "$300.00"],
+            "Current Value": ["$1500.00", "$1500.00"],
+            "Cost Basis Total": ["$1000.00", "$1200.00"],
+        })
 
-        # Parse the holdings
-        holdings = parse_portfolio_holdings(df)
+        # Parse the holdings - now returns (holdings, stock_tickers)
+        holdings_data = parse_portfolio_holdings(df)
+        holdings, stock_tickers = holdings_data
+
+        # Check the holdings list
         assert len(holdings) == 2
         assert holdings[0].symbol == "AAPL"
         assert holdings[0].quantity == 10
@@ -114,41 +115,44 @@ class TestParsePortfolioHoldings:
         assert holdings[0].value == 1500.0
         assert holdings[0].cost_basis_total == 1000.0
 
+        # Check the stock_tickers set
+        assert "AAPL" in stock_tickers
+        assert "MSFT" in stock_tickers
+        assert len(stock_tickers) == 2
+
     def test_parse_portfolio_holdings_with_empty_symbols(self):
         """Test parsing portfolio holdings with empty symbols."""
         # Create a test DataFrame with an empty symbol
-        df = pd.DataFrame(
-            {
-                "Symbol": ["AAPL", ""],
-                "Description": ["APPLE INC", "EMPTY SYMBOL"],
-                "Quantity": [10, 5],
-                "Last Price": ["$150.00", "$300.00"],
-                "Current Value": ["$1500.00", "$1500.00"],
-                "Cost Basis Total": ["$1000.00", "$1200.00"],
-            }
-        )
+        df = pd.DataFrame({
+            "Symbol": ["AAPL", ""],
+            "Description": ["APPLE INC", "EMPTY SYMBOL"],
+            "Quantity": [10, 5],
+            "Last Price": ["$150.00", "$300.00"],
+            "Current Value": ["$1500.00", "$1500.00"],
+            "Cost Basis Total": ["$1000.00", "$1200.00"],
+        })
 
         # Parse the holdings
-        holdings = parse_portfolio_holdings(df)
+        holdings, stock_tickers = parse_portfolio_holdings(df)
         assert len(holdings) == 1
         assert holdings[0].symbol == "AAPL"
+        assert len(stock_tickers) == 1
+        assert "AAPL" in stock_tickers
 
     def test_parse_portfolio_holdings_with_invalid_values(self):
         """Test parsing portfolio holdings with invalid values."""
         # Create a test DataFrame with invalid values
-        df = pd.DataFrame(
-            {
-                "Symbol": ["AAPL", "MSFT"],
-                "Description": ["APPLE INC", "MICROSOFT CORP"],
-                "Quantity": [10, "invalid"],
-                "Last Price": ["$150.00", "invalid"],
-                "Current Value": ["$1500.00", "invalid"],
-                "Cost Basis Total": ["$1000.00", "invalid"],
-            }
-        )
+        df = pd.DataFrame({
+            "Symbol": ["AAPL", "MSFT"],
+            "Description": ["APPLE INC", "MICROSOFT CORP"],
+            "Quantity": [10, "invalid"],
+            "Last Price": ["$150.00", "invalid"],
+            "Current Value": ["$1500.00", "invalid"],
+            "Cost Basis Total": ["$1000.00", "invalid"],
+        })
 
         # Parse the holdings
-        holdings = parse_portfolio_holdings(df)
+        holdings, stock_tickers = parse_portfolio_holdings(df)
         assert len(holdings) == 2
         assert holdings[0].symbol == "AAPL"
         assert holdings[0].quantity == 10
@@ -161,56 +165,61 @@ class TestParsePortfolioHoldings:
         assert holdings[1].value == 0.0
         assert holdings[1].cost_basis_total is None
 
+        # Check stock_tickers
+        assert len(stock_tickers) == 2
+        assert "AAPL" in stock_tickers
+        assert "MSFT" in stock_tickers
+
     def test_parse_portfolio_holdings_with_pending_activity(self):
         """Test parsing portfolio holdings with pending activity."""
         # Create a test DataFrame with pending activity
-        df = pd.DataFrame(
-            {
-                "Symbol": ["AAPL", "Pending Activity"],
-                "Description": ["APPLE INC", ""],
-                "Quantity": [10, ""],
-                "Last Price": ["$150.00", ""],
-                "Current Value": ["$1500.00", "$529535.51"],
-                "Cost Basis Total": ["$1000.00", ""],
-            }
-        )
+        df = pd.DataFrame({
+            "Symbol": ["AAPL", "Pending Activity"],
+            "Description": ["APPLE INC", ""],
+            "Quantity": [10, ""],
+            "Last Price": ["$150.00", ""],
+            "Current Value": ["$1500.00", "$529535.51"],
+            "Cost Basis Total": ["$1000.00", ""],
+        })
 
         # Parse the holdings
-        holdings = parse_portfolio_holdings(df)
+        holdings, stock_tickers = parse_portfolio_holdings(df)
         assert len(holdings) == 2
         assert holdings[0].symbol == "AAPL"
         assert holdings[1].symbol == "Pending Activity"
         assert holdings[1].quantity == 0
         assert holdings[1].price == 0.0
         assert holdings[1].value == 529535.51
+
+        # Check stock_tickers - pending activity should not be included
+        assert len(stock_tickers) == 1
+        assert "AAPL" in stock_tickers
 
     def test_parse_portfolio_holdings_with_fidelity_format_pending_activity(self):
         """Test parsing portfolio holdings with Fidelity-format pending activity."""
         # Create a test DataFrame with Fidelity-format pending activity
         # Format: Z26522634,GMX,Pending Activity,,,,,$529535.51,,,,,,,,
-        df = pd.DataFrame(
-            {
-                "Account Number": ["Z26522634", "Z26522634"],
-                "Account Name": ["GMX", "GMX"],
-                "Symbol": ["AAPL", "Pending Activity"],
-                "Description": ["APPLE INC", ""],
-                "Quantity": [10, ""],
-                "Last Price": ["$150.00", ""],
-                "Last Price Change": ["$1.00", ""],
-                "Current Value": ["$1500.00", "$529535.51"],
-                "Today's Gain/Loss Dollar": ["$10.00", ""],
-                "Today's Gain/Loss Percent": ["0.67%", ""],
-                "Total Gain/Loss Dollar": ["$500.00", ""],
-                "Total Gain/Loss Percent": ["50.00%", ""],
-                "Percent Of Account": ["1.00%", ""],
-                "Cost Basis Total": ["$1000.00", ""],
-                "Average Cost Basis": ["$100.00", ""],
-                "Type": ["Margin", ""],
-            }
-        )
+        df = pd.DataFrame({
+            "Account Number": ["Z26522634", "Z26522634"],
+            "Account Name": ["GMX", "GMX"],
+            "Symbol": ["AAPL", "Pending Activity"],
+            "Description": ["APPLE INC", ""],
+            "Quantity": [10, ""],
+            "Last Price": ["$150.00", ""],
+            "Last Price Change": ["$1.00", ""],
+            "Current Value": ["$1500.00", "$529535.51"],
+            "Today's Gain/Loss Dollar": ["$10.00", ""],
+            "Today's Gain/Loss Percent": ["0.67%", ""],
+            "Total Gain/Loss Dollar": ["$500.00", ""],
+            "Total Gain/Loss Percent": ["50.00%", ""],
+            "Percent Of Account": ["1.00%", ""],
+            "Cost Basis Total": ["$1000.00", ""],
+            "Average Cost Basis": ["$100.00", ""],
+            "Type": ["Margin", ""],
+        })
 
         # Parse the holdings
-        holdings = parse_portfolio_holdings(df)
+        holdings, stock_tickers = parse_portfolio_holdings(df)
         assert len(holdings) == 2
         assert holdings[0].symbol == "AAPL"
         assert holdings[1].symbol == "Pending Activity"
@@ -218,26 +227,31 @@ class TestParsePortfolioHoldings:
         assert holdings[1].price == 0.0
         assert holdings[1].value == 529535.51
 
+        # Check stock_tickers - pending activity should not be included
+        assert len(stock_tickers) == 1
+        assert "AAPL" in stock_tickers
+
     @patch("src.folib.data.loader.logger")
     def test_parse_portfolio_holdings_with_pending_activity_logging(self, mock_logger):
         """Test that pending activity parsing is properly logged."""
         # Create a test DataFrame with pending activity
-        df = pd.DataFrame(
-            {
-                "Symbol": ["Pending Activity"],
-                "Description": [""],
-                "Quantity": [""],
-                "Last Price": [""],
-                "Current Value": ["$529535.51"],
-                "Cost Basis Total": [""],
-            }
-        )
+        df = pd.DataFrame({
+            "Symbol": ["Pending Activity"],
+            "Description": [""],
+            "Quantity": [""],
+            "Last Price": [""],
+            "Current Value": ["$529535.51"],
+            "Cost Basis Total": [""],
+        })
 
         # Parse the holdings
-        holdings = parse_portfolio_holdings(df)
+        holdings, stock_tickers = parse_portfolio_holdings(df)
         assert len(holdings) == 1
         assert holdings[0].symbol == "Pending Activity"
         assert holdings[0].value == 529535.51
+
+        # Check stock_tickers - should be empty since there are no stocks
+        assert len(stock_tickers) == 0
 
         # Check that the correct log messages were generated
         mock_logger.debug.assert_any_call("Row 0: Identified pending activity row")
@@ -248,46 +262,48 @@ class TestParsePortfolioHoldings:
     def test_parse_portfolio_holdings_with_special_symbols(self):
         """Test parsing portfolio holdings with special symbols like SPAXX**."""
         # Create a test DataFrame with a special symbol
-        df = pd.DataFrame(
-            {
-                "Symbol": ["SPAXX**"],
-                "Description": ["FIDELITY GOVERNMENT MONEY MARKET"],
-                "Quantity": [""],
-                "Last Price": [""],
-                "Current Value": ["$51151.25"],
-                "Cost Basis Total": [""],
-            }
-        )
+        df = pd.DataFrame({
+            "Symbol": ["SPAXX**"],
+            "Description": ["FIDELITY GOVERNMENT MONEY MARKET"],
+            "Quantity": [""],
+            "Last Price": [""],
+            "Current Value": ["$51151.25"],
+            "Cost Basis Total": [""],
+        })
 
         # Parse the holdings
-        holdings = parse_portfolio_holdings(df)
+        holdings, stock_tickers = parse_portfolio_holdings(df)
         assert len(holdings) == 1
         assert holdings[0].symbol == "SPAXX"  # ** should be removed
         assert holdings[0].quantity == 1.0  # Should be set to 1.0 for cash positions
         assert holdings[0].price == 51151.25  # Should be calculated from value/quantity
         assert holdings[0].value == 51151.25
 
+        # Check stock_tickers - cash positions should not be included
+        assert len(stock_tickers) == 0
+
     @patch("src.folib.data.loader.logger")
     def test_parse_portfolio_holdings_with_special_symbols_logging(self, mock_logger):
         """Test that special symbol cleaning is properly logged."""
         # Create a test DataFrame with a special symbol
-        df = pd.DataFrame(
-            {
-                "Symbol": ["SPAXX**"],
-                "Description": ["FIDELITY GOVERNMENT MONEY MARKET"],
-                "Quantity": [""],
-                "Last Price": [""],
-                "Current Value": ["$51151.25"],
-                "Cost Basis Total": [""],
-            }
-        )
+        df = pd.DataFrame({
+            "Symbol": ["SPAXX**"],
+            "Description": ["FIDELITY GOVERNMENT MONEY MARKET"],
+            "Quantity": [""],
+            "Last Price": [""],
+            "Current Value": ["$51151.25"],
+            "Cost Basis Total": [""],
+        })
 
-        # Mock the is_cash_like method to return True
-        with patch("src.folib.data.stock.stockdata.is_cash_like", return_value=True):
+        # Mock the is_cash_or_short_term function to return True
+        with patch("src.folio.cash_detection.is_cash_or_short_term", return_value=True):
             # Parse the holdings
-            holdings = parse_portfolio_holdings(df)
+            holdings, stock_tickers = parse_portfolio_holdings(df)
             assert len(holdings) == 1
             assert holdings[0].symbol == "SPAXX"  # ** should be removed
+
+            # Check stock_tickers - cash positions should not be included
+            assert len(stock_tickers) == 0
 
             # Check that the correct log messages were generated
             mock_logger.debug.assert_any_call(

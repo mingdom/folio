@@ -219,8 +219,8 @@ class TestSortPositions:
 
         # Sort by value (descending by default)
         sorted_positions = sort_positions(positions, "value")
-        assert sorted_positions[0].ticker in ["AAPL", "MSFT"]  # Both have value 1500
-        assert sorted_positions[1].ticker in ["AAPL", "MSFT"]
+        assert sorted_positions[0].ticker in {"AAPL", "MSFT"}  # Both have value 1500
+        assert sorted_positions[1].ticker in {"AAPL", "MSFT"}
         assert sorted_positions[2].ticker == "SPAXX"  # Value 1000
         assert sorted_positions[3].ticker == "AAPL"  # Option with value 500
 
@@ -228,8 +228,8 @@ class TestSortPositions:
         sorted_positions = sort_positions(positions, "value", "asc")
         assert sorted_positions[0].ticker == "AAPL"  # Option with value 500
         assert sorted_positions[1].ticker == "SPAXX"  # Value 1000
-        assert sorted_positions[2].ticker in ["AAPL", "MSFT"]  # Both have value 1500
-        assert sorted_positions[3].ticker in ["AAPL", "MSFT"]
+        assert sorted_positions[2].ticker in {"AAPL", "MSFT"}  # Both have value 1500
+        assert sorted_positions[3].ticker in {"AAPL", "MSFT"}
 
     def test_sort_by_symbol(self):
         """Test sorting positions by symbol."""
@@ -307,5 +307,5 @@ class TestSortPositions:
         sorted_positions = sort_positions(positions, "invalid")
         # Both have the same value, so order doesn't matter
         assert len(sorted_positions) == 2
-        assert sorted_positions[0].ticker in ["AAPL", "MSFT"]
-        assert sorted_positions[1].ticker in ["AAPL", "MSFT"]
+        assert sorted_positions[0].ticker in {"AAPL", "MSFT"}
+        assert sorted_positions[1].ticker in {"AAPL", "MSFT"}
