@@ -24,6 +24,12 @@ from ..data.ticker_data import TickerData
 logger = logging.getLogger(__name__)
 
 
+class CacheTTL:
+    BETA = 7 * 86400  # 7 days
+    PRICE = 3 * 3600  # 3h
+    TICKER_DATA = 3 * 3600  # 3h
+
+
 class TickerService:
     """Service for accessing ticker data."""
 
@@ -42,7 +48,7 @@ class TickerService:
         )  # Cache prices for 15 minutes
         self._beta_cache_duration = timedelta(days=1)  # Cache beta values for 1 day
 
-    @cached(ttl=900, key_prefix="ticker_data")  # 15 minutes TTL
+    @cached(ttl=CacheTTL.TICKER_DATA, key_prefix="ticker_data")
     def get_ticker_data(self, ticker: str) -> TickerData:
         """
         Get data for a ticker, fetching if necessary.
@@ -65,7 +71,7 @@ class TickerService:
         # Fetch new data
         return self._fetch_ticker_data(ticker)
 
-    @cached(ttl=900, key_prefix="ticker_price")  # 15 minutes TTL
+    @cached(ttl=CacheTTL.PRICE, key_prefix="ticker_price")  # 15 minutes TTL
     def get_price(self, ticker: str) -> float:
         """
         Get the price for a ticker.
@@ -79,7 +85,7 @@ class TickerService:
         ticker_data = self.get_ticker_data(ticker)
         return ticker_data.effective_price
 
-    @cached(ttl=86400, key_prefix="ticker_beta")  # 24 hours TTL
+    @cached(ttl=CacheTTL.BETA, key_prefix="ticker_beta")  # 24 hours TTL
     def get_beta(self, ticker: str) -> float:
         """
         Get the beta for a ticker.
