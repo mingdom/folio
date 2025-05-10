@@ -1,38 +1,15 @@
 """
 Portfolio processing service.
 
-This module provides high-level functions for portfolio processing, including:
-- Processing raw portfolio holdings into a structured portfolio
-- Creating portfolio groups that combine related positions
-- Calculating portfolio summary metrics
-- Computing exposure metrics for risk analysis
+TODO: Rewrite docstring
 
-Important Implementation Notes:
----------------------
-1. CSV Structure Handling:
-   - Supports varying CSV formats with different column structures
-   - Handles duplicate columns in CSV headers (e.g. 'Type' appearing twice)
-   - Processes 'Pending Activity' entries with flexible value location
-   - Supports both normal and quoted currency values
-
-2. Data Processing Flow:
-   - Holdings are first parsed from CSV by the loader module
-   - Holdings are then categorized into different position types
-   - Related positions are grouped (e.g. stocks with their options)
-   - Portfolio summary and exposure metrics are calculated
-   - Special handling for cash-like positions (e.g. SPAXX, FMPXX)
-
-3. Key Features:
-   - Uses immutable data structures for thread safety
-   - Separates data loading from business logic
-   - Provides clear interfaces between components
-   - Follows functional programming principles where possible
-
-Old Codebase References:
-------------------------
-- src/folio/portfolio.py: Original process_portfolio_data function
-- src/folio/portfolio_value.py: Portfolio value and metric calculations
-- src/folio/data_model.py: Original Position, PortfolioGroup, and PortfolioSummary classes
+Key functions:
+- process_portfolio: Process raw portfolio holdings into a structured portfolio
+- create_portfolio_summary: Generate summary metrics for a portfolio
+- group_positions_by_ticker: Group positions by underlying ticker
+- get_portfolio_exposures: Calculate exposures for a portfolio
+- get_portfolio_value: Calculate total portfolio value
+- get_portfolio_beta_exposure: Calculate beta-adjusted exposure
 """
 
 import logging
@@ -49,8 +26,8 @@ from ..calculations.exposure import (
     calculate_stock_exposure,
 )
 from ..calculations.options import calculate_option_delta, categorize_option_by_delta
+from ..data.cache import log_cache_stats
 from ..data.loader import clean_currency_value
-from ..data.market_data import market_data_provider
 from ..domain import (
     CashPosition,
     OptionPosition,
@@ -63,7 +40,6 @@ from ..domain import (
 )
 from ..services.ticker_service import ticker_service
 
-# Set up logging
 logger = logging.getLogger(__name__)
 
 
@@ -93,7 +69,6 @@ def _categorize_holdings(
     pending_activity_found = False
 
     for holding in holdings:
-        # Check for pending activity
         if _is_pending_activity(holding.symbol):
             if pending_activity_found:
                 raise ValueError(
@@ -105,8 +80,6 @@ def _categorize_holdings(
                 f"Identified pending activity: {holding.symbol} with value {pending_activity_value}"
             )
             continue
-
-        # Check for cash-like positions
         if is_cash_or_short_term(holding.symbol, description=holding.description):
             cash_position = CashPosition(
                 ticker=holding.symbol,
@@ -116,13 +89,11 @@ def _categorize_holdings(
             )
             cash_positions.append(cash_position)
             logger.debug(f"Identified cash-like position: {holding.symbol}")
-        # Check for option positions or stock positions
         elif _is_option_holding(holding) or re.match(r"^[A-Z]{1,5}$", holding.symbol):
             non_cash_holdings.append(holding)
             logger.debug(
                 f"Identified {'option' if _is_option_holding(holding) else 'stock'} position: {holding.symbol}"
             )
-        # Unknown/invalid positions
         else:
             unknown_position = UnknownPosition(
                 ticker=holding.symbol,
@@ -273,7 +244,6 @@ def _parse_option_position(holding: PortfolioHolding) -> OptionPosition | None:
         description = holding.description
         symbol = holding.symbol.strip()  # Strip leading/trailing whitespace
 
-        # Add debug logging to understand the issue
         logger.debug(
             f"Parsing option position with symbol: '{symbol}' and description: '{description}'"
         )
@@ -294,7 +264,6 @@ def _parse_option_position(holding: PortfolioHolding) -> OptionPosition | None:
             option_type = match.group(6).upper()
             quantity = holding.quantity
 
-            # Convert month string to month number
             month_map = {
                 "JAN": 1,
                 "FEB": 2,
@@ -310,11 +279,8 @@ def _parse_option_position(holding: PortfolioHolding) -> OptionPosition | None:
                 "DEC": 12,
             }
             month = month_map[month_str]
-
-            # Create expiry date
             expiry = date(year, month, day)
 
-            # Create option position
             option_position = OptionPosition(
                 ticker=ticker,
                 quantity=quantity,
@@ -338,11 +304,6 @@ def _parse_option_position(holding: PortfolioHolding) -> OptionPosition | None:
             f"Error parsing option position for symbol '{holding.symbol}': {e}"
         )
         return None
-
-
-# The _identify_unpaired_options function has been removed as part of the refactoring
-# to identify unpaired options during initial parsing.
-# This functionality is now handled in the _create_option_positions function.
 
 
 def _synchronize_option_underlying_prices(positions: list[Position]) -> list[Position]:
@@ -406,11 +367,6 @@ def _synchronize_option_underlying_prices(positions: list[Position]) -> list[Pos
         )
 
     return updated_positions
-
-
-# The _update_unpaired_options_in_portfolio and _update_unpaired_option_prices functions
-# have been removed as part of the refactoring to identify unpaired options during initial parsing.
-# This functionality is now handled in the _create_option_positions function.
 
 
 def _update_all_prices(positions: list[Position]) -> list[Position]:
@@ -570,16 +526,12 @@ def process_portfolio(
     )
 
     # Log cache statistics after loading the portfolio
-    market_data_provider.log_cache_statistics()
+    log_cache_stats()
 
     logger.debug(
         f"Portfolio processing complete: {len(positions)} positions ({len(cash_positions)} cash, {len(unknown_positions)} unknown)"
     )
     return portfolio
-
-
-# create_portfolio_groups function has been removed as part of the migration to the new data model.
-# Use group_positions_by_ticker() instead.
 
 
 def create_portfolio_summary(portfolio: Portfolio) -> PortfolioSummary:
@@ -1096,12 +1048,6 @@ def get_pending_activity(holding: PortfolioHolding) -> float:
     return pending_activity_value
 
 
-# These functions have been removed as part of the migration to the new data model:
-# - _is_valid_option_symbol
-# - _is_option_description
-# - _extract_option_data
-
-
 def get_positions_by_type(
     positions: list[Position], position_type: str
 ) -> list[Position]:
@@ -1224,7 +1170,3 @@ def group_positions_by_ticker(positions: list[Position]) -> dict[str, list[Posit
             grouped[position.ticker] = []
         grouped[position.ticker].append(position)
     return grouped
-
-
-# create_portfolio_groups_from_positions function has been removed as part of the migration to the new data model.
-# Use group_positions_by_ticker() instead.

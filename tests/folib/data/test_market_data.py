@@ -20,8 +20,6 @@ class TestMarketDataProvider:
         """Set up test fixtures."""
         # Create a provider instance with a mock API key
         self.provider = MarketDataProvider(api_key="test_key")
-        # Clear the session cache before each test
-        self.provider.clear_session_cache()
 
     def test_initialization_with_api_key(self):
         """Test initialization with explicit API key."""
@@ -56,7 +54,6 @@ class TestMarketDataProvider:
 
             # Verify the profile was fetched correctly
             assert profile == mock_profile
-            # Skip session cache check as it's now handled by the cached decorator
 
     def test_fetch_profile_empty_response(self):
         """Test profile fetching with empty response."""
@@ -66,20 +63,13 @@ class TestMarketDataProvider:
 
             # Verify the result is None
             assert profile is None
-            # Skip session cache check as it's now handled by the cached decorator
 
     def test_fetch_profile_api_error(self):
         """Test profile fetching with API error."""
-        # This test is no longer valid with the new caching implementation
-        # The cached decorator handles errors differently
-        pass
-
-    def test_fetch_profile_cache_hit(self):
-        """Test profile fetching with cache hit."""
-        # This test is no longer valid since we're using the cached decorator
-        # which handles caching at a different level
-        # We'll test the caching behavior in the persistent_cache_integration test
-        pass
+        # Mock API error
+        with patch("fmpsdk.company_profile", side_effect=Exception("API Error")):
+            with pytest.raises(Exception, match="API Error"):
+                self.provider._fetch_profile("AAPL")
 
     def test_get_price_success(self):
         """Test successful price fetching."""
@@ -97,27 +87,21 @@ class TestMarketDataProvider:
             # Verify the price was fetched correctly
             assert price == 150.0
 
-    def test_get_price_cache_hit(self):
-        """Test price fetching with cache hit."""
-        # Populate cache
-        self.provider._session_cache["AAPL"] = {
-            "price": 150.0,
-        }
-
-        # Mock should not be called due to cache hit
-        with patch("fmpsdk.company_profile") as mock_company_profile:
-            price = self.provider.get_price("AAPL")
-
-            # Verify the price was returned from cache
-            assert price == 150.0
-            mock_company_profile.assert_not_called()
-
     def test_get_price_invalid_value(self):
         """Test price fetching with invalid value."""
-        # Since we've removed the skip_cache parameter, this test is no longer valid
-        # The cached decorator will always return the cached value if available
-        # We'll skip this test for now
-        pass
+        # Mock response with invalid price
+        mock_profile = {
+            "symbol": "AAPL",
+            "price": "invalid",
+            "beta": 1.2,
+        }
+
+        # Mock the fmpsdk.company_profile function
+        with patch("fmpsdk.company_profile", return_value=[mock_profile]):
+            price = self.provider.get_price("AAPL")
+
+            # Verify the result is None
+            assert price is None
 
     def test_get_beta_success(self):
         """Test successful beta fetching."""
@@ -135,71 +119,38 @@ class TestMarketDataProvider:
             # Verify the beta was fetched correctly
             assert beta == 1.2
 
-    def test_get_beta_cache_hit(self):
-        """Test beta fetching with cache hit."""
-        # Populate cache
-        self.provider._session_cache["AAPL"] = {
-            "beta": 1.2,
-        }
-
-        # Mock should not be called due to cache hit
-        with patch("fmpsdk.company_profile") as mock_company_profile:
-            beta = self.provider.get_beta("AAPL")
-
-            # Verify the beta was returned from cache
-            assert beta == 1.2
-            mock_company_profile.assert_not_called()
-
     def test_get_beta_invalid_value(self):
         """Test beta fetching with invalid value."""
-        # Since we've removed the skip_cache parameter, this test is no longer valid
-        # The cached decorator will always return the cached value if available
-        # We'll skip this test for now
-        pass
+        # Mock response with invalid beta
+        mock_profile = {
+            "symbol": "AAPL",
+            "price": 150.0,
+            "beta": "invalid",
+        }
 
-    def test_clear_session_cache(self):
-        """Test clearing the session cache."""
-        # Populate cache
-        self.provider._session_cache["AAPL"] = {
-            "profile": {"symbol": "AAPL", "price": 150.0, "beta": 1.2},
+        # Mock the fmpsdk.company_profile function
+        with patch("fmpsdk.company_profile", return_value=[mock_profile]):
+            beta = self.provider.get_beta("AAPL")
+
+            # Verify the result is None
+            assert beta is None
+
+    def test_get_data_with_cache_option(self):
+        """Test getting price and beta data together."""
+        # Mock response data
+        mock_profile = {
+            "symbol": "AAPL",
             "price": 150.0,
             "beta": 1.2,
         }
 
-        # Clear cache
-        self.provider.clear_session_cache()
+        # Mock the fmpsdk.company_profile function
+        with patch("fmpsdk.company_profile", return_value=[mock_profile]):
+            # We need to patch twice because get_data_with_cache_option calls both get_price and get_beta
+            with patch.object(self.provider, "get_price", return_value=150.0):
+                with patch.object(self.provider, "get_beta", return_value=1.2):
+                    price, beta = self.provider.get_data_with_cache_option("AAPL")
 
-        # Verify cache is empty
-        assert self.provider._session_cache == {}
-
-    def test_clear_all_cache(self):
-        """Test clearing both in-session and disk cache."""
-        # Populate session cache
-        self.provider._session_cache["AAPL"] = {
-            "profile": {"symbol": "AAPL", "price": 150.0, "beta": 1.2},
-            "price": 150.0,
-            "beta": 1.2,
-        }
-
-        # Mock the clear_cache function
-        with patch("src.folib.data.market_data.clear_cache") as mock_clear_cache:
-            # Clear all caches
-            self.provider.clear_all_cache()
-
-            # Verify session cache is empty
-            assert self.provider._session_cache == {}
-
-            # Verify disk cache was cleared
-            mock_clear_cache.assert_called_once_with(backup=False)
-
-    def test_log_cache_statistics(self):
-        """Test logging cache statistics."""
-        # Just verify that the method runs without errors
-        # We don't need to test the exact implementation details
-        self.provider.log_cache_statistics()
-
-    def test_persistent_cache_integration(self):
-        """Test integration with persistent cache."""
-        # This test is no longer needed as we've moved to a different caching mechanism
-        # The cache implementation is now tested separately in the cache module tests
-        pass
+                    # Verify the data was fetched correctly
+                    assert price == 150.0
+                    assert beta == 1.2

@@ -2,9 +2,11 @@
 Market data provider for financial data.
 
 This module provides a unified interface for fetching market data from FMP API.
-It includes in-session caching to minimize redundant API calls within a session.
-Persistent caching is handled at the ticker service level rather than here to avoid
-redundant caching layers.
+It is a low-level component that should only be used by the ticker service,
+not directly by other parts of the application.
+
+The market data provider is responsible only for fetching data from external sources.
+It does not implement any caching, as caching is handled by the ticker service.
 """
 
 import logging
@@ -13,16 +15,15 @@ from typing import Any
 
 import fmpsdk
 
-from src.folib.data.cache import clear_cache, log_cache_stats
-
 logger = logging.getLogger(__name__)
 
 
 class MarketDataProvider:
-    """Primary interface for accessing market data.
+    """Low-level interface for accessing market data.
 
     Uses Financial Modeling Prep (FMP) API to fetch stock price and beta data.
-    Implements both in-session and persistent caching to minimize redundant API calls.
+    This class should only be used by the ticker service, not directly by other parts
+    of the application.
     """
 
     def __init__(self, api_key: str | None = None):
@@ -37,8 +38,6 @@ class MarketDataProvider:
         self.api_key = api_key or os.environ.get("FMP_API_KEY")
         if not self.api_key:
             raise ValueError("FMP_API_KEY is required.")
-        # In-session cache: {ticker: {price: value, beta: value, profile: raw_data}}
-        self._session_cache: dict[str, dict[str, Any]] = {}
 
     def __str__(self) -> str:
         """Return a string representation of the market data provider."""
@@ -58,32 +57,20 @@ class MarketDataProvider:
             Company profile data dictionary or None if not found or error occurred.
         """
         ticker_upper = ticker.upper()
-        if (
-            ticker_upper not in self._session_cache
-            or "profile" not in self._session_cache[ticker_upper]
-        ):
-            logger.debug(f"Fetching FMP profile for {ticker_upper}")
-            try:
-                profile_data = fmpsdk.company_profile(
-                    apikey=self.api_key, symbol=ticker_upper
-                )
-                if profile_data:
-                    profile = profile_data[0]
-                    self._session_cache.setdefault(ticker_upper, {})["profile"] = (
-                        profile
-                    )
-                    self._session_cache[ticker_upper]["price"] = profile.get("price")
-                    self._session_cache[ticker_upper]["beta"] = profile.get("beta")
-                    return profile
-                else:
-                    logger.debug(f"No profile data found for {ticker_upper}")
-                    self._session_cache.setdefault(ticker_upper, {})["profile"] = None
-                    return None
-            except Exception as e:
-                logger.error(f"Error fetching FMP profile for {ticker_upper}: {e}")
-                self._session_cache.setdefault(ticker_upper, {})["profile"] = None
-                raise
-        return self._session_cache[ticker_upper].get("profile")
+        logger.debug(f"Fetching FMP profile for {ticker_upper}")
+        try:
+            profile_data = fmpsdk.company_profile(
+                apikey=self.api_key, symbol=ticker_upper
+            )
+            if profile_data:
+                profile = profile_data[0]
+                return profile
+            else:
+                logger.debug(f"No profile data found for {ticker_upper}")
+                return None
+        except Exception as e:
+            logger.error(f"Error fetching FMP profile for {ticker_upper}: {e}")
+            raise
 
     def get_price(self, ticker: str) -> float | None:
         """Get the current price for a stock ticker.
@@ -95,12 +82,7 @@ class MarketDataProvider:
             Current stock price as float or None if not available.
         """
         ticker_upper = ticker.upper()
-        if (
-            ticker_upper in self._session_cache
-            and self._session_cache[ticker_upper].get("price") is not None
-        ):
-            return self._session_cache[ticker_upper]["price"]
-        profile = self._fetch_profile(ticker)
+        profile = self._fetch_profile(ticker_upper)
         price = profile.get("price") if profile else None
         if price is not None:
             try:
@@ -120,12 +102,7 @@ class MarketDataProvider:
             Beta value as float or None if not available.
         """
         ticker_upper = ticker.upper()
-        if (
-            ticker_upper in self._session_cache
-            and self._session_cache[ticker_upper].get("beta") is not None
-        ):
-            return self._session_cache[ticker_upper]["beta"]
-        profile = self._fetch_profile(ticker)
+        profile = self._fetch_profile(ticker_upper)
         beta = profile.get("beta") if profile else None
         if beta is not None:
             try:
@@ -134,35 +111,6 @@ class MarketDataProvider:
                 logger.error(f"Invalid beta value for {ticker_upper}: {beta}")
                 return None
         return None
-
-    def clear_session_cache(self) -> None:
-        """Clear the in-session cache."""
-        self._session_cache.clear()
-        logger.info("In-session market data cache cleared.")
-
-    def clear_all_cache(self, backup: bool = False) -> None:
-        """
-        Clear in-session cache and global disk cache.
-
-        Note: This will clear the global disk cache used by all components,
-        including the ticker service. Use with caution.
-
-        Args:
-            backup: If True, backs up the cache before clearing it.
-        """
-        self.clear_session_cache()
-        clear_cache(backup=backup)
-        logger.info("In-session cache and global disk cache cleared.")
-
-    def log_cache_statistics(self, aggregate: bool = True) -> None:
-        """
-        Log cache hit/miss statistics.
-
-        Args:
-            aggregate: If True, log all statistics in a single message.
-                      If False, log overall statistics and detailed statistics separately.
-        """
-        log_cache_stats(aggregate=aggregate)
 
     def get_data_with_cache_option(
         self, ticker: str
