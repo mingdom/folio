@@ -183,9 +183,61 @@ Changes needed:
 5. All tests passing with the new approach
 6. Improved code readability and maintainability
 
+## Development Log, 2025-05-10:
+
+We've made significant progress on Phase 4 implementation:
+
+1. Added a `get_volatility` method to the ticker service
+2. Updated CLI components to use the ticker service instead of market_data_provider
+3. Simplified the market data provider to focus solely on fetching data
+4. Removed the session cache from the market data provider
+5. Updated the position service to use the ticker service for most operations
+6. Fixed the portfolio service to use the correct cache logging function
+
+### Remaining Work
+
+The following tasks still need to be completed:
+
+#### Update Position Service
+
+The position service still uses a `MarketData` protocol that includes methods like `get_volatility`. We need to:
+
+- Decide whether to keep the `MarketData` protocol or remove it
+- Update the position service to use the ticker service directly for all operations
+- Ensure consistent error handling across all methods
+
+**Files involved:**
+- `src/folib/services/position_service.py`
+
+#### Improve Volatility Handling
+
+The current implementation of `get_volatility` in the ticker service returns a fixed value of 0.3. We need to:
+
+- Decide on a proper implementation for volatility data
+- Update the ticker service to fetch real volatility data if needed
+- Ensure consistent caching for volatility data
+
+**Files involved:**
+- `src/folib/services/ticker_service.py`
+- `src/folib/data/market_data.py` (if we decide to fetch volatility from the market data provider)
+
+#### Complete Documentation
+
+We need to document the new architecture and usage patterns:
+
+- Update existing documentation to reflect the new architecture
+- Add examples of proper market data access patterns
+- Document the caching strategy and error handling approach
+
+**Files involved:**
+- `docs/cache-guide.md`
+- `src/folib/services/ticker_service.py` (docstrings)
+- `src/folib/data/market_data.py` (docstrings)
+
 ## Next Steps
 
-1. Create detailed tasks for each phase
-2. Prioritize tasks based on impact and dependencies
-3. Implement and test each phase incrementally
-4. Document the new approach for other developers
+1. Fix the failing tests related to exposure calculations
+2. Decide on the approach for the position service and volatility handling
+3. Complete the documentation updates
+4. Verify CLI functionality
+5. Run a full test suite to ensure everything works correctly

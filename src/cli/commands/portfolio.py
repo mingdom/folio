@@ -10,6 +10,7 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
+from src.folib.data.cache import log_cache_stats
 from src.folib.services.portfolio_service import (
     create_portfolio_summary,
     filter_positions_by_criteria,
@@ -79,6 +80,9 @@ def portfolio_summary_cmd(
         # Calculate portfolio exposures
         console.print("Calculating portfolio exposures...")
         exposures = get_portfolio_exposures(portfolio)
+
+        # Log cache statistics after all calculations are complete
+        log_cache_stats(show_all=True)
 
         # Display portfolio summary
         console.print("\n")
@@ -197,6 +201,9 @@ def portfolio_list_cmd(
             )
             console.print(table)
 
+            # Log cache statistics after all calculations are complete
+            log_cache_stats(show_all=True)
+
             # Display filter criteria if any
             if filter_criteria:
                 filter_desc = [f"{k}={v}" for k, v in filter_criteria.items()]
@@ -259,6 +266,9 @@ def portfolio_summary(state, _args):
 
         # Calculate portfolio exposures
         exposures = get_portfolio_exposures(state.portfolio)
+
+        # Log cache statistics after all calculations are complete
+        log_cache_stats(show_all=True)
 
         # Display portfolio summary
         console.print("\n")
@@ -360,6 +370,9 @@ def portfolio_list(state, args):
                 title=f"Portfolio Positions ({len(filtered_positions)} of {len(positions)})",
             )
             console.print(table)
+
+            # Log cache statistics after all calculations are complete
+            log_cache_stats(show_all=True)
 
             # Display filter criteria if any
             if filter_criteria:
