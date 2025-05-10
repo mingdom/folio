@@ -2,7 +2,7 @@
 Ticker service for the Folib library.
 
 This module provides a service for accessing ticker-related data,
-including prices, beta values, and company profiles.
+including prices and beta values.
 
 Caching Strategy:
 - The ticker service is the primary caching layer for all ticker-related data
@@ -27,7 +27,6 @@ logger = logging.getLogger(__name__)
 class CacheTTL:
     BETA = 7 * 86400  # 7 days
     PRICE = 3 * 3600  # 3h
-    VOLATILITY = 7 * 86400  # 7 days
     TICKER_DATA = 3 * 3600  # 3h
 
 
@@ -104,29 +103,6 @@ class TickerService:
         logger.debug(f"Getting beta for ticker: {ticker}")
         ticker_data = self.get_ticker_data(ticker)
         return ticker_data.effective_beta
-
-    @cached(ttl=CacheTTL.VOLATILITY, key_prefix="ticker_volatility")
-    def get_volatility(self, ticker: str) -> float:
-        """
-        Get the historical volatility for a ticker.
-
-        Args:
-            ticker: The ticker symbol
-
-        Returns:
-            The volatility value, or a default value of 0.3 (30%)
-
-        Note:
-            This is a placeholder implementation. In a real-world scenario,
-            this would fetch actual volatility data from the market data provider.
-        """
-        # Normalize ticker to uppercase for consistent caching
-        ticker = ticker.upper()
-
-        # Default volatility of 30% for all tickers
-        # In a real implementation, this would fetch actual volatility data
-        # from the market data provider or another source
-        return 0.3
 
     def prefetch_tickers(self, tickers: list[str]) -> None:
         """

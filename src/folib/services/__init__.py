@@ -27,7 +27,6 @@ Module Overview:
   - get_ticker_data: Get all data for a ticker
   - get_price: Get the price for a ticker
   - get_beta: Get the beta for a ticker
-  - get_company_profile: Get the company profile for a ticker
   - ticker_service: Pre-initialized instance for convenience
 
 - simulation_service.py: Portfolio simulation

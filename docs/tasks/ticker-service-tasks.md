@@ -63,12 +63,12 @@ These features have been deferred to a future phase.
 ## Phase 4: Migration and Cleanup (In Progress)
 
 - [x] Identify all places in the codebase that directly access market data
-- [x] Add a `get_volatility` method to the ticker service
 - [x] Update CLI components to use the ticker service instead of market_data_provider
 - [x] Simplify the market data provider to focus solely on fetching data
 - [x] Remove the session cache from the market data provider
-- [x] Update the position service to use the ticker service for most operations
+- [x] Update the position service to use the ticker service for all operations
 - [x] Fix the portfolio service to use the correct cache logging function
+- [x] Remove the MarketData protocol from the position service
 - [ ] Update tests to use the `TickerService` consistently
 - [ ] Fix failing tests related to exposure calculations
 - [ ] Ensure all CLI components work correctly with the ticker service
@@ -92,11 +92,9 @@ We have completed Phase 1 and Phase 2, and we're now working on Phase 4 (Migrati
 ## Open Questions
 
 1. Should we update the expected values in the critical tests to match the new implementation, or should we adjust the implementation to match the expected values?
-2. Should we completely remove the `MarketData` protocol from the position service, or keep it for flexibility?
-3. How should we handle the volatility data in the ticker service? Currently, it returns a fixed value of 0.3.
-4. Should we add more detailed logging for cache hits and misses to help with performance optimization?
-5. How should we handle network errors and timeouts when fetching data?
-6. Should we implement a fallback mechanism for when the ticker service fails to fetch data?
+2. Should we add more detailed logging for cache hits and misses to help with performance optimization?
+3. How should we handle network errors and timeouts when fetching data?
+4. Should we implement a fallback mechanism for when the ticker service fails to fetch data?
 
 ## Success Criteria
 

@@ -198,28 +198,28 @@ We've made significant progress on Phase 4 implementation:
 
 The following tasks still need to be completed:
 
-#### Update Position Service
+#### Update Position Service ✅
 
-The position service still uses a `MarketData` protocol that includes methods like `get_volatility`. We need to:
+We have removed the `MarketData` protocol and updated the position service to use the options calculation module directly:
 
-- Decide whether to keep the `MarketData` protocol or remove it
-- Update the position service to use the ticker service directly for all operations
-- Ensure consistent error handling across all methods
+- Removed the `MarketData` protocol completely
+- Updated the position service to use a fixed volatility value of 0.3 directly
+- Ensured consistent error handling across all methods
 
 **Files involved:**
 - `src/folib/services/position_service.py`
 
-#### Improve Volatility Handling
+#### Volatility Handling ✅
 
-The current implementation of `get_volatility` in the ticker service returns a fixed value of 0.3. We need to:
+We decided to remove the `get_volatility` method from the ticker service completely:
 
-- Decide on a proper implementation for volatility data
-- Update the ticker service to fetch real volatility data if needed
-- Ensure consistent caching for volatility data
+- Removed the `get_volatility` method from the ticker service
+- Updated the position service to use a fixed volatility value of 0.3 directly
+- This approach is simpler and aligns with the existing option calculation functions that already use 0.3 as a default
 
 **Files involved:**
 - `src/folib/services/ticker_service.py`
-- `src/folib/data/market_data.py` (if we decide to fetch volatility from the market data provider)
+- `src/folib/services/position_service.py`
 
 #### Complete Documentation
 

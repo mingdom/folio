@@ -14,7 +14,7 @@ Key functions:
 """
 
 import logging
-from typing import Protocol, cast
+from typing import cast
 
 from ..calculations import (
     calculate_option_delta,
@@ -29,32 +29,14 @@ from ..services.ticker_service import ticker_service
 logger = logging.getLogger(__name__)
 
 
-class MarketData(Protocol):
-    """Protocol defining the required market data interface."""
-
-    def get_price(self, ticker: str) -> float:
-        """Get current price for a ticker."""
-        ...
-
-    def get_beta(self, ticker: str) -> float:
-        """Get beta for a ticker."""
-        ...
-
-    def get_volatility(self, ticker: str) -> float:
-        """Get historical volatility for a ticker."""
-        ...
-
-
 def analyze_position(
     position: StockPosition | OptionPosition,
-    market_data: MarketData,
 ) -> dict:
     """
     Analyze a single position, calculating all relevant metrics.
 
     Args:
         position: The position to analyze
-        market_data: Market data provider for volatility data
 
     Returns:
         Dictionary containing:
@@ -66,7 +48,7 @@ def analyze_position(
     if isinstance(position, StockPosition):
         return analyze_stock_position(position)
     else:
-        return analyze_option_position(position, market_data)
+        return analyze_option_position(position)
 
 
 def analyze_stock_position(position: StockPosition) -> dict:
@@ -102,14 +84,12 @@ def analyze_stock_position(position: StockPosition) -> dict:
 
 def analyze_option_position(
     position: OptionPosition,
-    market_data: MarketData,
 ) -> dict:
     """
     Analyze an option position.
 
     Args:
         position: The option position to analyze
-        market_data: Market data provider for volatility data
 
     Returns:
         Dictionary with analysis results
@@ -118,8 +98,9 @@ def analyze_option_position(
     underlying_price = ticker_service.get_price(position.ticker)
     beta = ticker_service.get_beta(position.ticker)
 
-    # Still use market_data for volatility as ticker service doesn't provide this yet
-    volatility = market_data.get_volatility(position.ticker)
+    # Use default volatility of 0.3 (30%)
+    # This is the same default used in the options calculation module
+    volatility = 0.3
 
     # If price is 0, use strike as fallback
     if underlying_price == 0:
