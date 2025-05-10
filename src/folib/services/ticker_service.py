@@ -61,15 +61,18 @@ class TickerService:
             TickerData object containing all available data for the ticker
         """
         ticker = ticker.upper()  # Normalize ticker to uppercase
+        logger.debug(f"Getting ticker data for: {ticker}")
 
         # Check if we already have data for this ticker in memory
         if ticker in self._ticker_data:
             # Check if the data is still valid
             ticker_data = self._ticker_data[ticker]
             if self._is_data_valid(ticker_data):
+                logger.debug(f"Using in-memory cache for ticker: {ticker}")
                 return ticker_data
 
         # Fetch new data
+        logger.debug(f"Fetching new data for ticker: {ticker}")
         return self._fetch_ticker_data(ticker)
 
     @cached(ttl=CacheTTL.PRICE, key_prefix="ticker_price")  # 15 minutes TTL
@@ -83,6 +86,7 @@ class TickerService:
         Returns:
             The current price, or an appropriate default value
         """
+        logger.debug(f"Getting price for ticker: {ticker}")
         ticker_data = self.get_ticker_data(ticker)
         return ticker_data.effective_price
 
@@ -97,6 +101,7 @@ class TickerService:
         Returns:
             The beta value, or an appropriate default value
         """
+        logger.debug(f"Getting beta for ticker: {ticker}")
         ticker_data = self.get_ticker_data(ticker)
         return ticker_data.effective_beta
 

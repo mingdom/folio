@@ -201,13 +201,15 @@ def get_cache_stats() -> dict[str, dict[str, int]]:
     return _cache_stats
 
 
-def log_cache_stats(aggregate: bool = True) -> None:
+def log_cache_stats(aggregate: bool = True, show_all: bool = False) -> None:
     """
     Log cache statistics at INFO level.
 
     Args:
         aggregate: If True, log all statistics in a single message.
                   If False, log overall statistics and detailed statistics separately.
+        show_all: If True, show all cache functions even if they have no activity.
+                 If False (default), only show functions with activity.
     """
     # Calculate overall statistics
     total_hits = sum(stats["hits"] for stats in _cache_stats.values())
@@ -216,21 +218,47 @@ def log_cache_stats(aggregate: bool = True) -> None:
     total_requests = total_hits + total_misses
     overall_hit_rate = (total_hits / total_requests) * 100 if total_requests > 0 else 0
 
+    # Sort cache stats by function name for consistent output
+    sorted_stats = sorted(_cache_stats.items())
+
+    # Group by prefix for better organization
+    grouped_stats = {}
+    for func_name, stats in sorted_stats:
+        # Extract prefix (e.g., "ticker_price" from "ticker_price_get_price")
+        prefix = func_name.split("_")[0] if "_" in func_name else "other"
+        if prefix not in grouped_stats:
+            grouped_stats[prefix] = []
+        grouped_stats[prefix].append((func_name, stats))
+
     if aggregate:
         # Build a single aggregated message with all statistics
         message_parts = [
-            f"Cache hit rate: {overall_hit_rate:.1f}% (hits: {total_hits}, misses: {total_misses}, fallbacks: {total_fallbacks})"
+            f"Cache hit rate: {overall_hit_rate:.1f}% (hits: {total_hits}, misses: {total_misses}, fallbacks: {total_fallbacks}, total requests: {total_requests})"
         ]
 
-        # Add per-function statistics
-        for func_name, stats in _cache_stats.items():
-            total = stats["hits"] + stats["misses"]
-            if total > 0:  # Only include functions with activity
-                hit_rate = (stats["hits"] / total) * 100 if total > 0 else 0
-                func_display = func_name.replace("_", " ").strip()
-                message_parts.append(
-                    f"  {func_display}: {hit_rate:.1f}% (hits: {stats['hits']}, misses: {stats['misses']})"
+        # Add per-function statistics, grouped by prefix
+        for prefix, funcs in sorted(grouped_stats.items()):
+            # Add group header
+            prefix_hits = sum(stats["hits"] for _, stats in funcs)
+            prefix_misses = sum(stats["misses"] for _, stats in funcs)
+            prefix_total = prefix_hits + prefix_misses
+            if prefix_total > 0 or show_all:
+                prefix_hit_rate = (
+                    (prefix_hits / prefix_total) * 100 if prefix_total > 0 else 0
                 )
+                message_parts.append(
+                    f"\n  {prefix.upper()} CACHE: {prefix_hit_rate:.1f}% (hits: {prefix_hits}, misses: {prefix_misses})"
+                )
+
+                # Add individual functions in the group
+                for func_name, stats in funcs:
+                    total = stats["hits"] + stats["misses"]
+                    if total > 0 or show_all:
+                        hit_rate = (stats["hits"] / total) * 100 if total > 0 else 0
+                        func_display = func_name.replace("_", " ").strip()
+                        message_parts.append(
+                            f"    {func_display}: {hit_rate:.1f}% (hits: {stats['hits']}, misses: {stats['misses']}, fallbacks: {stats.get('fallbacks', 0)})"
+                        )
 
         # Log the aggregated message
         logger.info("\n".join(message_parts))
@@ -242,15 +270,31 @@ def log_cache_stats(aggregate: bool = True) -> None:
             f"total requests: {total_requests})"
         )
 
-        # Log detailed statistics for each function
-        for func_name, stats in _cache_stats.items():
-            total = stats["hits"] + stats["misses"]
-            hit_rate = (stats["hits"] / total) * 100 if total > 0 else 0
-            logger.info(
-                f"Cache stats for {func_name}: "
-                f"hit rate: {hit_rate:.1f}% "
-                f"(hits: {stats['hits']}, misses: {stats['misses']}, fallbacks: {stats['fallbacks']})"
-            )
+        # Log detailed statistics for each function, grouped by prefix
+        for prefix, funcs in sorted(grouped_stats.items()):
+            # Log group header
+            prefix_hits = sum(stats["hits"] for _, stats in funcs)
+            prefix_misses = sum(stats["misses"] for _, stats in funcs)
+            prefix_total = prefix_hits + prefix_misses
+            if prefix_total > 0 or show_all:
+                prefix_hit_rate = (
+                    (prefix_hits / prefix_total) * 100 if prefix_total > 0 else 0
+                )
+                logger.info(
+                    f"{prefix.upper()} CACHE: {prefix_hit_rate:.1f}% "
+                    f"(hits: {prefix_hits}, misses: {prefix_misses})"
+                )
+
+                # Log individual functions in the group
+                for func_name, stats in funcs:
+                    total = stats["hits"] + stats["misses"]
+                    if total > 0 or show_all:
+                        hit_rate = (stats["hits"] / total) * 100 if total > 0 else 0
+                        logger.info(
+                            f"  {func_name}: "
+                            f"hit rate: {hit_rate:.1f}% "
+                            f"(hits: {stats['hits']}, misses: {stats['misses']}, fallbacks: {stats.get('fallbacks', 0)})"
+                        )
 
 
 def clear_cache(cache_dir: str | None = None, backup: bool = False) -> None:

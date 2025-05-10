@@ -99,6 +99,21 @@ def load_portfolio(
         f"Processed portfolio with [bold]{len(portfolio.positions)}[/bold] positions"
     )
 
+    # Create a portfolio summary to ensure all beta values are accessed
+    # This is just to populate the cache - we don't need to use the result
+    from src.folib.data.cache import log_cache_stats
+    from src.folib.services.portfolio_service import (
+        create_portfolio_summary,
+        get_portfolio_exposures,
+    )
+
+    # Calculate summary and exposures to ensure all cache values are accessed
+    create_portfolio_summary(portfolio)
+    get_portfolio_exposures(portfolio)
+
+    # Now log the cache statistics after all calculations are complete
+    log_cache_stats(show_all=True)
+
     return {
         "df": df,
         "holdings": holdings,

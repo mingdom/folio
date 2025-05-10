@@ -26,7 +26,6 @@ from ..calculations.exposure import (
     calculate_stock_exposure,
 )
 from ..calculations.options import calculate_option_delta, categorize_option_by_delta
-from ..data.cache import log_cache_stats
 from ..data.loader import clean_currency_value
 from ..domain import (
     CashPosition,
@@ -198,7 +197,7 @@ def _create_option_positions(
         logger.debug(f"Created option position for {holding.symbol}")
 
     if unpaired_count > 0:
-        logger.info(f"Updated {unpaired_count} unpaired options during creation")
+        logger.debug(f"Updated {unpaired_count} unpaired options during creation")
 
     return option_positions
 
@@ -512,7 +511,7 @@ def process_portfolio(
     _synchronize_option_underlying_prices(positions)
 
     # We no longer need to update unpaired options separately as they're updated during creation
-    logger.info("Using raw CSV prices with unpaired options updated during creation")
+    logger.debug("Using raw CSV prices with unpaired options updated during creation")
 
     # If update_prices flag is set, update all positions
     if update_prices:
@@ -524,9 +523,6 @@ def process_portfolio(
         positions=positions,
         pending_activity_value=pending_activity_value,
     )
-
-    # Log cache statistics after loading the portfolio
-    log_cache_stats()
 
     logger.debug(
         f"Portfolio processing complete: {len(positions)} positions ({len(cash_positions)} cash, {len(unknown_positions)} unknown)"
