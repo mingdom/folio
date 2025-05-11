@@ -44,12 +44,22 @@ def test_put_option_price():
 def test_call_option_delta():
     """Test call option delta calculation."""
     expiry = datetime.date(2026, 1, 1)
+    # First calculate the option price with known volatility
+    known_vol = 0.3
+    price = calculate_option_price(
+        option_type="CALL",
+        strike=100.0,
+        expiry=expiry,
+        underlying_price=100.0,
+        volatility=known_vol,
+        risk_free_rate=0.05,
+    )
     delta = calculate_option_delta(
         option_type="CALL",
         strike=100.0,
         expiry=expiry,
         underlying_price=100.0,
-        volatility=0.3,
+        option_price=price,
         risk_free_rate=0.05,
     )
     assert 0 <= delta <= 1.0  # Call delta between 0 and 1
@@ -58,12 +68,21 @@ def test_call_option_delta():
 def test_put_option_delta():
     """Test put option delta calculation."""
     expiry = datetime.date(2026, 1, 1)
+    known_vol = 0.3
+    price = calculate_option_price(
+        option_type="PUT",
+        strike=100.0,
+        expiry=expiry,
+        underlying_price=100.0,
+        volatility=known_vol,
+        risk_free_rate=0.05,
+    )
     delta = calculate_option_delta(
         option_type="PUT",
         strike=100.0,
         expiry=expiry,
         underlying_price=100.0,
-        volatility=0.3,
+        option_price=price,
         risk_free_rate=0.05,
     )
     assert -1.0 <= delta <= 0  # Put delta between -1 and 0

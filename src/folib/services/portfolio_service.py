@@ -704,13 +704,18 @@ def _process_option_position(
     # Get underlying price and beta
     underlying_price, beta = _get_option_market_data(position)
 
-    # Calculate option exposures
+    # Use the option's market price (fail if not present or <= 0)
+    option_price = position.price
+    if option_price is None or option_price <= 0:
+        raise ValueError(f"Option market price must be positive, got {option_price}")
+
+    # Calculate option exposures using market price (implied volatility is calculated internally)
     delta = calculate_option_delta(
         option_type=position.option_type,
         strike=position.strike,
         expiry=position.expiry,
         underlying_price=underlying_price,
-        volatility=None,  # Use default volatility
+        option_price=option_price,
     )
 
     market_exposure = calculate_option_exposure(
@@ -725,7 +730,6 @@ def _process_option_position(
     option_category = categorize_option_by_delta(delta)
 
     if option_category == "long":
-        # For long positions with positive delta (long calls, short puts)
         position_values["long_options"]["value"] += position_value
         position_values["long_options"]["beta_adjusted"] += beta_adjusted
         position_values["long_options"]["delta_exposure"] += market_exposure
@@ -734,11 +738,8 @@ def _process_option_position(
             f"{position.strike} (delta: {delta}, exposure: {market_exposure})"
         )
     else:  # option_category == "short"
-        # For long positions with negative delta (long puts) or short positions with positive delta
         position_values["short_options"]["value"] += position_value
         position_values["short_options"]["beta_adjusted"] += beta_adjusted
-
-        # For short options, ensure the exposure is stored with the correct sign
         if market_exposure > 0:
             position_values["short_options"]["delta_exposure"] += -market_exposure
             logger.debug(
@@ -928,13 +929,18 @@ def get_portfolio_exposures(portfolio: Portfolio) -> dict:
         if underlying_price == 0:
             underlying_price = position.strike
 
-        # Calculate option exposures using the calculation modules with fallback
+        # Calculate option exposures using the calculation modules with new API
+        option_price = position.price
+        if option_price is None or option_price <= 0:
+            raise ValueError(
+                f"Option market price must be positive, got {option_price}"
+            )
         delta = calculate_option_delta(
             option_type=position.option_type,
             strike=position.strike,
             expiry=position.expiry,
             underlying_price=underlying_price,
-            volatility=None,  # Use default volatility
+            option_price=option_price,
         )
         logger.debug(
             f"Exposure calculation - Option delta for {position.ticker} {position.option_type} {position.strike}: {delta}"

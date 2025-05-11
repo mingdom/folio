@@ -261,6 +261,9 @@ def calculate_implied_volatility(
 
     Returns:
         Implied volatility that produces the given option_price
+
+    Raises:
+        ValueError: If inputs are fundamentally invalid (e.g., expiry in the past).
     """
     validate_option_inputs(option_type, strike, expiry, underlying_price)
     if option_price <= 0:
@@ -271,7 +274,7 @@ def calculate_implied_volatility(
     ql.Settings.instance().evaluationDate = calculation_date
     expiry_ql = ql.Date(expiry.day, expiry.month, expiry.year)
     if expiry_ql <= calculation_date:
-        expiry_ql = calculation_date + 1
+        raise ValueError(f"Invalid expiry date: {expiry}. Must be in the future")
 
     # Set up the option
     ql_option_type = ql.Option.Call if option_type == "CALL" else ql.Option.Put
