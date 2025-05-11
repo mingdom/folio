@@ -694,6 +694,8 @@ def _process_option_position(
     """
     Process an option position and update the position values dictionary.
 
+    TODO: Refactor for simplicity, especially around the long/short options part.
+
     Args:
         position: The option position to process
         position_value: The position's market value

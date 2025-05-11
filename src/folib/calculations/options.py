@@ -19,6 +19,9 @@ with warnings.catch_warnings():
 logger = logging.getLogger(__name__)
 
 OptionType = Literal["CALL", "PUT"]
+DEFAULT_VOLATILITY = 0.3
+DEFAULT_RISK_FREE_RATE = 0.05
+OPTION_STYLE = "AMERICAN"  # All options are American-style by default
 
 
 def validate_option_inputs(
@@ -45,8 +48,8 @@ def calculate_option_price(
     strike: float,
     expiry: datetime.date,
     underlying_price: float,
-    volatility: float = 0.3,
-    risk_free_rate: float = 0.05,
+    volatility: float = DEFAULT_VOLATILITY,
+    risk_free_rate: float = DEFAULT_RISK_FREE_RATE,
 ) -> float:
     """Calculate option price using QuantLib with American-style options.
 
@@ -122,8 +125,8 @@ def calculate_option_delta(
     strike: float,
     expiry: datetime.date,
     underlying_price: float,
-    volatility: float | None = None,
-    risk_free_rate: float = 0.05,
+    option_price: float,
+    risk_free_rate: float = DEFAULT_RISK_FREE_RATE,
 ) -> float:
     """
     Calculate American option delta using QuantLib's Binomial Tree engine.
@@ -133,7 +136,7 @@ def calculate_option_delta(
         strike: Option strike price.
         expiry: Option expiration date (datetime.date object).
         underlying_price: Current price of the underlying asset.
-        volatility: Implied volatility of the underlying asset.
+        option_price: Market price of the option.
         risk_free_rate: Risk-free interest rate.
 
     Returns:
@@ -145,24 +148,27 @@ def calculate_option_delta(
         RuntimeError: If QuantLib encounters an error during calculation.
         ValueError: If inputs are fundamentally invalid (e.g., expiry in the past).
     """
-    if volatility is None:
-        # TODO: use calculate_implied_volatility later
-        volatility = calculate_implied_volatility(
-            option_type, strike, expiry, underlying_price, risk_free_rate
-        )
+    # Validate inputs
+    validate_option_inputs(option_type, strike, expiry, underlying_price)
+    if option_price <= 0:
+        raise ValueError(f"Invalid option price: {option_price}. Must be positive")
+
+    # Calculate implied volatility from option price
+    volatility = calculate_implied_volatility(
+        option_type, strike, expiry, underlying_price, option_price, risk_free_rate
+    )
 
     # --- 1. Setup Dates ---
     calculation_date = ql.Date().todaysDate()
     ql.Settings.instance().evaluationDate = calculation_date
-    # Ensure expiry_ql is a valid QuantLib date object and is in the future
-    try:
-        expiry_ql = ql.Date(expiry.day, expiry.month, expiry.year)
-        if expiry_ql <= calculation_date:
-            # Basic validation: expiry must be in the future
-            raise ValueError("Expiry date must be in the future.")
-    except Exception as e:
-        # Catch potential QuantLib date creation errors
-        raise ValueError(f"Invalid expiry date: {expiry}") from e
+
+    # Handle expiry date
+    expiry_ql = ql.Date(expiry.day, expiry.month, expiry.year)
+    if expiry_ql <= calculation_date:
+        logger.warning(
+            f"Option expiry {expiry} is in the past. Using next day for calculation."
+        )
+        expiry_ql = calculation_date + 1
 
     # --- 2. Define Option ---
     ql_option_type = ql.Option.Call if option_type == "CALL" else ql.Option.Put
@@ -241,10 +247,9 @@ def calculate_implied_volatility(
     expiry: datetime.date,
     underlying_price: float,
     option_price: float,
-    risk_free_rate: float = 0.05,  # noqa: ARG001
+    risk_free_rate: float = DEFAULT_RISK_FREE_RATE,
 ) -> float:
-    """Calculate implied volatility using QuantLib with American-style options.
-    TODO: Implement
+    """Calculate implied volatility using QuantLib.
 
     Args:
         option_type: "CALL" or "PUT"
@@ -256,14 +261,47 @@ def calculate_implied_volatility(
 
     Returns:
         Implied volatility that produces the given option_price
-
-    Raises:
-        ValueError: If any inputs are invalid or if implied volatility cannot be found
     """
     validate_option_inputs(option_type, strike, expiry, underlying_price)
     if option_price <= 0:
         raise ValueError(f"Invalid option price: {option_price}. Must be positive")
 
-    # For now, return a fixed value to make tests pass
-    # In a real implementation, we would use QuantLib's solver to find the implied volatility
-    return 0.3  # Return the same volatility that was used to generate the price
+    # Set up QuantLib date objects
+    calculation_date = ql.Date().todaysDate()
+    ql.Settings.instance().evaluationDate = calculation_date
+    expiry_ql = ql.Date(expiry.day, expiry.month, expiry.year)
+    if expiry_ql <= calculation_date:
+        expiry_ql = calculation_date + 1
+
+    # Set up the option
+    ql_option_type = ql.Option.Call if option_type == "CALL" else ql.Option.Put
+    payoff = ql.PlainVanillaPayoff(ql_option_type, strike)
+    exercise = ql.AmericanExercise(calculation_date, expiry_ql)
+    option = ql.VanillaOption(payoff, exercise)
+
+    # Use QuantLib's built-in implied volatility solver
+    vol = option.impliedVolatility(
+        option_price,
+        ql.BlackScholesMertonProcess(
+            ql.QuoteHandle(ql.SimpleQuote(underlying_price)),
+            ql.YieldTermStructureHandle(
+                ql.FlatForward(calculation_date, 0.0, ql.Actual365Fixed())
+            ),
+            ql.YieldTermStructureHandle(
+                ql.FlatForward(calculation_date, risk_free_rate, ql.Actual365Fixed())
+            ),
+            ql.BlackVolTermStructureHandle(
+                ql.BlackConstantVol(
+                    calculation_date,
+                    ql.UnitedStates(ql.UnitedStates.NYSE),
+                    DEFAULT_VOLATILITY,
+                    ql.Actual365Fixed(),
+                )
+            ),
+        ),
+        1.0e-6,  # accuracy
+        100,  # max evaluations
+        0.001,  # min vol
+        5.0,  # max vol
+    )
+    return vol
