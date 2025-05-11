@@ -40,6 +40,7 @@ from ..calculations.exposure import (
 )
 from ..calculations.options import calculate_option_delta, categorize_option_by_delta
 from ..data.loader import clean_currency_value
+from ..data.utils import is_valid_stock_symbol
 from ..domain import (
     CashPosition,
     OptionPosition,
@@ -53,6 +54,25 @@ from ..domain import (
 from ..services.ticker_service import ticker_service
 
 logger = logging.getLogger(__name__)
+
+
+def _create_cash_position(holding: PortfolioHolding) -> CashPosition:
+    return CashPosition(
+        ticker=holding.symbol,
+        quantity=holding.quantity,
+        price=holding.price,
+        cost_basis=holding.cost_basis_total,
+    )
+
+
+def _create_unknown_position(holding: PortfolioHolding) -> UnknownPosition:
+    return UnknownPosition(
+        ticker=holding.symbol,
+        quantity=holding.quantity,
+        price=holding.price,
+        description=holding.description,
+        cost_basis=holding.cost_basis_total,
+    )
 
 
 def _categorize_holdings(
@@ -93,28 +113,15 @@ def _categorize_holdings(
             )
             continue
         if is_cash_or_short_term(holding.symbol, description=holding.description):
-            cash_position = CashPosition(
-                ticker=holding.symbol,
-                quantity=holding.quantity,
-                price=holding.price,
-                cost_basis=holding.cost_basis_total,
-            )
-            cash_positions.append(cash_position)
+            cash_positions.append(_create_cash_position(holding))
             logger.debug(f"Identified cash-like position: {holding.symbol}")
-        elif _is_option_holding(holding) or re.match(r"^[A-Z]{1,5}$", holding.symbol):
+        elif _is_option_holding(holding) or is_valid_stock_symbol(holding.symbol):
             non_cash_holdings.append(holding)
             logger.debug(
                 f"Identified {'option' if _is_option_holding(holding) else 'stock'} position: {holding.symbol}"
             )
         else:
-            unknown_position = UnknownPosition(
-                ticker=holding.symbol,
-                quantity=holding.quantity,
-                price=holding.price,
-                description=holding.description,
-                cost_basis=holding.cost_basis_total,
-            )
-            unknown_positions.append(unknown_position)
+            unknown_positions.append(_create_unknown_position(holding))
             logger.debug(f"Identified unknown position: {holding.symbol}")
 
     return non_cash_holdings, cash_positions, unknown_positions, pending_activity_value
