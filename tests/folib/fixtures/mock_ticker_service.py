@@ -151,12 +151,8 @@ TEST_PORTFOLIO_TICKER_DATA = {
     "UBER": {"price": 82.7954, "beta": 1.3},
     "V": {"price": 354.16, "beta": 0.9},
     # Additional tickers found in the test portfolio
-    "ANET": {"price": 100.0, "beta": 1.3},
-    "CRM": {"price": 300.0, "beta": 1.2},
-    "MSFT": {"price": 400.0, "beta": 1.1},
-    "PDD": {"price": 150.0, "beta": 1.5},
-    "SNOW": {"price": 200.0, "beta": 1.4},
-    "ZS": {"price": 180.0, "beta": 1.3},
+    "CRM": {"price": 275.42, "beta": 1.3},
+    "PDD": {"price": 109.65, "beta": 0.96},
     # Cash-like instruments
     "SPAXX": {"price": 1.0, "beta": 0.0},
     "FMPXX": {"price": 1.0, "beta": 0.0},

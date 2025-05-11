@@ -155,6 +155,7 @@ def test_invalid_inputs():
             strike=-100.0,  # Invalid negative strike
             expiry=expiry,
             underlying_price=100.0,
+            option_price=1.0,  # Dummy positive price
         )
 
     with pytest.raises(ValueError):

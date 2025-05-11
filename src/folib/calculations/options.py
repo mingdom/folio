@@ -283,28 +283,41 @@ def calculate_implied_volatility(
     option = ql.VanillaOption(payoff, exercise)
 
     # Use QuantLib's built-in implied volatility solver
-    vol = option.impliedVolatility(
-        option_price,
-        ql.BlackScholesMertonProcess(
-            ql.QuoteHandle(ql.SimpleQuote(underlying_price)),
-            ql.YieldTermStructureHandle(
-                ql.FlatForward(calculation_date, 0.0, ql.Actual365Fixed())
+    try:
+        vol = option.impliedVolatility(
+            option_price,
+            ql.BlackScholesMertonProcess(
+                ql.QuoteHandle(ql.SimpleQuote(underlying_price)),
+                ql.YieldTermStructureHandle(
+                    ql.FlatForward(calculation_date, 0.0, ql.Actual365Fixed())
+                ),
+                ql.YieldTermStructureHandle(
+                    ql.FlatForward(
+                        calculation_date, risk_free_rate, ql.Actual365Fixed()
+                    )
+                ),
+                ql.BlackVolTermStructureHandle(
+                    ql.BlackConstantVol(
+                        calculation_date,
+                        ql.UnitedStates(ql.UnitedStates.NYSE),
+                        DEFAULT_VOLATILITY,
+                        ql.Actual365Fixed(),
+                    )
+                ),
             ),
-            ql.YieldTermStructureHandle(
-                ql.FlatForward(calculation_date, risk_free_rate, ql.Actual365Fixed())
-            ),
-            ql.BlackVolTermStructureHandle(
-                ql.BlackConstantVol(
-                    calculation_date,
-                    ql.UnitedStates(ql.UnitedStates.NYSE),
-                    DEFAULT_VOLATILITY,
-                    ql.Actual365Fixed(),
-                )
-            ),
-        ),
-        1.0e-6,  # accuracy
-        100,  # max evaluations
-        0.001,  # min vol
-        5.0,  # max vol
-    )
-    return vol
+            1.0e-6,  # accuracy
+            100,  # max evaluations
+            0.001,  # min vol
+            5.0,  # max vol
+        )
+        return vol
+    except RuntimeError as e:
+        # Log all relevant option parameters for debugging
+        logger.error(
+            f"Implied volatility calculation failed for option: "
+            f"type={option_type}, strike={strike}, expiry={expiry}, "
+            f"underlying_price={underlying_price}, option_price={option_price}, "
+            f"risk_free_rate={risk_free_rate}. Error: {e}"
+        )
+        # Re-raise the error for now (fail fast, but with context)
+        raise
