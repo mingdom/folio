@@ -1,15 +1,28 @@
 """
-Portfolio processing service.
+Portfolio processing and analytics service for Folib.
 
-TODO: Rewrite docstring
+This module provides the core logic for transforming raw portfolio holdings into structured, analyzable objects and for computing key portfolio metrics. It is responsible for:
+
+- Parsing and categorizing raw portfolio holdings (from CSV or other sources) into typed position objects (stocks, options, cash, unknown)
+- Handling special cases such as cash-like positions and pending activity
+- Creating and updating position objects with current market data as needed
+- Calculating portfolio-level summaries, including total value, breakdowns by asset type, and pending activity
+- Computing market exposures, beta-adjusted exposures, and option Greeks (using market price, not volatility)
+- Optimizing performance by caching expensive calculations (e.g., option delta) within a processing run
+- Providing helper utilities for grouping, sorting, and filtering positions
+
+Design principles:
+- All calculations fail fast on missing or invalid prices (no fallback volatility)
+- Data models are immutable and separated from business logic
+- All service and CLI consumers interact with this layer for portfolio analytics
+- Modular, testable, and efficient code structure
 
 Key functions:
-- process_portfolio: Process raw portfolio holdings into a structured portfolio
+- process_portfolio: Transform raw holdings into a structured Portfolio object
 - create_portfolio_summary: Generate summary metrics for a portfolio
-- group_positions_by_ticker: Group positions by underlying ticker
-- get_portfolio_exposures: Calculate exposures for a portfolio
-- get_portfolio_value: Calculate total portfolio value
-- get_portfolio_beta_exposure: Calculate beta-adjusted exposure
+- get_portfolio_exposures: Calculate detailed exposure metrics for a portfolio
+- group_positions_by_ticker: Group positions by underlying ticker symbol
+- Additional helpers for value calculation, sorting, and filtering
 """
 
 import logging
@@ -673,10 +686,9 @@ def _process_stock_position(
         position_values["long_stocks"]["value"] += position_value
         position_values["long_stocks"]["beta_adjusted"] += beta_adjusted
     else:
-        position_values["short_stocks"]["value"] += position_value  # Already negative
-        position_values["short_stocks"]["beta_adjusted"] += (
-            beta_adjusted  # Already negative
-        )
+        # Short values are stored as negative
+        position_values["short_stocks"]["value"] += position_value
+        position_values["short_stocks"]["beta_adjusted"] += beta_adjusted
 
 
 def _process_option_position(
@@ -701,17 +713,10 @@ def _process_option_position(
         position.expiry,
         position.option_type,
     )
-    if cache_key in delta_cache:
-        delta = delta_cache[cache_key]
-    else:
-        delta = calculate_option_delta(
-            option_type=position.option_type,
-            strike=position.strike,
-            expiry=position.expiry,
-            underlying_price=underlying_price,
-            option_price=option_price,
-        )
-        delta_cache[cache_key] = delta
+
+    if cache_key not in delta_cache:
+        raise ValueError(f"_process_option_position: Key {cache_key} not found!")
+    delta = delta_cache[cache_key]
 
     market_exposure = calculate_option_exposure(
         quantity=position.quantity,
