@@ -22,7 +22,7 @@ Key functions:
 - create_portfolio_summary: Generate summary metrics for a portfolio
 - get_portfolio_exposures: Calculate detailed exposure metrics for a portfolio
 - group_positions_by_ticker: Group positions by underlying ticker symbol
-- Additional helpers for value calculation, sorting, and filtering
+- Additional helpers for value calculation, sorting, and filtering positions
 """
 
 import logging
@@ -338,53 +338,37 @@ def _synchronize_option_underlying_prices(positions: list[Position]) -> list[Pos
     Returns:
         Updated list of positions with synchronized underlying prices
     """
-    # Create a dictionary of stock tickers to prices
-    stock_prices = {}
-    for position in positions:
-        if position.position_type == "stock":
-            stock_position = position  # type: StockPosition
-            stock_prices[stock_position.ticker] = stock_position.price
+    if not isinstance(positions, list):
+        raise TypeError("positions must be a list")
+    if not positions:
+        return []
 
-    # Create a new list for the updated positions
-    updated_positions = []
-    paired_count = 0
+    stock_prices = {
+        p.ticker: p.price
+        for p in positions
+        if getattr(p, "position_type", None) == "stock"
+    }
 
-    # Process each position
-    for position in positions:
-        if position.position_type == "option":
-            option_position = position  # type: OptionPosition
-            if option_position.ticker in stock_prices:
-                # Create a new option position with the updated underlying price
-                updated_position = OptionPosition(
-                    ticker=option_position.ticker,
-                    quantity=option_position.quantity,
-                    price=option_position.price,
-                    strike=option_position.strike,
-                    expiry=option_position.expiry,
-                    option_type=option_position.option_type,
-                    cost_basis=option_position.cost_basis,
-                    raw_data=option_position.raw_data,
-                )
-                # Set the underlying price using the stock price
-                object.__setattr__(
-                    updated_position,
-                    "underlying_price",
-                    stock_prices[option_position.ticker],
-                )
-                updated_positions.append(updated_position)
-                paired_count += 1
-            else:
-                # Keep the original position
-                updated_positions.append(position)
-        else:
-            # Keep non-option positions as is
-            updated_positions.append(position)
-
-    if paired_count > 0:
-        logger.debug(
-            f"Synchronized underlying prices for {paired_count} paired options"
+    # Value-based cache key: (ticker, strike, expiry, option_type)
+    def _option_cache_key(pos):
+        return (
+            getattr(pos, "ticker", None),
+            getattr(pos, "strike", None),
+            getattr(pos, "expiry", None),
+            getattr(pos, "option_type", None),
         )
 
+    updated_positions = []
+    for pos in positions:
+        if getattr(pos, "position_type", None) != "option":
+            updated_positions.append(pos)
+            continue
+        if pos.ticker not in stock_prices:
+            updated_positions.append(pos)
+            continue
+        # Mutate in place to preserve object identity for cache linkage
+        object.__setattr__(pos, "underlying_price", stock_prices[pos.ticker])
+        updated_positions.append(pos)
     return updated_positions
 
 
@@ -528,7 +512,7 @@ def process_portfolio(
     positions.extend(unknown_positions)
 
     # Synchronize option underlying prices with paired stocks
-    _synchronize_option_underlying_prices(positions)
+    positions = _synchronize_option_underlying_prices(positions)
 
     # We no longer need to update unpaired options separately as they're updated during creation
     logger.debug("Using raw CSV prices with unpaired options updated during creation")
@@ -713,7 +697,7 @@ def _process_option_position(
     if option_price is None or option_price <= 0:
         raise ValueError(f"Option market price must be positive, got {option_price}")
 
-    # Use cache key
+    # Use value-based cache key
     cache_key = (
         position.ticker,
         position.strike,
@@ -722,8 +706,16 @@ def _process_option_position(
     )
 
     if cache_key not in delta_cache:
-        raise ValueError(f"_process_option_position: Key {cache_key} not found!")
-    delta = delta_cache[cache_key]
+        delta = calculate_option_delta(
+            option_type=position.option_type,
+            strike=position.strike,
+            expiry=position.expiry,
+            underlying_price=underlying_price,
+            option_price=option_price,
+        )
+        delta_cache[cache_key] = delta
+    else:
+        delta = delta_cache[cache_key]
 
     market_exposure = calculate_option_exposure(
         quantity=position.quantity,
@@ -885,6 +877,7 @@ def get_portfolio_exposures(portfolio: Portfolio) -> dict:
             raise ValueError(
                 f"Option market price must be positive, got {option_price}"
             )
+        # Use value-based cache key
         cache_key = (
             position.ticker,
             position.strike,
@@ -914,7 +907,6 @@ def get_portfolio_exposures(portfolio: Portfolio) -> dict:
             f"Portfolio exposure - Option exposure for {position.ticker} {position.option_type} {position.strike}: {market_exposure} (delta: {delta}, underlying: {underlying_price})"
         )
         beta_adjusted = calculate_beta_adjusted_exposure(market_exposure, beta)
-        exposures["beta_adjusted_exposure"] += beta_adjusted
         if market_exposure > 0:
             exposures["long_option_exposure"] += market_exposure
             logger.debug(
