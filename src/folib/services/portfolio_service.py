@@ -907,6 +907,7 @@ def get_portfolio_exposures(portfolio: Portfolio) -> dict:
             f"Portfolio exposure - Option exposure for {position.ticker} {position.option_type} {position.strike}: {market_exposure} (delta: {delta}, underlying: {underlying_price})"
         )
         beta_adjusted = calculate_beta_adjusted_exposure(market_exposure, beta)
+        exposures["beta_adjusted_exposure"] += beta_adjusted
         if market_exposure > 0:
             exposures["long_option_exposure"] += market_exposure
             logger.debug(
