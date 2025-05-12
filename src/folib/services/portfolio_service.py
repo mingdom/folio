@@ -534,6 +534,174 @@ def process_portfolio(
     return portfolio
 
 
+def _compute_option_deltas(option_positions: list[OptionPosition]) -> dict:
+    """
+    Compute all option deltas up front and return a value-based delta map.
+    """
+    delta_map = {}
+    for position in option_positions:
+        cache_key = (
+            position.ticker,
+            position.strike,
+            position.expiry,
+            position.option_type,
+        )
+        underlying_price = ticker_service.get_price(position.ticker)
+        if underlying_price == 0:
+            underlying_price = position.strike
+        option_price = position.price
+        if option_price is None or option_price <= 0:
+            raise ValueError(
+                f"Option market price must be positive, got {option_price}"
+            )
+        delta = calculate_option_delta(
+            option_type=position.option_type,
+            strike=position.strike,
+            expiry=position.expiry,
+            underlying_price=underlying_price,
+            option_price=option_price,
+        )
+        delta_map[cache_key] = delta
+    return delta_map
+
+
+def _calculate_position_values(portfolio: Portfolio, delta_map: dict) -> dict:
+    """
+    Calculate value breakdowns for different position types, using a precomputed delta_map for options.
+    """
+    position_values = {
+        "long_stocks": {"value": 0.0, "beta_adjusted": 0.0},
+        "short_stocks": {"value": 0.0, "beta_adjusted": 0.0},
+        "long_options": {"value": 0.0, "beta_adjusted": 0.0, "delta_exposure": 0.0},
+        "short_options": {"value": 0.0, "beta_adjusted": 0.0, "delta_exposure": 0.0},
+        "cash_value": 0.0,
+        "unknown_value": 0.0,
+    }
+    for position in portfolio.positions:
+        position_value = _get_safe_position_value(position)
+        if position_value is None:
+            continue
+        if position.position_type == "stock":
+            _process_stock_position(position, position_value, position_values)
+        elif position.position_type == "option":
+            _process_option_position_with_deltas(
+                position, position_value, position_values, delta_map
+            )
+        elif position.position_type == "cash":
+            position_values["cash_value"] += position_value
+        elif position.position_type == "unknown":
+            position_values["unknown_value"] += position_value
+    return position_values
+
+
+def _process_option_position_with_deltas(
+    position: Position, position_value: float, position_values: dict, delta_map: dict
+) -> None:
+    """
+    Process an option position and update the position values dictionary using a precomputed delta_map.
+    """
+    underlying_price, beta = _get_option_market_data(position)
+    option_price = position.price
+    if option_price is None or option_price <= 0:
+        raise ValueError(f"Option market price must be positive, got {option_price}")
+    cache_key = (
+        position.ticker,
+        position.strike,
+        position.expiry,
+        position.option_type,
+    )
+    delta = delta_map[cache_key]
+    market_exposure = calculate_option_exposure(
+        quantity=position.quantity,
+        underlying_price=underlying_price,
+        delta=delta,
+    )
+    beta_adjusted = calculate_beta_adjusted_exposure(market_exposure, beta)
+    option_category = categorize_option_by_delta(delta)
+    if option_category == "long":
+        position_values["long_options"]["value"] += position_value
+        position_values["long_options"]["beta_adjusted"] += beta_adjusted
+        position_values["long_options"]["delta_exposure"] += market_exposure
+    else:
+        position_values["short_options"]["value"] += position_value
+        position_values["short_options"]["beta_adjusted"] += beta_adjusted
+        position_values["short_options"]["delta_exposure"] += market_exposure
+
+
+def get_portfolio_exposures(
+    portfolio: Portfolio, delta_map: dict | None = None
+) -> dict:
+    """
+    Calculate exposure metrics for a portfolio, using a precomputed delta_map for options.
+    If delta_map is not provided, compute it internally (for backward compatibility).
+    """
+    if delta_map is None:
+        option_positions = [
+            p for p in portfolio.positions if p.position_type == "option"
+        ]
+        delta_map = _compute_option_deltas(option_positions)
+    # ...rest of the function unchanged...
+    logger.debug("Calculating portfolio exposures")
+    total_value = sum(p.market_value for p in portfolio.positions)
+    if portfolio.pending_activity_value is not None and not pd.isna(
+        portfolio.pending_activity_value
+    ):
+        total_value += portfolio.pending_activity_value
+    exposures = {
+        "long_stock_exposure": 0.0,
+        "short_stock_exposure": 0.0,
+        "long_option_exposure": 0.0,
+        "short_option_exposure": 0.0,
+        "net_market_exposure": 0.0,
+        "beta_adjusted_exposure": 0.0,
+        "total_value": total_value,
+    }
+    for position in portfolio.stock_positions:
+        if is_cash_or_short_term(
+            position.ticker, description=getattr(position, "description", "")
+        ):
+            continue
+        market_exposure = calculate_stock_exposure(position.quantity, position.price)
+        beta = ticker_service.get_beta(position.ticker)
+        beta_adjusted = calculate_beta_adjusted_exposure(market_exposure, beta)
+        exposures["beta_adjusted_exposure"] += beta_adjusted
+        if market_exposure > 0:
+            exposures["long_stock_exposure"] += market_exposure
+        else:
+            exposures["short_stock_exposure"] += market_exposure
+    for position in portfolio.option_positions:
+        cache_key = (
+            position.ticker,
+            position.strike,
+            position.expiry,
+            position.option_type,
+        )
+        delta = delta_map[cache_key]
+        underlying_price = ticker_service.get_price(position.ticker)
+        if underlying_price == 0:
+            underlying_price = position.strike
+        market_exposure = calculate_option_exposure(
+            quantity=position.quantity,
+            underlying_price=underlying_price,
+            delta=delta,
+        )
+        beta = ticker_service.get_beta(position.ticker)
+        beta_adjusted = calculate_beta_adjusted_exposure(market_exposure, beta)
+        exposures["beta_adjusted_exposure"] += beta_adjusted
+        if market_exposure > 0:
+            exposures["long_option_exposure"] += market_exposure
+        else:
+            exposures["short_option_exposure"] += market_exposure
+    exposures["net_market_exposure"] = (
+        exposures["long_stock_exposure"]
+        + exposures["short_stock_exposure"]
+        + exposures["long_option_exposure"]
+        + exposures["short_option_exposure"]
+    )
+    logger.debug(f"Portfolio exposures calculated: {exposures}")
+    return exposures
+
+
 def create_portfolio_summary(portfolio: Portfolio) -> PortfolioSummary:
     """
     Create a summary of portfolio metrics including values and exposures.
@@ -552,8 +720,12 @@ def create_portfolio_summary(portfolio: Portfolio) -> PortfolioSummary:
     """
     logger.debug("Creating portfolio summary")
 
+    # Precompute option deltas
+    option_positions = [p for p in portfolio.positions if p.position_type == "option"]
+    delta_map = _compute_option_deltas(option_positions)
+
     # Calculate position values by type
-    position_values = _calculate_position_values(portfolio)
+    position_values = _calculate_position_values(portfolio, delta_map)
 
     # Calculate total portfolio value
     total_value = _calculate_total_value(
@@ -561,7 +733,7 @@ def create_portfolio_summary(portfolio: Portfolio) -> PortfolioSummary:
     )
 
     # Calculate portfolio exposures
-    exposures = get_portfolio_exposures(portfolio)
+    exposures = get_portfolio_exposures(portfolio, delta_map)
 
     # Calculate net exposure percentage
     net_exposure_pct = _calculate_net_exposure_percentage(
@@ -587,36 +759,6 @@ def create_portfolio_summary(portfolio: Portfolio) -> PortfolioSummary:
 
     logger.debug("Portfolio summary created successfully")
     return summary
-
-
-def _calculate_position_values(portfolio: Portfolio) -> dict:
-    """
-    Calculate value breakdowns for different position types, using a delta_cache for options.
-    """
-    position_values = {
-        "long_stocks": {"value": 0.0, "beta_adjusted": 0.0},
-        "short_stocks": {"value": 0.0, "beta_adjusted": 0.0},
-        "long_options": {"value": 0.0, "beta_adjusted": 0.0, "delta_exposure": 0.0},
-        "short_options": {"value": 0.0, "beta_adjusted": 0.0, "delta_exposure": 0.0},
-        "cash_value": 0.0,
-        "unknown_value": 0.0,
-    }
-    delta_cache = {}
-    for position in portfolio.positions:
-        position_value = _get_safe_position_value(position)
-        if position_value is None:
-            continue
-        if position.position_type == "stock":
-            _process_stock_position(position, position_value, position_values)
-        elif position.position_type == "option":
-            _process_option_position(
-                position, position_value, position_values, delta_cache
-            )
-        elif position.position_type == "cash":
-            position_values["cash_value"] += position_value
-        elif position.position_type == "unknown":
-            position_values["unknown_value"] += position_value
-    return position_values
 
 
 def _get_safe_position_value(position: Position) -> float:
@@ -832,100 +974,6 @@ def _calculate_net_exposure_percentage(
         Net exposure percentage, or 0.0 if total_value is 0
     """
     return (net_market_exposure / total_value) if total_value > 0 else 0.0
-
-
-def get_portfolio_exposures(portfolio: Portfolio) -> dict:
-    """
-    Calculate exposure metrics for a portfolio, using a delta_cache for options.
-    """
-    logger.debug("Calculating portfolio exposures")
-    total_value = sum(p.market_value for p in portfolio.positions)
-    if portfolio.pending_activity_value is not None and not pd.isna(
-        portfolio.pending_activity_value
-    ):
-        total_value += portfolio.pending_activity_value
-    exposures = {
-        "long_stock_exposure": 0.0,
-        "short_stock_exposure": 0.0,
-        "long_option_exposure": 0.0,
-        "short_option_exposure": 0.0,
-        "net_market_exposure": 0.0,
-        "beta_adjusted_exposure": 0.0,
-        "total_value": total_value,
-    }
-    delta_cache = {}
-    for position in portfolio.stock_positions:
-        if is_cash_or_short_term(
-            position.ticker, description=getattr(position, "description", "")
-        ):
-            continue
-        market_exposure = calculate_stock_exposure(position.quantity, position.price)
-        beta = ticker_service.get_beta(position.ticker)
-        beta_adjusted = calculate_beta_adjusted_exposure(market_exposure, beta)
-        exposures["beta_adjusted_exposure"] += beta_adjusted
-        if market_exposure > 0:
-            exposures["long_stock_exposure"] += market_exposure
-        else:
-            exposures["short_stock_exposure"] += market_exposure
-    for position in portfolio.option_positions:
-        underlying_price = ticker_service.get_price(position.ticker)
-        beta = ticker_service.get_beta(position.ticker)
-        if underlying_price == 0:
-            underlying_price = position.strike
-        option_price = position.price
-        if option_price is None or option_price <= 0:
-            raise ValueError(
-                f"Option market price must be positive, got {option_price}"
-            )
-        # Use value-based cache key
-        cache_key = (
-            position.ticker,
-            position.strike,
-            position.expiry,
-            position.option_type,
-        )
-        if cache_key in delta_cache:
-            delta = delta_cache[cache_key]
-        else:
-            delta = calculate_option_delta(
-                option_type=position.option_type,
-                strike=position.strike,
-                expiry=position.expiry,
-                underlying_price=underlying_price,
-                option_price=option_price,
-            )
-            delta_cache[cache_key] = delta
-        logger.debug(
-            f"Exposure calculation - Option delta for {position.ticker} {position.option_type} {position.strike}: {delta}"
-        )
-        market_exposure = calculate_option_exposure(
-            quantity=position.quantity,
-            underlying_price=underlying_price,
-            delta=delta,
-        )
-        logger.debug(
-            f"Portfolio exposure - Option exposure for {position.ticker} {position.option_type} {position.strike}: {market_exposure} (delta: {delta}, underlying: {underlying_price})"
-        )
-        beta_adjusted = calculate_beta_adjusted_exposure(market_exposure, beta)
-        exposures["beta_adjusted_exposure"] += beta_adjusted
-        if market_exposure > 0:
-            exposures["long_option_exposure"] += market_exposure
-            logger.debug(
-                f"Added to LONG option exposure: {position.ticker} {position.option_type} {position.strike} (delta: {delta}, exposure: {market_exposure})"
-            )
-        else:
-            exposures["short_option_exposure"] += market_exposure
-            logger.debug(
-                f"Added to SHORT option exposure: {position.ticker} {position.option_type} {position.strike} (delta: {delta}, exposure: {market_exposure})"
-            )
-    exposures["net_market_exposure"] = (
-        exposures["long_stock_exposure"]
-        + exposures["short_stock_exposure"]
-        + exposures["long_option_exposure"]
-        + exposures["short_option_exposure"]
-    )
-    logger.debug(f"Portfolio exposures calculated: {exposures}")
-    return exposures
 
 
 # Helper functions
