@@ -312,12 +312,11 @@ def calculate_implied_volatility(
         )
         return vol
     except RuntimeError as e:
-        # Log all relevant option parameters for debugging
-        logger.error(
+        # This can happen for deeply in the money options, especially when it's not liquid
+        logger.warn(
             f"Implied volatility calculation failed for option: "
             f"type={option_type}, strike={strike}, expiry={expiry}, "
             f"underlying_price={underlying_price}, option_price={option_price}, "
             f"risk_free_rate={risk_free_rate}. Error: {e}"
         )
-        # Re-raise the error for now (fail fast, but with context)
-        raise
+        return DEFAULT_VOLATILITY
