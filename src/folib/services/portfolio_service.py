@@ -56,6 +56,20 @@ from ..services.ticker_service import ticker_service
 logger = logging.getLogger(__name__)
 
 
+class Exposures:
+    LONG_STOCK = "long_stock_exposure"
+    SHORT_STOCK = "short_stock_exposure"
+    LONG_OPTION = "long_option_exposure"
+    SHORT_OPTION = "short_option_exposure"
+    LONG_STOCK_BETA_ADJ = "long_stock_beta_adjusted"
+    SHORT_STOCK_BETA_ADJ = "short_stock_beta_adjusted"
+    LONG_OPTION_BETA_ADJ = "long_option_beta_adjusted"
+    SHORT_OPTION_BETA_ADJ = "short_option_beta_adjusted"
+    NET_MARKET = "net_market_exposure"
+    BETA_ADJ = "beta_adjusted_exposure"
+    TOTAL_VALUE = "total_value"
+
+
 def _create_cash_position(holding: PortfolioHolding) -> CashPosition:
     return CashPosition(
         ticker=holding.symbol,
@@ -640,7 +654,6 @@ def get_portfolio_exposures(
             p for p in portfolio.positions if p.position_type == "option"
         ]
         delta_map = _compute_option_deltas(option_positions)
-    # ...rest of the function unchanged...
     logger.debug("Calculating portfolio exposures")
     total_value = sum(p.market_value for p in portfolio.positions)
     if portfolio.pending_activity_value is not None and not pd.isna(
@@ -648,17 +661,17 @@ def get_portfolio_exposures(
     ):
         total_value += portfolio.pending_activity_value
     exposures = {
-        "long_stock_exposure": 0.0,
-        "short_stock_exposure": 0.0,
-        "long_option_exposure": 0.0,
-        "short_option_exposure": 0.0,
-        "long_stock_beta_adjusted": 0.0,
-        "short_stock_beta_adjusted": 0.0,
-        "long_option_beta_adjusted": 0.0,
-        "short_option_beta_adjusted": 0.0,
-        "net_market_exposure": 0.0,
-        "beta_adjusted_exposure": 0.0,
-        "total_value": total_value,
+        Exposures.LONG_STOCK: 0.0,
+        Exposures.SHORT_STOCK: 0.0,
+        Exposures.LONG_OPTION: 0.0,
+        Exposures.SHORT_OPTION: 0.0,
+        Exposures.LONG_STOCK_BETA_ADJ: 0.0,
+        Exposures.SHORT_STOCK_BETA_ADJ: 0.0,
+        Exposures.LONG_OPTION_BETA_ADJ: 0.0,
+        Exposures.SHORT_OPTION_BETA_ADJ: 0.0,
+        Exposures.NET_MARKET: 0.0,
+        Exposures.BETA_ADJ: 0.0,
+        Exposures.TOTAL_VALUE: total_value,
     }
     for position in portfolio.stock_positions:
         if is_cash_or_short_term(
@@ -668,13 +681,13 @@ def get_portfolio_exposures(
         market_exposure = calculate_stock_exposure(position.quantity, position.price)
         beta = ticker_service.get_beta(position.ticker)
         beta_adjusted = calculate_beta_adjusted_exposure(market_exposure, beta)
-        exposures["beta_adjusted_exposure"] += beta_adjusted
+        exposures[Exposures.BETA_ADJ] += beta_adjusted
         if market_exposure > 0:
-            exposures["long_stock_exposure"] += market_exposure
-            exposures["long_stock_beta_adjusted"] += beta_adjusted
+            exposures[Exposures.LONG_STOCK] += market_exposure
+            exposures[Exposures.LONG_STOCK_BETA_ADJ] += beta_adjusted
         else:
-            exposures["short_stock_exposure"] += market_exposure
-            exposures["short_stock_beta_adjusted"] += beta_adjusted
+            exposures[Exposures.SHORT_STOCK] += market_exposure
+            exposures[Exposures.SHORT_STOCK_BETA_ADJ] += beta_adjusted
     for position in portfolio.option_positions:
         cache_key = (
             position.ticker,
@@ -693,18 +706,18 @@ def get_portfolio_exposures(
         )
         beta = ticker_service.get_beta(position.ticker)
         beta_adjusted = calculate_beta_adjusted_exposure(market_exposure, beta)
-        exposures["beta_adjusted_exposure"] += beta_adjusted
+        exposures[Exposures.BETA_ADJ] += beta_adjusted
         if market_exposure > 0:
-            exposures["long_option_exposure"] += market_exposure
-            exposures["long_option_beta_adjusted"] += beta_adjusted
+            exposures[Exposures.LONG_OPTION] += market_exposure
+            exposures[Exposures.LONG_OPTION_BETA_ADJ] += beta_adjusted
         else:
-            exposures["short_option_exposure"] += market_exposure
-            exposures["short_option_beta_adjusted"] += beta_adjusted
-    exposures["net_market_exposure"] = (
-        exposures["long_stock_exposure"]
-        + exposures["short_stock_exposure"]
-        + exposures["long_option_exposure"]
-        + exposures["short_option_exposure"]
+            exposures[Exposures.SHORT_OPTION] += market_exposure
+            exposures[Exposures.SHORT_OPTION_BETA_ADJ] += beta_adjusted
+    exposures[Exposures.NET_MARKET] = (
+        exposures[Exposures.LONG_STOCK]
+        + exposures[Exposures.SHORT_STOCK]
+        + exposures[Exposures.LONG_OPTION]
+        + exposures[Exposures.SHORT_OPTION]
     )
     logger.debug(f"Portfolio exposures calculated: {exposures}")
     return exposures

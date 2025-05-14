@@ -11,6 +11,8 @@ from typing import Any
 
 from rich.table import Table
 
+from src.folib.services.portfolio_service import Exposures
+
 
 def format_currency(
     value: float | Decimal | None,
@@ -324,23 +326,23 @@ def create_exposures_table(exposures: dict[str, Any]) -> Table:
     rows = [
         (
             "Long Stock",
-            exposures.get("long_stock_exposure", 0.0),
-            exposures.get("long_stock_beta_adjusted", 0.0),
+            exposures.get(Exposures.LONG_STOCK, 0.0),
+            exposures.get(Exposures.LONG_STOCK_BETA_ADJ, 0.0),
         ),
         (
             "Short Stock",
-            exposures.get("short_stock_exposure", 0.0),
-            exposures.get("short_stock_beta_adjusted", 0.0),
+            exposures.get(Exposures.SHORT_STOCK, 0.0),
+            exposures.get(Exposures.SHORT_STOCK_BETA_ADJ, 0.0),
         ),
         (
             "Long Option",
-            exposures.get("long_option_exposure", 0.0),
-            exposures.get("long_option_beta_adjusted", 0.0),
+            exposures.get(Exposures.LONG_OPTION, 0.0),
+            exposures.get(Exposures.LONG_OPTION_BETA_ADJ, 0.0),
         ),
         (
             "Short Option",
-            exposures.get("short_option_exposure", 0.0),
-            exposures.get("short_option_beta_adjusted", 0.0),
+            exposures.get(Exposures.SHORT_OPTION, 0.0),
+            exposures.get(Exposures.SHORT_OPTION_BETA_ADJ, 0.0),
         ),
     ]
     total_beta_adjusted = sum(abs(row[2]) for row in rows)
