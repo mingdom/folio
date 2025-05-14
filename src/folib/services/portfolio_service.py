@@ -652,6 +652,10 @@ def get_portfolio_exposures(
         "short_stock_exposure": 0.0,
         "long_option_exposure": 0.0,
         "short_option_exposure": 0.0,
+        "long_stock_beta_adjusted": 0.0,
+        "short_stock_beta_adjusted": 0.0,
+        "long_option_beta_adjusted": 0.0,
+        "short_option_beta_adjusted": 0.0,
         "net_market_exposure": 0.0,
         "beta_adjusted_exposure": 0.0,
         "total_value": total_value,
@@ -667,8 +671,10 @@ def get_portfolio_exposures(
         exposures["beta_adjusted_exposure"] += beta_adjusted
         if market_exposure > 0:
             exposures["long_stock_exposure"] += market_exposure
+            exposures["long_stock_beta_adjusted"] += beta_adjusted
         else:
             exposures["short_stock_exposure"] += market_exposure
+            exposures["short_stock_beta_adjusted"] += beta_adjusted
     for position in portfolio.option_positions:
         cache_key = (
             position.ticker,
@@ -690,8 +696,10 @@ def get_portfolio_exposures(
         exposures["beta_adjusted_exposure"] += beta_adjusted
         if market_exposure > 0:
             exposures["long_option_exposure"] += market_exposure
+            exposures["long_option_beta_adjusted"] += beta_adjusted
         else:
             exposures["short_option_exposure"] += market_exposure
+            exposures["short_option_beta_adjusted"] += beta_adjusted
     exposures["net_market_exposure"] = (
         exposures["long_stock_exposure"]
         + exposures["short_stock_exposure"]

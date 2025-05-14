@@ -309,34 +309,51 @@ def create_exposures_table(exposures: dict[str, Any]) -> Table:
 
     table.add_column("Exposure Type", style="bold")
     table.add_column("Value", justify="right")
-    table.add_column("% of Portfolio", justify="right")
+    table.add_column("Beta Adjusted Exposure", justify="right")
+    table.add_column("Beta Adjusted %", justify="right")
 
     # Ensure we're working with a dictionary
     if not isinstance(exposures, dict):
-        # Convert to dictionary if it's not already
         exposures = {
             k: getattr(exposures, k)
             for k in dir(exposures)
             if not k.startswith("_") and not callable(getattr(exposures, k))
         }
 
-    total_value = exposures.get("total_value")
+    # Gather per-category values
+    rows = [
+        (
+            "Long Stock",
+            exposures.get("long_stock_exposure", 0.0),
+            exposures.get("long_stock_beta_adjusted", 0.0),
+        ),
+        (
+            "Short Stock",
+            exposures.get("short_stock_exposure", 0.0),
+            exposures.get("short_stock_beta_adjusted", 0.0),
+        ),
+        (
+            "Long Option",
+            exposures.get("long_option_exposure", 0.0),
+            exposures.get("long_option_beta_adjusted", 0.0),
+        ),
+        (
+            "Short Option",
+            exposures.get("short_option_exposure", 0.0),
+            exposures.get("short_option_beta_adjusted", 0.0),
+        ),
+    ]
+    total_beta_adjusted = sum(abs(row[2]) for row in rows)
+    if total_beta_adjusted == 0:
+        total_beta_adjusted = None
 
-    # Add rows for each exposure type
-    for exposure_type, value in exposures.items():
-        if exposure_type == "total_value":
-            continue
-
-        # Calculate percentage of portfolio
-        if total_value is None or total_value == 0:
-            percentage = None
-        else:
-            percentage = value / total_value
-
+    for label, value, beta_adj in rows:
+        percent = (beta_adj / total_beta_adjusted) if total_beta_adjusted else None
         table.add_row(
-            exposure_type.replace("_", " ").title(),
+            label,
             format_currency(value),
-            format_percentage(percentage),
+            format_currency(beta_adj),
+            format_percentage(percent),
         )
 
     return table
