@@ -86,62 +86,60 @@ def analyze_option_position(
     position: OptionPosition,
 ) -> dict:
     """
-    Analyze an option position.
+    Analyze an option position using market price for implied volatility (fail-fast).
 
     Args:
         position: The option position to analyze
 
     Returns:
         Dictionary with analysis results
+
+    Raises:
+        ValueError, RuntimeError: If option price or IV calculation fails
     """
-    # Use the ticker service to get the price and beta
     underlying_price = ticker_service.get_price(position.ticker)
     beta = ticker_service.get_beta(position.ticker)
 
-    # Use default volatility of 0.3 (30%)
-    # This is the same default used in the options calculation module
-    volatility = 0.3
-
-    # If price is 0, use strike as fallback
     if underlying_price == 0:
         underlying_price = position.strike
 
-    # Calculate Greeks
+    # Use the option's market price (fail if not present or <= 0)
+    option_price = position.price
+    if option_price is None or option_price <= 0:
+        raise ValueError(f"Option market price must be positive, got {option_price}")
+
+    # Calculate delta using market price (implied volatility is calculated internally)
     delta = calculate_option_delta(
         option_type=position.option_type,
         strike=position.strike,
         expiry=position.expiry,
         underlying_price=underlying_price,
-        volatility=volatility,
+        option_price=option_price,
     )
 
-    # Calculate theoretical price
+    # Calculate theoretical price (for completeness, not used for IV)
     price = calculate_option_price(
         option_type=position.option_type,
         strike=position.strike,
         expiry=position.expiry,
         underlying_price=underlying_price,
-        volatility=volatility,
+        volatility=None,  # Not used, but kept for compatibility if needed
     )
 
     # Calculate exposures
     exposure = calculate_option_exposure(
         position.quantity, underlying_price, delta, True
     )
-
     beta_adjusted = exposure * beta
 
     return {
         "type": "option",
         "exposure": exposure,
         "beta_adjusted_exposure": beta_adjusted,
-        "market_value": position.quantity
-        * position.price
-        * 100,  # Standard contract size
+        "market_value": position.quantity * position.price * 100,
         "beta": beta,
         "delta": delta,
         "price": price,
-        # Add P&L if cost basis is available
         "unrealized_pnl": (position.price - position.cost_basis)
         * position.quantity
         * 100
@@ -193,44 +191,42 @@ def get_position_price(position: Position) -> float:
 
 def get_position_market_exposure(position: Position) -> float:
     """
-    Calculate the market exposure for a position.
+    Calculate the market exposure for a position (fail-fast for options).
 
     Args:
         position: The position to calculate exposure for
 
     Returns:
         The market exposure for the position
+
+    Raises:
+        ValueError, RuntimeError: If option price or IV calculation fails
     """
     if position.position_type == "stock":
         stock_position = cast(StockPosition, position)
         return calculate_stock_exposure(
             stock_position.quantity, get_position_price(stock_position)
         )
-
     elif position.position_type == "option":
         option_position = cast(OptionPosition, position)
-
-        # Get the underlying price
         underlying_price = ticker_service.get_price(option_position.ticker)
-
-        # If price is 0, use strike as fallback
         if underlying_price == 0:
             underlying_price = option_position.strike
-
-        # Calculate delta
+        option_price = option_position.price
+        if option_price is None or option_price <= 0:
+            raise ValueError(
+                f"Option market price must be positive, got {option_price}"
+            )
         delta = calculate_option_delta(
             option_type=option_position.option_type,
             strike=option_position.strike,
             expiry=option_position.expiry,
             underlying_price=underlying_price,
+            option_price=option_price,
         )
-
-        # Calculate exposure
         return calculate_option_exposure(
             option_position.quantity, underlying_price, delta, True
         )
-
-    # Cash and unknown positions have zero exposure
     return 0.0
 
 

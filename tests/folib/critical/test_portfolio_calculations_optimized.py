@@ -45,6 +45,22 @@ from tests.folib.fixtures.mock_ticker_service import (
     MockTickerService,
 )
 
+# Expected values based on test_portfolio.csv with mock ticker data
+# These values are calculated based on the test portfolio and mock ticker data
+EXPECTED_TOTAL_VALUE = 2789293.40
+EXPECTED_STOCK_VALUE = 1823711.39
+EXPECTED_OPTION_VALUE = -154099.0
+EXPECTED_CASH_VALUE = 593093.76
+EXPECTED_UNKNOWN_VALUE = 0.00
+EXPECTED_PENDING_ACTIVITY = 526587.25
+EXPECTED_BETA_ADJUSTED_EXPOSURE = 1301993.10
+EXPECTED_NET_MARKET_EXPOSURE = 1076617.57
+EXPECTED_NET_EXPOSURE_PCT = 0.3860
+EXPECTED_LONG_STOCK_EXPOSURE = 2373923.53
+EXPECTED_SHORT_STOCK_EXPOSURE = -550212.15
+EXPECTED_LONG_OPTION_EXPOSURE = 1265645.30
+EXPECTED_SHORT_OPTION_EXPOSURE = -2012739.12
+
 
 @pytest.fixture(scope="module", autouse=True)
 def fix_quantlib_date():
@@ -219,15 +235,6 @@ def test_portfolio_total_value_calculation(portfolio_summary):
     Failure in this test indicates a serious issue with the portfolio value calculation
     logic that would result in incorrect portfolio valuation for users.
     """
-    # Expected values based on test_portfolio.csv with mock ticker data
-    # These values are calculated based on the test portfolio and mock ticker data
-    EXPECTED_TOTAL_VALUE = 2800822.40
-    EXPECTED_STOCK_VALUE = 1823711.39
-    EXPECTED_OPTION_VALUE = -142570.00
-    EXPECTED_CASH_VALUE = 593093.76
-    EXPECTED_UNKNOWN_VALUE = 0.00
-    EXPECTED_PENDING_ACTIVITY = 526587.25
-
     # Verify total value matches expected value
     assert abs(portfolio_summary.total_value - EXPECTED_TOTAL_VALUE) < 0.01, (
         f"Expected total value {EXPECTED_TOTAL_VALUE}, but got {portfolio_summary.total_value}. "
@@ -284,15 +291,6 @@ def test_portfolio_exposure_calculation(portfolio_summary, portfolio_exposures):
     Failure in this test indicates a serious issue with the exposure calculation logic
     that would result in incorrect risk assessment for users.
     """
-    # Expected values based on test_portfolio.csv with mock ticker data
-    # These values are calculated based on the test portfolio and our mock ticker data
-    EXPECTED_NET_MARKET_EXPOSURE = 1105961.03
-    EXPECTED_NET_EXPOSURE_PCT = 0.3949
-    EXPECTED_LONG_STOCK_EXPOSURE = 2373923.53
-    EXPECTED_SHORT_STOCK_EXPOSURE = -550212.15
-    EXPECTED_LONG_OPTION_EXPOSURE = 1449980.28
-    EXPECTED_SHORT_OPTION_EXPOSURE = -2167730.64
-
     # Verify net market exposure matches expected value
     assert (
         abs(portfolio_summary.net_market_exposure - EXPECTED_NET_MARKET_EXPOSURE) < 0.01
@@ -363,10 +361,6 @@ def test_portfolio_beta_adjusted_exposure_calculation(
     Failure in this test indicates a serious issue with the beta-adjusted exposure
     calculation logic that would result in incorrect risk assessment for users.
     """
-    # Expected value based on test_portfolio.csv with mock ticker data
-    # This value is calculated based on the test portfolio and our mock ticker data
-    EXPECTED_BETA_ADJUSTED_EXPOSURE = 1372872.40
-
     # Verify beta-adjusted exposure matches expected value
     assert (
         abs(portfolio_summary.beta_adjusted_exposure - EXPECTED_BETA_ADJUSTED_EXPOSURE)
