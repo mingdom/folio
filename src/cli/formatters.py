@@ -11,6 +11,8 @@ from typing import Any
 
 from rich.table import Table
 
+from src.folib.services.portfolio_service import Exposures
+
 
 def format_currency(
     value: float | Decimal | None,
@@ -152,6 +154,7 @@ def create_portfolio_summary_table(summary: Any) -> Table:
 
     table.add_column("Metric", style="bold")
     table.add_column("Value", justify="right")
+    table.add_column("% of Total", justify="right")
 
     # Handle both dictionary and PortfolioSummary object
     if hasattr(summary, "get"):
@@ -164,7 +167,7 @@ def create_portfolio_summary_table(summary: Any) -> Table:
         pending_activity_value = summary.get("pending_activity_value")
         net_market_exposure = summary.get("net_market_exposure")
         beta_adjusted_exposure = summary.get("beta_adjusted_exposure")
-        net_exposure_pct = summary.get("net_exposure_pct")
+        # net_exposure_pct is no longer needed
     else:
         # It's a PortfolioSummary object
         total_value = summary.total_value
@@ -175,22 +178,41 @@ def create_portfolio_summary_table(summary: Any) -> Table:
         pending_activity_value = summary.pending_activity_value
         net_market_exposure = summary.net_market_exposure
         beta_adjusted_exposure = summary.beta_adjusted_exposure
-        net_exposure_pct = summary.net_exposure_pct
+        # net_exposure_pct is no longer needed
 
-    table.add_row("Total Value", format_currency(total_value))
-    table.add_row("Stock Value", format_currency(stock_value))
-    table.add_row("Option Value", format_currency(option_value))
-    table.add_row("Cash Value", format_currency(cash_value))
+    def percent(val):
+        if total_value in (None, 0) or val is None:
+            return "N/A"
+        pct = val / total_value
+        return format_percentage(pct)
+
+    table.add_row("Total Value", format_currency(total_value), "100.00%")
+    table.add_row("Stock Value", format_currency(stock_value), percent(stock_value))
+    table.add_row("Option Value", format_currency(option_value), percent(option_value))
+    table.add_row("Cash Value", format_currency(cash_value), percent(cash_value))
 
     if unknown_value != 0:
-        table.add_row("Unknown Value", format_currency(unknown_value))
+        table.add_row(
+            "Unknown Value", format_currency(unknown_value), percent(unknown_value)
+        )
 
     if pending_activity_value != 0:
-        table.add_row("Pending Activity", format_currency(pending_activity_value))
+        table.add_row(
+            "Pending Activity",
+            format_currency(pending_activity_value),
+            percent(pending_activity_value),
+        )
 
-    table.add_row("Net Market Exposure", format_currency(net_market_exposure))
-    table.add_row("Net Exposure %", format_percentage(net_exposure_pct))
-    table.add_row("Beta Adjusted Exposure", format_currency(beta_adjusted_exposure))
+    table.add_row(
+        "Net Market Exposure",
+        format_currency(net_market_exposure),
+        percent(net_market_exposure),
+    )
+    table.add_row(
+        "Beta Adjusted Exposure",
+        format_currency(beta_adjusted_exposure),
+        percent(beta_adjusted_exposure),
+    )
 
     return table
 
@@ -289,34 +311,51 @@ def create_exposures_table(exposures: dict[str, Any]) -> Table:
 
     table.add_column("Exposure Type", style="bold")
     table.add_column("Value", justify="right")
-    table.add_column("% of Portfolio", justify="right")
+    table.add_column("Beta Adjusted Exposure", justify="right")
+    table.add_column("Beta Adjusted %", justify="right")
 
     # Ensure we're working with a dictionary
     if not isinstance(exposures, dict):
-        # Convert to dictionary if it's not already
         exposures = {
             k: getattr(exposures, k)
             for k in dir(exposures)
             if not k.startswith("_") and not callable(getattr(exposures, k))
         }
 
-    total_value = exposures.get("total_value")
+    # Gather per-category values
+    rows = [
+        (
+            "Long Stock",
+            exposures.get(Exposures.LONG_STOCK, 0.0),
+            exposures.get(Exposures.LONG_STOCK_BETA_ADJ, 0.0),
+        ),
+        (
+            "Short Stock",
+            exposures.get(Exposures.SHORT_STOCK, 0.0),
+            exposures.get(Exposures.SHORT_STOCK_BETA_ADJ, 0.0),
+        ),
+        (
+            "Long Option",
+            exposures.get(Exposures.LONG_OPTION, 0.0),
+            exposures.get(Exposures.LONG_OPTION_BETA_ADJ, 0.0),
+        ),
+        (
+            "Short Option",
+            exposures.get(Exposures.SHORT_OPTION, 0.0),
+            exposures.get(Exposures.SHORT_OPTION_BETA_ADJ, 0.0),
+        ),
+    ]
+    total_beta_adjusted = sum(abs(row[2]) for row in rows)
+    if total_beta_adjusted == 0:
+        total_beta_adjusted = None
 
-    # Add rows for each exposure type
-    for exposure_type, value in exposures.items():
-        if exposure_type == "total_value":
-            continue
-
-        # Calculate percentage of portfolio
-        if total_value is None or total_value == 0:
-            percentage = None
-        else:
-            percentage = value / total_value
-
+    for label, value, beta_adj in rows:
+        percent = (beta_adj / total_beta_adjusted) if total_beta_adjusted else None
         table.add_row(
-            exposure_type.replace("_", " ").title(),
+            label,
             format_currency(value),
-            format_percentage(percentage),
+            format_currency(beta_adj),
+            format_percentage(percent),
         )
 
     return table
