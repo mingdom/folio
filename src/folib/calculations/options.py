@@ -443,10 +443,10 @@ def calculate_implied_volatility(
     ql.Settings.instance().evaluationDate = calculation_date
     expiry_ql = ql.Date(expiry.day, expiry.month, expiry.year)
 
-    if expiry_ql < calculation_date:
+    if expiry_ql <= calculation_date:
         _log_calculation_warning(
             "calculate_implied_volatility",
-            f"Option is expired, using default volatility: {DEFAULT_VOLATILITY:.3f}",
+            f"Option is expired or near expired, using default volatility: {DEFAULT_VOLATILITY:.3f}",
             option_type=option_type,
             strike=strike,
             expiry=expiry,
@@ -488,18 +488,6 @@ def calculate_implied_volatility(
             0.001,  # min vol
             5.0,  # max vol
         )
-        if expiry_ql == calculation_date:
-            _log_calculation_warning(
-                "calculate_implied_volatility",
-                f"Option expires today, implied volatility may be unreliable: {vol:.6f}",
-                option_type=option_type,
-                strike=strike,
-                expiry=expiry,
-                underlying_price=underlying_price,
-                option_price=option_price,
-                volatility=vol,
-            )
-
         logger.debug(
             "Implied volatility calculated: vol=%.4f, type=%s, strike=%.2f, underlying=%.2f, price=%.2f",
             vol,
