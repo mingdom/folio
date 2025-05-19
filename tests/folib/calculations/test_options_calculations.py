@@ -166,3 +166,63 @@ def test_invalid_inputs():
             underlying_price=100.0,
             option_price=-1.0,  # Invalid negative price
         )
+
+
+def test_expired_option():
+    """Test handling of expired and today-expiry options."""
+    today = datetime.date.today()
+    yesterday = today - datetime.timedelta(days=1)
+
+    # Test expired option (yesterday)
+    price = calculate_option_price(
+        option_type="CALL",
+        strike=100.0,
+        expiry=yesterday,
+        underlying_price=100.0,
+    )
+    assert price == 0.0  # Expired option should have zero price
+
+    delta = calculate_option_delta(
+        option_type="CALL",
+        strike=100.0,
+        expiry=yesterday,
+        underlying_price=100.0,
+        option_price=1.0,
+    )
+    assert delta == 0.0  # Expired option should have zero delta
+
+    vol = calculate_implied_volatility(
+        option_type="CALL",
+        strike=100.0,
+        expiry=yesterday,
+        underlying_price=100.0,
+        option_price=1.0,
+    )
+    assert vol == 0.3  # Expired option should return DEFAULT_VOLATILITY
+
+    # Test today-expiring option (should be valid but may have warnings)
+    price = calculate_option_price(
+        option_type="CALL",
+        strike=90.0,
+        expiry=today,
+        underlying_price=100.0,
+    )
+    assert abs(price - 10.0) < 0.1  # Should be close to intrinsic value
+
+    delta = calculate_option_delta(
+        option_type="CALL",
+        strike=90.0,
+        expiry=today,
+        underlying_price=100.0,
+        option_price=price,
+    )
+    assert 0.0 <= delta <= 1.0  # Should still have valid delta
+
+    vol = calculate_implied_volatility(
+        option_type="CALL",
+        strike=90.0,
+        expiry=today,
+        underlying_price=100.0,
+        option_price=price,
+    )
+    assert vol > 0.0  # Should be able to calculate meaningful vol for intrinsic value
