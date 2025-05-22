@@ -138,9 +138,7 @@ def show_help(command: str | None = None):
         console.print(
             "  portfolio list [options]    - List positions with filtering and sorting"
         )
-        console.print(
-            "  position <TICKER> [options] - Analyze position details and risk metrics"
-        )
+        console.print("  position <TICKER>           - Show all positions for a ticker")
         console.print("  help [COMMAND]              - Display help information")
         console.print("  exit                        - Exit the interactive shell")
     elif command == "portfolio":
@@ -156,12 +154,7 @@ def show_help(command: str | None = None):
         )
     elif command == "position":
         console.print("[bold]Position commands:[/bold]")
-        console.print(
-            "  position <TICKER> [options] - Analyze position details and risk metrics"
-        )
-        console.print("    Options:")
-        console.print("      --show-legs    - Show detailed option leg information")
-        console.print("      --show-greeks  - Show option Greeks (Delta, etc.)")
+        console.print("  position <TICKER>           - Show all positions for a ticker")
     else:
         console.print(f"[red]No help available for command:[/red] {command}")
 

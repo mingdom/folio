@@ -89,16 +89,13 @@ python -m src.cli position SPY --file path/to/portfolio.csv
 
 ### Position Commands
 
-- `position <TICKER> [options]`
-  - Analyze a position group showing both detailed composition and risk metrics
-  - Options:
-    - `--show-legs`: Show detailed option leg information
-    - `--show-greeks`: Show option Greeks (Delta, Gamma, Theta, Vega)
+- `position <TICKER>`
+  - Show all positions for a ticker in a unified table
+  - Displays quantity, type (Stock/CALL Option/PUT Option), value, and beta adjusted exposure
   - Examples:
-    - `position SPY` - Basic position analysis
-    - `position --show-legs SPY` - Show detailed option legs
-    - `position --show-greeks AAPL` - Include option Greeks
-    - `position --show-legs --show-greeks TSLA` - Show both legs and Greeks
+    - `position SPY` - Show all SPY positions
+    - `position NVDA` - Show all NVDA positions
+    - `position --file myport.csv AAPL` - Use specific portfolio file
 
 ### Utility Commands
 
@@ -133,17 +130,14 @@ folio> portfolio list type=stock
 ### Position Analysis
 
 ```
-# Analyze a specific position (shows both details and risk metrics)
+# Show all positions for a ticker
 folio> position SPY
 
-# Include option Greeks in the analysis
-folio> position --show-greeks AAPL
+# Show NVDA positions
+folio> position NVDA
 
-# Show detailed option legs
-folio> position --show-legs TSLA
-
-# Show both option legs and Greeks
-folio> position --show-legs --show-greeks AAPL
+# Show AAPL positions
+folio> position AAPL
 ```
 
 ## Tips and Tricks
