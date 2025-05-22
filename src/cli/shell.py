@@ -15,7 +15,7 @@ from prompt_toolkit.history import FileHistory
 from rich.console import Console
 
 from .commands.portfolio import portfolio_list, portfolio_load, portfolio_summary
-from .commands.position import position_details, position_risk
+from .commands.position import position_analyze
 from .state import State
 
 # Create console for rich output
@@ -31,10 +31,7 @@ COMMANDS = {
         "summary": portfolio_summary,
         "list": portfolio_list,
     },
-    "position": {
-        "details": position_details,
-        "risk": position_risk,
-    },
+    "position": position_analyze,
     "help": None,  # Will be handled separately
     "exit": None,  # Will be handled separately
 }
@@ -46,9 +43,11 @@ def get_command_completer():
     words = []
     for cmd, subcmds in COMMANDS.items():
         words.append(cmd)
-        if subcmds:
+        if isinstance(subcmds, dict):
+            # Handle dictionary of subcommands
             for subcmd in subcmds:
                 words.append(f"{cmd} {subcmd}")
+        # For function commands like position, just add the base command
 
     # Add special commands
     words.append("help")
@@ -99,13 +98,11 @@ def process_command(command: str) -> bool:
 
     # Handle position commands
     elif cmd == "position":
-        if len(parts) > 2 and parts[2] in COMMANDS["position"]:
-            # Call the appropriate command function
-            subcmd = parts[2]
-            ticker = parts[1]
-            args = [ticker, *parts[3:]]
+        if len(parts) > 1:
+            # Call the position analysis function
+            ticker_and_args = parts[1:]
             try:
-                COMMANDS["position"][subcmd](state=state, args=args)
+                COMMANDS["position"](state=state, args=ticker_and_args)
             except Exception as e:
                 console.print(f"[red]Error:[/red] {e!s}")
         else:
@@ -142,10 +139,7 @@ def show_help(command: str | None = None):
             "  portfolio list [options]    - List positions with filtering and sorting"
         )
         console.print(
-            "  position <TICKER> details   - View detailed composition of a position"
-        )
-        console.print(
-            "  position <TICKER> risk      - Analyze risk metrics for a position"
+            "  position <TICKER> [options] - Analyze position details and risk metrics"
         )
         console.print("  help [COMMAND]              - Display help information")
         console.print("  exit                        - Exit the interactive shell")
@@ -163,11 +157,11 @@ def show_help(command: str | None = None):
     elif command == "position":
         console.print("[bold]Position commands:[/bold]")
         console.print(
-            "  position <TICKER> details   - View detailed composition of a position"
+            "  position <TICKER> [options] - Analyze position details and risk metrics"
         )
-        console.print(
-            "  position <TICKER> risk      - Analyze risk metrics for a position"
-        )
+        console.print("    Options:")
+        console.print("      --show-legs    - Show detailed option leg information")
+        console.print("      --show-greeks  - Show option Greeks (Delta, etc.)")
     else:
         console.print(f"[red]No help available for command:[/red] {command}")
 
