@@ -105,7 +105,9 @@ def analyze_option_position(
 
     # Use the option's market price (fail if not present or <= 0)
     option_price = position.price
-    if option_price is None or option_price <= 0:
+    if option_price is None:
+        raise ValueError(f"Option market price is None for {position.ticker}")
+    if option_price <= 0:
         raise ValueError(f"Option market price must be positive, got {option_price}")
 
     # Calculate delta using market price (implied volatility is calculated internally)
@@ -123,7 +125,6 @@ def analyze_option_position(
         strike=position.strike,
         expiry=position.expiry,
         underlying_price=underlying_price,
-        volatility=None,  # Not used, but kept for compatibility if needed
     )
 
     # Calculate exposures
@@ -213,7 +214,11 @@ def get_position_market_exposure(position: Position) -> float:
         if underlying_price == 0:
             underlying_price = option_position.strike
         option_price = option_position.price
-        if option_price is None or option_price <= 0:
+        if option_price is None:
+            raise ValueError(
+                f"Option market price is None for {option_position.ticker}"
+            )
+        if option_price <= 0:
             raise ValueError(
                 f"Option market price must be positive, got {option_price}"
             )

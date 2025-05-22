@@ -25,6 +25,7 @@ class Position:
     quantity: float
     price: float
     position_type: Literal["stock", "option", "cash", "unknown"]
+    description: str
     cost_basis: float | None = None
     raw_data: dict | None = (
         None  # Original CSV row data for debugging and recalculation
@@ -56,6 +57,7 @@ class StockPosition(Position):
         ticker: str,
         quantity: float,
         price: float,
+        description: str | None = None,
         cost_basis: float | None = None,
         raw_data: dict | None = None,
     ):
@@ -63,6 +65,7 @@ class StockPosition(Position):
         object.__setattr__(self, "quantity", quantity)
         object.__setattr__(self, "price", price)
         object.__setattr__(self, "position_type", "stock")
+        object.__setattr__(self, "description", description or f"{ticker} Stock")
         object.__setattr__(self, "cost_basis", cost_basis)
         object.__setattr__(self, "raw_data", raw_data)
 
@@ -84,6 +87,7 @@ class OptionPosition(Position):
         strike: float,
         expiry: date,
         option_type: Literal["CALL", "PUT"],
+        description: str | None = None,
         cost_basis: float | None = None,
         raw_data: dict | None = None,
     ):
@@ -94,6 +98,15 @@ class OptionPosition(Position):
         object.__setattr__(self, "strike", strike)
         object.__setattr__(self, "expiry", expiry)
         object.__setattr__(self, "option_type", option_type)
+
+        # Generate description if not provided: "AAPL 150C 01-19-24"
+        if description is None:
+            option_letter = "C" if option_type == "CALL" else "P"
+            formatted_date = expiry.strftime("%m-%d-%y")
+            strike_str = f"{int(strike)}" if strike == int(strike) else f"{strike:.1f}"
+            description = f"{ticker} {strike_str}{option_letter} {formatted_date}"
+
+        object.__setattr__(self, "description", description)
         object.__setattr__(self, "cost_basis", cost_basis)
         object.__setattr__(self, "raw_data", raw_data)
 
@@ -122,6 +135,7 @@ class CashPosition(Position):
         ticker: str,
         quantity: float,
         price: float,
+        description: str | None = None,
         cost_basis: float | None = None,
         raw_data: dict | None = None,
     ):
@@ -129,6 +143,7 @@ class CashPosition(Position):
         object.__setattr__(self, "quantity", quantity)
         object.__setattr__(self, "price", price)
         object.__setattr__(self, "position_type", "cash")
+        object.__setattr__(self, "description", description or f"{ticker} Cash")
         object.__setattr__(self, "cost_basis", cost_basis)
         object.__setattr__(self, "raw_data", raw_data)
 
@@ -138,14 +153,14 @@ class UnknownPosition(Position):
     """Position that couldn't be classified as stock, option, or cash."""
 
     # This field is added in __init__ and not part of the base Position class
-    description: str = field(init=False)
+    original_description: str = field(init=False)
 
     def __init__(
         self,
         ticker: str,
         quantity: float,
         price: float,
-        description: str,
+        original_description: str,
         cost_basis: float | None = None,
         raw_data: dict | None = None,
     ):
@@ -153,7 +168,8 @@ class UnknownPosition(Position):
         object.__setattr__(self, "quantity", quantity)
         object.__setattr__(self, "price", price)
         object.__setattr__(self, "position_type", "unknown")
-        object.__setattr__(self, "description", description)
+        object.__setattr__(self, "original_description", original_description)
+        object.__setattr__(self, "description", original_description)
         object.__setattr__(self, "cost_basis", cost_basis)
         object.__setattr__(self, "raw_data", raw_data)
 
@@ -161,7 +177,7 @@ class UnknownPosition(Position):
         """Convert the unknown position to a dictionary for display purposes."""
         base_dict = super().to_dict()
         base_dict.update({
-            "description": self.description,
+            "original_description": self.original_description,
         })
         return base_dict
 

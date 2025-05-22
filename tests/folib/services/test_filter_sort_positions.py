@@ -36,7 +36,7 @@ class TestFilterPositionsByCriteria:
             ),
             CashPosition(ticker="SPAXX", quantity=1, price=1.0),
             UnknownPosition(
-                ticker="XYZ", quantity=5, price=10.0, description="Unknown"
+                ticker="XYZ", quantity=5, price=10.0, original_description="Unknown"
             ),
         ]
 
@@ -277,7 +277,7 @@ class TestSortPositions:
             ),
             CashPosition(ticker="SPAXX", quantity=1000, price=1.0),
             UnknownPosition(
-                ticker="XYZ", quantity=5, price=10.0, description="Unknown"
+                ticker="XYZ", quantity=5, price=10.0, original_description="Unknown"
             ),
         ]
 

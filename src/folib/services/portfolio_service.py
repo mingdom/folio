@@ -84,7 +84,7 @@ def _create_unknown_position(holding: PortfolioHolding) -> UnknownPosition:
         ticker=holding.symbol,
         quantity=holding.quantity,
         price=holding.price,
-        description=holding.description,
+        original_description=holding.description,
         cost_basis=holding.cost_basis_total,
     )
 
@@ -413,6 +413,7 @@ def _update_all_prices(positions: list[Position]) -> list[Position]:
                         ticker=position.ticker,
                         quantity=position.quantity,
                         price=current_price,
+                        description=position.description,
                         cost_basis=position.cost_basis,
                         raw_data=position.raw_data,
                     )
@@ -432,10 +433,11 @@ def _update_all_prices(positions: list[Position]) -> list[Position]:
                         ticker=position.ticker,
                         quantity=position.quantity,
                         price=position.price,  # Keep original price for options
-                        cost_basis=position.cost_basis,
                         strike=position.strike,
                         expiry=position.expiry,
                         option_type=position.option_type,
+                        description=position.description,
+                        cost_basis=position.cost_basis,
                         raw_data=getattr(position, "raw_data", None),
                     )
                     # Set the underlying_price attribute

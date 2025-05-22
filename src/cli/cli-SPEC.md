@@ -88,21 +88,13 @@ This document outlines the specifications for the `Folio CLI`, a command-line in
         * **Options (Examples):** `--file <PATH>`, `--focus <TICKERS>`, `--type [stock|option|cash]`, `--min-value <VAL>`, `--max-value <VAL>`, `--sort [ticker|value|beta|exposure]` (Specify direction: e.g., `value:desc`).
         * **Output:** Formatted table (`rich`) of positions with key metrics. Filter summary if applicable.
 
-* **`position <TICKER>`**: Analyze a specific position group (stock + options).
-    * **`details [options]`**:
-        * **Goal:** View detailed composition of a position group.
-        * **Direct:** `folio position <TICKER> details --file <FILE_PATH> [--show-legs]`
-        * **Interactive:** `position <TICKER> details [--show-legs]`
-        * **Action:** Requires loaded portfolio. Finds relevant `Position` objects from `folib.domain`.
-        * **Options:** `--file <PATH>`, `--show-legs` (equivalent to old `--detailed` for options).
-        * **Output:** Formatted tables showing stock details and/or option leg details (strike, expiry, delta, value).
-    * **`risk [options]`**:
-        * **Goal:** Analyze risk metrics for a position group.
-        * **Direct:** `folio position <TICKER> risk --file <FILE_PATH> [--show-greeks]`
-        * **Interactive:** `position <TICKER> risk [--show-greeks]`
-        * **Action:** Requires loaded portfolio. Uses `folib` calculations for risk metrics.
-        * **Options:** `--file <PATH>`, `--show-greeks` (display Delta, Gamma, Theta, Vega if calculable by `folib`).
-        * **Output:** Formatted table showing Beta, Beta-Adjusted Exposure, Delta Exposure, etc. Optionally shows Greeks.
+* **`position <TICKER>`**: Show all positions for a ticker.
+        * **Goal:** Display all stock and option positions for a ticker in a unified table.
+        * **Direct:** `folio position <TICKER> --file <FILE_PATH>`
+        * **Interactive:** `position <TICKER>`
+        * **Action:** Requires loaded portfolio. Groups positions by ticker and displays in unified table.
+        * **Options:** `--file <PATH>`
+        * **Output:** Unified table showing quantity, type (Stock/CALL Option/PUT Option), value, and beta adjusted exposure for each position.
     * **`simulate [options]`**:
         * **Goal:** Simulate P&L for a specific position group against SPY changes.
         * **Direct:** `folio position <TICKER> simulate --file <FILE_PATH> [--min-spy <VAL>] [--max-spy <VAL>] [--steps <N>]`

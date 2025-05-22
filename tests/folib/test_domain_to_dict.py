@@ -73,7 +73,7 @@ class TestDomainToDictMethods:
             ticker="XYZ123",
             quantity=5,
             price=10.0,
-            description="Unknown security",
+            original_description="Unknown security",
             cost_basis=45.0,
         )
 
@@ -88,7 +88,7 @@ class TestDomainToDictMethods:
         assert result["position_type"] == "unknown"
         assert result["market_value"] == 50.0
         assert result["cost_basis"] == 45.0
-        assert result["description"] == "Unknown security"
+        assert result["original_description"] == "Unknown security"
 
     def test_portfolio_summary_to_dict(self):
         """Test the to_dict method of the PortfolioSummary class."""
