@@ -1,0 +1,13 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# User Interaction Rules
+- Unless asked by the user, you should NOT write code. See the "When to NOT edit code" section below.
+- When the user says "STOP" - stop editing immediately and give the user a summary of your progress.
+
+# When to STOP and ask the user
+STOP and ASK for help if:
+- If you are making repeated edits to the same file without resolving the issue
+- If you exceed 3 tries at any task

@@ -1,0 +1,17 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+# Project Rules
+- Maintain strict separation of concerns: Business logic MUST reside in the core library (`src/folio/`), not in interface layers in either `src/cli/` or `src/folio`.
+- Use `.refs/` to write plans out in markdown format
+- All application, test and lint logs are in `logs/`
+- `@docs` has project docs, including `@project-design.md`
+
+# Prohibited actions - **NEVER** run these:
+- Do not run `make folio`. You can't test your code changes by running the application.
+
+# Encouraged Actions
+- `make lint`: Run this all the time to catch lint issues early
+- `make test`: Unit tests
