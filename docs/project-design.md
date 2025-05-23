@@ -4,6 +4,8 @@ globs: *
 alwaysApply: true
 ---
 
+> **Important:** The web interface (`src/folio/`) described in this document is deprecated and no longer actively maintained. The project's current focus is on the CLI (`src/cli/`) and the core library (`src/folib/`). Parts of this document related to the web interface are kept for historical context but may not reflect current development.
+
 # Folio Project Design
 
 This document outlines how the Folio codebase is structured and how data flows through the application. Folio provides tools for analyzing and visualizing investment portfolios, with a focus on stocks and options, through both a web-based dashboard and a command-line interface (CLI).
@@ -12,8 +14,8 @@ This document outlines how the Folio codebase is structured and how data flows t
 
 Folio is a Python-based application that provides comprehensive portfolio analysis capabilities through multiple interfaces:
 
-1. **Web Interface (`src/folio/`)**: A Dash-based web application for visualizing portfolio data
-2. **CLI Interface (`src/cli/`)**: A command-line interface for portfolio analysis and simulation
+1. **Web Interface (`src/folio/`)**: A Dash-based web application for visualizing portfolio data. **(Deprecated)**
+2. **CLI Interface (`src/cli/`)**: A command-line interface for portfolio analysis and simulation. This is the primary interface for the application.
 
 Both interfaces leverage the core library (`src/folib/`) for business logic, following our strict separation of concerns principles. The core library provides a functional-first approach to portfolio analysis with clear boundaries between layers.
 
@@ -35,7 +37,7 @@ src/
 │       ├── portfolio_service.py  # Portfolio processing
 │       ├── position_service.py   # Position analysis
 │       ├── simulation_service.py # Portfolio simulation
-├── folio/                  # Web interface (Dash)
+├── folio/                  # Web interface (Dash) (deprecated)
 │   ├── app.py              # Main Dash application
 │   ├── components/         # UI components
 ├── cli/                    # Command-line interface
@@ -89,6 +91,8 @@ Orchestrates the lower layers to fulfill specific use cases:
 - **simulation_service.py**: Portfolio simulation
 
 ## Web Interface (`src/folio/`)
+
+**Note:** This component is deprecated, and the information below is for historical reference. The web interface is no longer actively maintained.
 
 The web interface is built with Dash and provides a visual dashboard for portfolio analysis:
 
@@ -204,9 +208,9 @@ The codebase strictly separates concerns:
 
 Folio can run in multiple deployment environments:
 
-- **Local Development**: Running directly on a developer's machine
-- **Docker Container**: Running in a containerized environment
-- **Hugging Face Spaces**: Deployed as a Hugging Face Space for public access
+- **Local Development**: Running directly on a developer's machine (primarily for CLI and core library development).
+- **Docker Container**: Running in a containerized environment. Note that the default Docker setup runs the deprecated web interface.
+- **Hugging Face Spaces**: Deployed as a Hugging Face Space for public access. This deploys the deprecated web interface.
 
 The application detects its environment and adjusts settings accordingly, such as cache directories and logging behavior.
 
@@ -233,8 +237,8 @@ Tests are organized to mirror the structure of the source code, with test files 
 
 Folio is designed with a clean architecture that separates concerns and promotes maintainability:
 
-- **Core Library (`src/folib/`)**: Contains all business logic in a functional-first approach
-- **Web Interface (`src/folio/`)**: Provides a visual dashboard using Dash
-- **CLI Interface (`src/cli/`)**: Provides a command-line tool for portfolio analysis
+- **Core Library (`src/folib/`)**: Contains all business logic in a functional-first approach. This is the foundation of the application.
+- **CLI Interface (`src/cli/`)**: Provides a command-line tool for portfolio analysis. This is the primary and actively developed interface.
+- **Web Interface (`src/folio/`)**: (Deprecated) Provided a visual dashboard using Dash. This interface is no longer maintained.
 
-This architecture makes the codebase maintainable, testable, and extensible, allowing for easy addition of new features and improvements.
+This architecture makes the codebase maintainable, testable, and extensible, allowing for easy addition of new features and improvements, primarily focused on the CLI and core library.

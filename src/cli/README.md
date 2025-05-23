@@ -1,6 +1,6 @@
 # Folio CLI
 
-A command-line interface for portfolio analysis and simulation, leveraging the `folib` library for core business logic.
+This is the main and actively developed interface for the Folio project, providing powerful command-line tools for portfolio analysis and simulation. It leverages the `folib` library for core business logic.
 
 ## Features
 
