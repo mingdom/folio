@@ -253,6 +253,11 @@ def create_positions_table(
             # Get beta and exposure values if available, otherwise default to 0
             beta = position.get("beta", 1.0)
             beta_adjusted_exposure = position.get("beta_adjusted_exposure", 0.0)
+            # Use option_type for options
+            if position_type == "option" and "option_type" in position:
+                display_type = position["option_type"]
+            else:
+                display_type = position_type
         else:
             # It's a Position object
             position_type = position.position_type
@@ -263,6 +268,11 @@ def create_positions_table(
             # Get beta and exposure values if available, otherwise default to 0
             beta = getattr(position, "beta", 1.0)
             beta_adjusted_exposure = getattr(position, "beta_adjusted_exposure", 0.0)
+            # Use option_type for options if present
+            if position_type == "option" and hasattr(position, "option_type"):
+                display_type = getattr(position, "option_type", position_type)
+            else:
+                display_type = position_type
 
         # Round values to nearest dollar
         if price is not None and isinstance(price, (int, float)):
@@ -280,7 +290,7 @@ def create_positions_table(
         table.add_row(
             str(i),
             ticker,
-            position_type,
+            display_type,
             format_quantity(quantity),
             format_currency(
                 price, round_to_dollar=False
