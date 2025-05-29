@@ -91,3 +91,6 @@ private-data/**
 
 # repomix
 repomix**
+
+# Local backups
+.backup*

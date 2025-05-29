@@ -281,9 +281,12 @@ def _parse_option_position(holding: PortfolioHolding) -> OptionPosition | None:
             f"Parsing option position with symbol: '{symbol}' and description: '{description}'"
         )
 
-        # Try to extract data from the description (e.g., "AMZN MAY 16 2025 $190 CALL")
+        # Updated regex to handle:
+        # 1. Strike prices with commas (e.g., "$5,600")
+        # 2. Optional suffixes after CALL/PUT (e.g., "(AM)")
+        # 3. Match the format: "TICKER MONTH DAY YEAR $STRIKE CALL/PUT [optional suffix]"
         match = re.search(
-            r"([A-Z]+)\s+(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\s+(\d{1,2})\s+(\d{4})\s+\$(\d+(?:\.\d+)?)\s+(CALL|PUT)",
+            r"([A-Z]+W?)\s+(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\s+(\d{1,2})\s+(\d{4})\s+\$(\d{1,3}(?:,\d{3})*(?:\.\d+)?)\s+(CALL|PUT)(?:\s+\([^)]+\))?",
             description,
             re.IGNORECASE,
         )
@@ -293,9 +296,20 @@ def _parse_option_position(holding: PortfolioHolding) -> OptionPosition | None:
             month_str = match.group(2).upper()
             day = int(match.group(3))
             year = int(match.group(4))
-            strike = float(match.group(5))
+            strike_str = match.group(5)
             option_type = match.group(6).upper()
             quantity = holding.quantity
+
+            # Remove commas from strike price and convert to float
+            strike = float(strike_str.replace(",", ""))
+
+            # Normalize weekly option tickers (SPXW -> SPX, etc.)
+            if ticker.endswith("W"):
+                # For now, handle the common case of SPXW -> SPX
+                # This could be expanded to handle other weekly options if needed
+                if ticker == "SPXW":
+                    ticker = "SPX"
+                    logger.debug("Normalized weekly option ticker SPXW to SPX")
 
             month_map = {
                 "JAN": 1,

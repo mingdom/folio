@@ -3,6 +3,7 @@ Tests for the portfolio service module.
 """
 
 import datetime
+from datetime import date
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -15,6 +16,7 @@ from src.folib.domain import (
     StockPosition,
 )
 from src.folib.services.portfolio_service import (
+    _parse_option_position,
     create_portfolio_summary,
     get_pending_activity,
     get_portfolio_exposures,
@@ -376,3 +378,87 @@ class TestGetPendingActivity:
 
         # Verify the pending activity value is correctly detected
         assert pending_activity_value == 524609.67
+
+
+class TestSPXOptionParsing:
+    """Tests for SPX option parsing with special formatting."""
+
+    def test_parse_spx_option_with_comma_and_suffix(self):
+        """Test parsing SPX option with comma in strike price and (AM) suffix."""
+        holding = PortfolioHolding(
+            symbol="-SPX250620P5600",
+            description="SPX JUN 20 2025 $5,600 PUT (AM)",
+            quantity=-1,
+            price=41.50,
+            value=-4150.00,
+            cost_basis_total=3742.32,
+        )
+
+        option_position = _parse_option_position(holding)
+
+        assert option_position is not None
+        assert option_position.ticker == "SPX"
+        assert option_position.strike == 5600.0
+        assert option_position.expiry == date(2025, 6, 20)
+        assert option_position.option_type == "PUT"
+        assert option_position.quantity == -1
+        assert option_position.price == 41.50
+
+    def test_parse_spxw_option_normalizes_to_spx(self):
+        """Test parsing SPXW option with comma in strike and normalizes ticker to SPX."""
+        holding = PortfolioHolding(
+            symbol="-SPXW250620P5920",
+            description="SPXW JUN 20 2025 $5,920 PUT",
+            quantity=1,
+            price=128.70,
+            value=12870.00,
+            cost_basis_total=12193.68,
+        )
+
+        option_position = _parse_option_position(holding)
+
+        assert option_position is not None
+        assert option_position.ticker == "SPX"  # Should be normalized from SPXW to SPX
+        assert option_position.strike == 5920.0
+        assert option_position.expiry == date(2025, 6, 20)
+        assert option_position.option_type == "PUT"
+        assert option_position.quantity == 1
+        assert option_position.price == 128.70
+
+    def test_parse_option_with_large_comma_separated_strike(self):
+        """Test parsing option with multi-comma strike price (e.g., $10,000)."""
+        holding = PortfolioHolding(
+            symbol="-SPX250620C10000",
+            description="SPX JUN 20 2025 $10,000 CALL",
+            quantity=1,
+            price=5.25,
+            value=525.00,
+            cost_basis_total=500.00,
+        )
+
+        option_position = _parse_option_position(holding)
+
+        assert option_position is not None
+        assert option_position.ticker == "SPX"
+        assert option_position.strike == 10000.0
+        assert option_position.expiry == date(2025, 6, 20)
+        assert option_position.option_type == "CALL"
+
+    def test_parse_option_with_decimal_strike_and_comma(self):
+        """Test parsing option with decimal strike price and comma (e.g., $1,500.50)."""
+        holding = PortfolioHolding(
+            symbol="-SPX250620P1500",
+            description="SPX JUN 20 2025 $1,500.50 PUT",
+            quantity=-2,
+            price=25.75,
+            value=-5150.00,
+            cost_basis_total=5000.00,
+        )
+
+        option_position = _parse_option_position(holding)
+
+        assert option_position is not None
+        assert option_position.ticker == "SPX"
+        assert option_position.strike == 1500.50
+        assert option_position.expiry == date(2025, 6, 20)
+        assert option_position.option_type == "PUT"
